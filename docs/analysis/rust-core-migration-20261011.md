@@ -2,6 +2,56 @@
 
 日期：2026-10-11。检查基线：本地提交 `1c1c4d08`，含 Windows Pi 放行、后台 Python 环境修复和原生插件/技能直接引用。本文只评估；没有迁移实现、启动或停止 Agent、修改用户 Workspace。
 
+> 上句描述初次评估时的状态。仓库随后已有实验性 Rust 内核实现；下面的更新以 `53d66ea1` 为检查基线，优先于本文后面的历史现状描述和迁移阶段建议。本次更新只检查源码和提交记录，没有安装、启动或停止 Server/Agent。
+
+## 当前实现复核：2026-10-11
+
+### 本地保存状态
+
+检查时工作区及暂存区均为空，现有实现已经提交到本地，无需重复创建空提交。最近的实现提交为：
+
+| 提交 | 内容 |
+|---|---|
+| `1c1c4d08` | Windows Herdr 放行 Pi、原生资源引用、后台 Python 环境修复 |
+| `000cbf5b` | Rust Mailbox 状态转换、持久化日志和调度索引 |
+| `e4c7f22a` | Rust 消息记录、入队和 callback continuation 原子写入 |
+| `b4e122d7` | Rust 完成判定、完成权威校验和快照 |
+| `53d66ea1` | 共享 TCP 内核、守护租约与生命周期围栏 |
+
+上述是源码状态，不代表普通终端中的已安装 CCB 已更新。进度记录明确保留 `production_install_changed=false` 和 `existing_agents_controlled=false`。[进度记录](rust-core-refactor-progress.json)
+
+### 已落地与尚未落地
+
+| 范围 | 当前源码状态 | 对完整 Rust 核心的影响 |
+|---|---|---|
+| FIFO、租约、记录和持久化 | Rust 内核有独占 writer lock、redo journal、增量记录索引 | 已具备核心状态写入模块；仍需完整流程级崩溃验收 |
+| 调度队列和完成判定 | 队列、活动槽位、五类完成跟踪与快照已迁移 | Provider 的 observation 和执行生命周期仍由 Python 接入 |
+| Callback | continuation 准备、入队和闭合已有 Rust 事务 | callback 注册、修复遍历、正文构造、目标可用性检查仍有 Python 编排 |
+| 通信和后台所有权 | Rust 有认证 loopback TCP、generation 校验、共享客户端和租约策略 | 当前是内部 API-1 内核服务，尚未替代公共 API-2 `ccbd` |
+| 用户命令与自主运行 | 公共 handlers、提交计划和维护编排仍在 Python | Rust 进程不能独立承担完整 `ask → Worker → back → Lead` 流程 |
+| 安装与依赖 | 默认 `CCB_CORE_RUNTIME=python`；Rust 为显式实验选项 | Windows launcher 仍寻找 Python，尚不能取消 venv/Python |
+
+源码依据：[Rust dispatch](../../rust/crates/ccb-kernel/src/lib.rs)、[持久化](../../rust/crates/ccb-kernel/src/store.rs)、[TCP 服务循环](../../rust/crates/ccb-kernel/src/control_plane.rs)、[Python 选择与启动内核](../../lib/native_kernel.py)、[公共命令注册](../../lib/ccbd/app_runtime/handlers.py)、[提交计划](../../lib/ccbd/services/dispatcher_runtime/submission_recording.py)、[callback 注册与修复](../../lib/ccbd/services/dispatcher_runtime/callbacks.py)、[continuation 适配器](../../lib/ccbd/services/dispatcher_runtime/native_callbacks.py)、[Windows launcher](../../platforms/windows/launcher/src/main.rs)。
+
+### 收益排序与可行性判断
+
+1. **状态一致性与维护收益最明确。** 将消息、尝试、回信、callback 的相关写入集中到一个权威模块，配合 journal、身份校验和重放测试，可以减少 Python 多处编排造成的中间态。可靠性来自这些具体设计，不能归因于语言本身；目前提交计划仍跨多次操作，不能声称整条业务流程已有一个事务。
+2. **部署收益取决于后续迁移范围。** 常驻服务、CLI、配置和 Pi/Codex/Claude 适配器都能原生运行后，才有机会减少 Python 环境问题。当前混合版本增加了一个内核进程、协议兼容检查及构建产物，短期运维复杂度会增加。
+3. **CPU/RSS 和历史查询有优化空间，尚无本机对照结论。** 当前跨 Python/Rust 的每次调用要经过 JSON 编解码、TCP 和同步请求。大量细粒度调用可能抵消 Rust 收益，应迁移完整状态转换、批量 observation，减少往返。现有进度记录中的 debug TCP 平均 ping 10.61ms、token 初始化 1.11s，仅是历史测量，不是与 Python 的性能对照。
+4. **模型和外部工具耗时基本仍由外部系统决定。** Rust 不会直接缩短模型响应、Herdr IPC、CLI 登录或插件加载。已移除资源快照扫描后，更应先测剩余启动阶段，避免把外部等待当成 Python 计算瓶颈。
+
+据此，**继续迁移常驻核心具有可行性；立刻全面重写所有 Provider 的成本与风险较高。** 现有 Rust 实现提供了复用基础，但不足以估计完整交付工期。主要风险是动态 Provider 状态跨进程传递、取消/恢复语义、旧记录兼容，以及 Windows 进程、文件锁和 ACL 行为。
+
+### 下一步建议与验收条件
+
+1. 将提交、终结、callback 注册与修复的完整状态转换迁入 Rust，保留现有 RPC 和记录格式；先避免 Python/Rust 多次往返造成非原子流程。
+2. 接通公共 API-2 和自主调度/维护循环，使 Rust 拥有任务推进责任。当前内核 TCP 循环只处理请求及退出，没有自行启动 Worker 或轮询 Provider 的行为。
+3. 迁移 Windows Herdr 的 Pi/Codex 执行路径，再处理 Claude hook、会话绑定、取消和恢复；Python 适配器只作为过渡。
+4. 在独立目录与独立 namespace 验证：Lead 提交后结束该轮；Worker 完成后结果自动入队、实际投递、Lead 开始新轮次。分别记录三个时刻，并覆盖 Lead 忙碌、重复完成、断线、daemon 重启及 callback 写入中途崩溃。
+5. 用相同假 Provider、相同历史数据和 release 构建对照 Python/Rust 的启动、空闲 CPU/RSS、receipt 与 callback p50/p95。行为和恢复通过后，再决定默认切换与删除 Python 依赖。
+
+现有进度文件记录了 284 项集成测试通过、13 项排除，以及原生协议/持久化测试；这些是此前保存的验证结果，本次未重跑，且**不能代替真实 Pi/Codex/Claude 的端到端验证**。本次只更新分析文档，执行文档差异校验，不改变实现或生产环境。
+
 ## 结论
 
 **可行，但适合分阶段迁移常驻调度核心，不适合立即重写整个 CCB。** 优先考虑协议服务、Mailbox/Job 状态机、存储索引和完成事件处理；保留已有 Python Provider 适配层作为迁移过渡。收益首先在部署、常驻资源和结构清晰度；不能保证 Agent 启动或模型任务显著加速。自动回投和唤醒是否可靠，主要取决于持久化、关联、幂等和恢复协议，换语言本身不会补齐这些条件。

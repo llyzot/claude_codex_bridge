@@ -102,6 +102,7 @@ fn serve_runtime(
         .to_owned();
     if config.is_some() {
         crate::daemon::verify_owner(root)?;
+        crate::security::own_process_tree()?;
     }
     let kernel = Kernel::open(root)?;
     let mut runtime = if let Some(config) = config {

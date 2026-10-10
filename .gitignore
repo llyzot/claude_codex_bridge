@@ -3,6 +3,8 @@ __pycache__/
 target/
 /bin/ccb-kernel
 /bin/ccb-kernel.exe
+/bin/ccb-native
+/bin/ccb-native.exe
 .venv/
 .pytest_cache/
 .architec/

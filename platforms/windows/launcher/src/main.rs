@@ -19,18 +19,40 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Result<i32, String> {
-    let executable = env::current_exe()
-        .map_err(|error| format!("cannot resolve launcher path: {error}"))?;
+    let executable =
+        env::current_exe().map_err(|error| format!("cannot resolve launcher path: {error}"))?;
     let bin_dir = executable
         .parent()
         .ok_or_else(|| "launcher has no parent directory".to_string())?;
     let install_root = bin_dir
         .parent()
         .ok_or_else(|| "launcher must live under <install-root>\\bin".to_string())?;
+    if env::var_os("CCB_NATIVE_CLI").is_some_and(|value| value == "1") {
+        let native = bin_dir.join("ccb-native.exe");
+        if !native.is_file() {
+            return Err(format!(
+                "Native CLI selected but missing: {}",
+                native.display()
+            ));
+        }
+        let forwarded = native_arguments(&executable, env::args_os().skip(1).collect())?;
+        let mut command = Command::new(native);
+        command
+            .args(forwarded)
+            .env("CCB_INSTALL_PREFIX", install_root);
+        suppress_child_console(&mut command);
+        return command
+            .status()
+            .map(|status| status.code().unwrap_or(1))
+            .map_err(|error| format!("Native CLI failed: {error}"));
+    }
     let script = entry_script(&executable, install_root)?;
 
     if !script.is_file() {
-        return Err(format!("Python entrypoint is missing: {}", script.display()));
+        return Err(format!(
+            "Python entrypoint is missing: {}",
+            script.display()
+        ));
     }
 
     let forwarded: Vec<OsString> = env::args_os().skip(1).collect();
@@ -52,10 +74,16 @@ fn run() -> Result<i32, String> {
         match command.status() {
             Ok(status) => return Ok(status.code().unwrap_or(1)),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                failures.push(format!("{}: not found", PathBuf::from(&python.executable).display()));
+                failures.push(format!(
+                    "{}: not found",
+                    PathBuf::from(&python.executable).display()
+                ));
             }
             Err(error) => {
-                failures.push(format!("{}: {error}", PathBuf::from(&python.executable).display()));
+                failures.push(format!(
+                    "{}: {error}",
+                    PathBuf::from(&python.executable).display()
+                ));
             }
         }
     }
@@ -64,6 +92,18 @@ fn run() -> Result<i32, String> {
         "Python 3.10+ was not found. Checked: {}",
         failures.join(", ")
     ))
+}
+fn native_arguments(executable: &Path, mut args: Vec<OsString>) -> Result<Vec<OsString>, String> {
+    let stem = executable
+        .file_stem()
+        .and_then(OsStr::to_str)
+        .unwrap_or("ccb")
+        .to_ascii_lowercase();
+    match stem.as_str() {
+        "ccb"|"ccb-windows-launcher"=>Ok(args),
+        "ask"=>{if args.len()<2 || args[0]!="--state-root" {return Err("Native ask requires --state-root <directory> before target arguments".into());}args.insert(2,OsString::from("ask"));Ok(args)},
+        _=>Err(format!("Native CLI does not yet support launcher {stem}; do not select CCB_NATIVE_CLI for this command")),
+    }
 }
 
 fn entry_script(executable: &Path, install_root: &Path) -> Result<PathBuf, String> {
@@ -139,6 +179,24 @@ fn suppress_child_console(_command: &mut Command) {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_ask_keeps_global_state_arguments_before_operation() {
+        let args = native_arguments(
+            Path::new("ask.exe"),
+            vec!["--state-root".into(), "C:\\test".into(), "worker".into()],
+        )
+        .unwrap();
+        assert_eq!(
+            args,
+            vec![
+                OsString::from("--state-root"),
+                "C:\\test".into(),
+                "ask".into(),
+                "worker".into()
+            ]
+        );
+        assert!(native_arguments(Path::new("autonew.exe"), Vec::new()).is_err());
+    }
 
     #[test]
     fn maps_launcher_names_to_python_entrypoints() {
@@ -155,8 +213,8 @@ mod tests {
 
     #[test]
     fn rejects_unknown_launcher_name() {
-        let error = entry_script(Path::new(r"C:\x\bin\unknown.exe"), Path::new(r"C:\x"))
-            .unwrap_err();
+        let error =
+            entry_script(Path::new(r"C:\x\bin\unknown.exe"), Path::new(r"C:\x")).unwrap_err();
         assert!(error.contains("unsupported launcher name"));
     }
 }

@@ -6,7 +6,7 @@ This checkpoint is an experimental executable path inside `ccb-kernel`; the inst
 
 `ccb-kernel --state-root <isolated-directory> --token-file <protected-file-under-root/kernel> --daemon-config <json-file> [--standalone]`
 
-The supplied token follows the existing `ccbd-control-plane-token-v1` contract and must be provisioned securely before startup. Native token provisioning and the normal CCB installer/CLI path remain work in progress.
+The supplied token follows the existing `ccbd-control-plane-token-v1` contract. `ccb-native token-create <new-file>` creates it using native OS randomness and protected same-user ACLs on Windows (0600 on Unix). `ccb-native --state-root <dir> daemon --config <json>` provisions its own token and starts the standalone service. Native CLI request commands authenticate the existing endpoint; they do not start Python. Complete normal CCB CLI/config/installer parity remains work in progress.
 
 The config has `schema_version: 2`, a `project_id`, and an `agents` object. Each entry declares `provider`, an optional `profile_family`, optional `workspace_path`, and either a `command` argv array or no command for externally claimed work. The current format is an internal checkpoint format; conversion from the full existing CCB config is not complete.
 
@@ -20,10 +20,18 @@ The config has `schema_version: 2`, a `project_id`, and an `agents` object. Each
 - Retry admission keeps the logical Message and records the new Job/Attempt/FIFO admission together. Result policy preserves configured runtime-retry opt-out, nonretryable account failures, and empty-result notices.
 - Standalone mode continues after creator stdin closes. Mounted lease/lifecycle ownership and heartbeat are native. A live/uncertain previous owner blocks startup before journal recovery. Graceful shutdown only stops processes owned by this runtime and releases its own lease.
 
+## Native Pi RPC checkpoint
+
+An agent can select `driver_kind: "pi_rpc"`, `provider: "pi"`, and a command argv which starts Pi RPC mode. The process is persistent across tasks. A task completes only after its prompt ID is accepted, the user message contains its matching `CCB_REQ_ID` anchor, `agent_settled` arrives and an ID-correlated `get_state` confirms the same session is idle. `agent_end`, command acceptance and foreign anchors do not complete a task. Session identity/activity metadata is persisted separately from model/auth configuration.
+
+The installed local primary source is `@earendil-works/pi-coding-agent 1.1.0`; its `docs/rpc.md`, `docs/cli-integration.md`, `docs/rpc-commands.md` and `dist/modes/rpc/rpc-mode.js` establish this contract. A real read-only `get_state` handshake passed with a private home and automatic resources disabled; model execution was not exercised. Protocol fixtures verified same-process task/callback continuation and out-of-order acceptance handling. Exact-session restart restoration, cancellation/deadlines and real Pi/Codex collaboration remain incomplete.
+
+On Windows the daemon owns a nested Job Object with kill-on-job-close and is assigned before spawning executors. A daemon-death test verified cleanup of an owned descendant. Unix process-tree ownership is still an explicit remaining requirement.
+
 ## Remaining requirements
 
-The test driver is not a real provider adapter. Persistent Pi RPC/session events, Codex session evidence, Claude hooks, Herdr startup/Agent management, native CLI/config/install integration, native token creation, full public operation parity and Keeper behavior still require implementation and verification.
+The command fixture is not a real provider adapter. Native Pi RPC is integrated as above, but Codex session evidence, Claude hooks, Herdr startup/Agent management, complete native CLI/config/install integration, full public operation parity and Keeper behavior still require implementation and verification.
 
-An old running Job with no owned process handle is kept active/fenced after restart. This avoids interpreting an observation gap as completion or replaying uncertain work. Durable provider recovery, operator reconciliation and process-tree ownership are not finished. Controlled child processes are stopped on normal runtime teardown; this is not a claim of crash-proof descendant-process cleanup.
+An old running Job with no owned process handle is kept active/fenced after restart. This avoids interpreting an observation gap as completion or replaying uncertain work. Durable provider recovery, operator reconciliation and Unix process-tree ownership are not finished. Windows descendant cleanup is verified for this owned-process driver; it is not a claim of controlling unrelated Herdr Agents.
 
 Performance against the Python baseline, true persistent-session Lead wakeup, state rollback across all supported providers, and a default Rust runtime are still unproven. See [migration progress](rust-core-refactor-progress.json) for recorded checks and remaining scope.

@@ -110,6 +110,13 @@ impl Store {
             && parts[0] == "artifacts"
             && parts[1] == "text"
             && parts[3].ends_with(".txt");
+        let provider_state = parts.len() == 4
+            && parts[0] == "providers"
+            && parts[1] == "pi"
+            && parts[3] == "session.json";
+        if provider_state {
+            crate::models::validate_agent(parts[2])?;
+        }
         ensure!(
             relative.starts_with("mailboxes/")
                 || relative.starts_with("leases/")
@@ -117,6 +124,7 @@ impl Store {
                 || agent_log
                 || stream
                 || artifact
+                || provider_state
                 || ["lease.json", "lifecycle.json"].contains(&relative),
             "unowned state path"
         );

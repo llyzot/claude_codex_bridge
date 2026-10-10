@@ -97,6 +97,7 @@ dependencies = [
  "subtle",
  "tempfile",
  "uuid",
+ "windows-sys",
 ]
 
 [[package]]

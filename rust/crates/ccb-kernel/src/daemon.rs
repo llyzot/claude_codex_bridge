@@ -58,6 +58,7 @@ pub struct Daemon {
     config: Value,
     state: String,
     running: HashMap<String, Running>,
+    pi: HashMap<String, crate::pi_rpc::Session>,
     pub stopping: bool,
     heartbeat: Instant,
 }
@@ -100,6 +101,17 @@ impl Daemon {
                 spec["command"].is_null() || spec["command"].is_array(),
                 "command must be an argv array"
             );
+            ensure!(
+                spec["driver_kind"].is_null()
+                    || ["command", "pi_rpc"].contains(&spec["driver_kind"].as_str().unwrap_or("")),
+                "unknown native driver kind"
+            );
+            if spec["driver_kind"] == "pi_rpc" {
+                ensure!(
+                    spec["provider"] == "pi" && spec["command"].is_array(),
+                    "Pi RPC driver requires pi provider and command argv"
+                );
+            }
             ensure!(
                 spec["profile_family"].is_null()
                     || [
@@ -155,6 +167,7 @@ impl Daemon {
             config,
             state,
             running: HashMap::new(),
+            pi: HashMap::new(),
             stopping: false,
             heartbeat: Instant::now(),
         })
@@ -186,6 +199,7 @@ impl Daemon {
         Ok(())
     }
     pub fn unmount(&mut self) -> Result<()> {
+        self.pi.clear();
         for running in self.running.values_mut() {
             let _ = running.child.kill();
             let _ = running.child.wait();
@@ -774,6 +788,59 @@ impl Daemon {
                 continue;
             }
             let spec = self.spec(&agent)?;
+            if spec["driver_kind"] == "pi_rpc" {
+                if !self.pi.contains_key(&agent) {
+                    let session =
+                        crate::pi_rpc::Session::spawn(&agent, &spec, endpoint, token_path)?;
+                    self.pi.insert(agent.clone(), session);
+                }
+                let (completion, metadata, ready) = {
+                    let session = self.pi.get_mut(&agent).unwrap();
+                    let completion = session.poll()?;
+                    let metadata = if session.dirty {
+                        session.dirty = false;
+                        Some(
+                            json!({"schema_version":1,"record_type":"pi_rpc_session","agent_name":agent,"runtime_instance_id":session.runtime,"pid":session.pid(),"state":session.state,"observed_at":now()}),
+                        )
+                    } else {
+                        None
+                    };
+                    (completion, metadata, session.ready)
+                };
+                if let Some(metadata) = metadata {
+                    self.kernel
+                        .store
+                        .save(&format!("providers/pi/{agent}/session.json"), &metadata)?;
+                    self.kernel.store.commit()?;
+                }
+                if let Some((job, decision)) = completion {
+                    let checkpoint = self.kernel.memory_checkpoint();
+                    if let Err(error) = self.complete(&job, &decision) {
+                        self.kernel.store.rollback();
+                        self.kernel.restore_memory(checkpoint);
+                        return Err(error);
+                    }
+                    self.kernel.store.commit()?;
+                }
+                if ready {
+                    let checkpoint = self.kernel.memory_checkpoint();
+                    let job = match self.start(&agent) {
+                        Ok(job) => {
+                            self.kernel.store.commit()?;
+                            job
+                        }
+                        Err(error) => {
+                            self.kernel.store.rollback();
+                            self.kernel.restore_memory(checkpoint);
+                            return Err(error);
+                        }
+                    };
+                    if !job.is_null() {
+                        self.pi.get_mut(&agent).unwrap().start(&job)?;
+                    }
+                }
+                continue;
+            }
             if spec["command"].is_null() {
                 continue;
             }

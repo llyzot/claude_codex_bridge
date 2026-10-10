@@ -188,6 +188,8 @@ def build_native_binaries(artifact_root: Path, build_root: Path) -> dict[str, st
         entries[name] = destination.relative_to(artifact_root).as_posix()
 
     helpers = (
+        (REPO_ROOT / "rust" / "crates" / "ccb-kernel" / "Cargo.toml", "ccb-kernel"),
+        (REPO_ROOT / "rust" / "crates" / "ccb-kernel" / "Cargo.toml", "ccb-native"),
         (REPO_ROOT / "tools" / "ccb-agent-sidebar" / "Cargo.toml", "ccb-agent-sidebar"),
         (REPO_ROOT / "tools" / "ccb-rs-helper" / "Cargo.toml", "ccb-rs-helper"),
     )

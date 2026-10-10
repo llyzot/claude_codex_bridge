@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import subprocess
 import sys
 import time
 
@@ -22,6 +23,10 @@ def rpc(op, request):
 mode=sys.argv[1]
 if mode=='slow-input':time.sleep(.7)
 job=json.load(sys.stdin)
+if mode=='descendant':
+    child=subprocess.Popen([sys.executable,'-I','-c','import time; time.sleep(60)'])
+    Path(sys.argv[2]).write_text(str(child.pid),encoding='utf-8')
+    time.sleep(60)
 request=job['request']
 reply='worker result'
 status='completed'

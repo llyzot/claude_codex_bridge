@@ -1,0 +1,43 @@
+{
+  "objective": "Migrate CCB core to Rust, preserving Windows Herdr and Pi/Codex/Claude asynchronous collaboration",
+  "baseline_commit": "16f16d24",
+  "complete": false,
+  "production_install_changed": false,
+  "existing_agents_controlled": false,
+  "runtime_selection": {
+    "transition_default": "python",
+    "experimental_mode": "CCB_CORE_RUNTIME=rust",
+    "binary_override": "CCB_KERNEL_BIN",
+    "final_requirement": "Rust must own the default core runtime; an optional sidecar alone is not completion"
+  },
+  "completed": [
+    "Cross-platform ccb-kernel crate and persistent versioned stdio transport",
+    "Mailbox FIFO queries, claim/ack/terminal/rewrite transitions and lease expiry in Rust",
+    "Mailbox/inbox/lease filesystem writes owned by Rust, with redo journal and partial-append recovery",
+    "OS writer lock shared with transitional Python stores and service transitions",
+    "Dispatcher queue, active slot, job index and mailbox-admission-order rebuild in Rust",
+    "Python interface adapters, explicit failure without automatic replay or fallback",
+    "Core selection propagated through filtered keeper/daemon environment",
+    "Release build scripts; Windows release build succeeded in repository bin directory"
+  ],
+  "remaining": [
+    "Migrate Job/Message/Attempt/Reply/Callback record ownership and state transitions",
+    "Migrate completion tracking, event correlation and continuation repair into Rust",
+    "Migrate ccbd RPC control plane, lifecycle fencing, supervision and recovery",
+    "Migrate CLI and integrate native build/install/release paths",
+    "Integrate Pi and Codex provider execution, then Claude hooks/session/cancel/restore",
+    "Verify actual Pi Lead + Codex Worker and Claude Lead callback execution in isolated Windows projects",
+    "Measure startup, idle CPU/RSS, receipt and callback p50/p95 against Python baseline",
+    "Validate state compatibility, crash points, rollback and default Rust ownership",
+    "Remove transitional Python core dependencies after native runtime parity is proven"
+  ],
+  "verification": {
+    "native_contract_tests": 12,
+    "rust_store_tests": 2,
+    "clippy": "passed with warnings denied",
+    "integration_suite": "213 passed with Rust mailbox and scheduler; 4 Windows symlink-permission fixtures deselected",
+    "existing_windows_changes": "219 passed",
+    "baseline_failure": "runtime_env source-home pwd fixture fails identically with HEAD control_plane.py on Windows",
+    "scope_limit": "No real provider runtime or performance parity has yet been proven for Rust"
+  }
+}

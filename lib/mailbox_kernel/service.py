@@ -14,6 +14,7 @@ from .models import (
 )
 from .service_state import MailboxKernelRuntimeState, MailboxKernelStateMixin
 from .store import DeliveryLeaseStore, InboundEventStore, MailboxStore
+from .native import connect_native, native_mailbox_service
 from .service_runtime import (
     ack_reply,
     apply_incremental_summary_update,
@@ -42,6 +43,7 @@ _TERMINAL_EVENT_STATES = frozenset(
 _CLAIMABLE_EVENT_STATES = frozenset({InboundEventStatus.CREATED, InboundEventStatus.QUEUED})
 
 
+@native_mailbox_service
 class MailboxKernelService(MailboxKernelStateMixin):
     def __init__(
         self,
@@ -53,6 +55,7 @@ class MailboxKernelService(MailboxKernelStateMixin):
         lease_store: DeliveryLeaseStore | None = None,
         lease_ttl_seconds: float | None = None,
     ) -> None:
+        self._native = connect_native(layout, (mailbox_store, inbound_store, lease_store))
         self._runtime_state = MailboxKernelRuntimeState(
             layout=layout,
             clock=clock,

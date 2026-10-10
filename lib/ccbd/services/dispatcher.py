@@ -23,6 +23,7 @@ from .dispatcher_runtime import (
 from .dispatcher_runtime.active_followups import replay_accepted_followups, request_active_followup
 from .dispatcher_runtime.facade import DispatcherFacadeMixin
 from .dispatcher_runtime.facade_state import DispatcherRuntimeState, DispatcherRuntimeStateMixin
+from .dispatcher_runtime.native_state import create_dispatcher_state as _create_dispatcher_state
 from ccbd.api_models import (
     CancelReceipt,
     JobRecord,
@@ -104,7 +105,7 @@ class JobDispatcher(DispatcherRuntimeStateMixin, DispatcherFacadeMixin):
             message_bureau_control=message_bureau_control or MessageBureauControlService(layout, config, clock=clock),
             snapshot_writer=snapshot_writer or SnapshotWriter(layout),
             clock=clock,
-            state=DispatcherState(config.agents),
+            state=_create_dispatcher_state(layout, config.agents),
             dispatch_error=DispatchError,
             dispatch_rejected_error=DispatchRejectedError,
             terminal_event_by_status=_TERMINAL_EVENT_BY_STATUS,

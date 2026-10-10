@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cargo build --manifest-path "$REPO_ROOT/rust/Cargo.toml" -p ccb-kernel --release --locked
+install -m 755 "$REPO_ROOT/rust/target/release/ccb-kernel" "$REPO_ROOT/bin/ccb-kernel"

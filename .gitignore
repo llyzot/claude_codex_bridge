@@ -1,6 +1,8 @@
 __pycache__/
 *.pyc
 target/
+/bin/ccb-kernel
+/bin/ccb-kernel.exe
 .venv/
 .pytest_cache/
 .architec/

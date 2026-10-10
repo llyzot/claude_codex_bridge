@@ -35,6 +35,9 @@ def record_message_bureau_completion(
     reply_decision = decision
     if dispatcher._message_bureau is None:
         return terminal, reply_decision, False
+    if getattr(dispatcher._state,'_native',None) is not None:
+        from ..native_results import complete_native_result
+        return complete_native_result(dispatcher,current,terminal,decision,finished_at=finished_at,prior_snapshot=prior_snapshot)
 
     if getattr(dispatcher._state, '_native', None) is None:
         dispatcher._message_bureau.record_attempt_terminal(terminal, decision, finished_at=finished_at)

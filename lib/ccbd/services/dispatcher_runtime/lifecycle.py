@@ -77,6 +77,9 @@ def resubmit_message(dispatcher, message_id: str) -> dict[str, object]:
 def retry_attempt(dispatcher, target: str) -> dict[str, object]:
     if dispatcher._message_bureau is None:
         raise dispatcher._dispatch_error('retry requires message bureau support')
+    if getattr(dispatcher._state,'_native',None) is not None:
+        from .native_results import retry_native
+        return retry_native(dispatcher,target)
     accepted_at = dispatcher._clock()
     original_attempt = _resolve_retry_attempt(dispatcher, target)
     if original_attempt.attempt_state not in _TERMINAL_ATTEMPT_STATES:

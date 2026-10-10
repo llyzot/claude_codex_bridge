@@ -16,7 +16,7 @@ struct State {
     index: HashMap<String, String>,
     active_order: Vec<String>,
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Scheduler {
     states: HashMap<String, State>,
 }

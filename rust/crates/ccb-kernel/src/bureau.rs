@@ -277,6 +277,9 @@ pub fn reply(kernel: &mut Kernel, args: &Value) -> Result<Value> {
         .as_str()
         .unwrap_or("")
         .trim();
+    if let Some(authority) = args["result_authority"].as_str() {
+        diagnostics["result_authority"] = json!(authority);
+    }
     if empty_cancel {
         diagnostics["notice"] = json!(true);
         diagnostics["notice_kind"] = json!("cancelled");

@@ -84,7 +84,7 @@ struct Tracker {
     settle: f64,
     candidates: Vec<(u8, String)>,
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Completion {
     groups: HashMap<String, Vec<(String, Tracker)>>,
 }

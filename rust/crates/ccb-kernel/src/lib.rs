@@ -7,10 +7,13 @@ mod callback_recovery;
 mod completion;
 mod completion_gate;
 pub mod control_plane;
+pub mod daemon;
 mod finalization;
 mod lifecycle;
 pub mod models;
 mod records;
+mod result_policy;
+mod retry;
 pub mod rpc;
 mod scheduler;
 pub mod store;
@@ -30,6 +33,16 @@ pub struct Kernel {
     completion: completion::Completion,
 }
 impl Kernel {
+    pub(crate) fn memory_checkpoint(&self) -> (scheduler::Scheduler, completion::Completion) {
+        (self.scheduler.clone(), self.completion.clone())
+    }
+    pub(crate) fn restore_memory(
+        &mut self,
+        checkpoint: (scheduler::Scheduler, completion::Completion),
+    ) {
+        self.scheduler = checkpoint.0;
+        self.completion = checkpoint.1;
+    }
     pub fn open(root: &Path) -> Result<Self> {
         Ok(Self {
             store: Store::open(root)?,
@@ -76,6 +89,10 @@ impl Kernel {
         }
         match op {
             "dispatcher.submit" => return admission::submit(self, args),
+            "dispatcher.retry" => return retry::admit(self, args),
+            "retry.source" => return retry::source(self, records::string(args, "target")?),
+            "result.plan" => return result_policy::plan(self, args),
+            "result.record" => return result_policy::record(self, args),
             "dispatcher.persist_terminal" => return finalization::persist(self, args, false),
             "dispatcher.revise_reply" => return finalization::persist(self, args, true),
             "artifact.spill_completion" => {
@@ -119,7 +136,7 @@ impl Kernel {
         if op == "ping" {
             return Ok(
                 json!({"service":"ccb-kernel", "api_version":API_VERSION, "pid":std::process::id(),
-                    "capabilities":["mailbox","scheduler","records","bureau","callback","completion","control_plane","lifecycle","admission","finalization","callback_recovery"]}),
+                    "capabilities":["mailbox","scheduler","records","bureau","callback","completion","control_plane","lifecycle","admission","finalization","callback_recovery","result_policy","retry"]}),
             );
         }
         if op == "lease.list" || op == "mailbox.list" {

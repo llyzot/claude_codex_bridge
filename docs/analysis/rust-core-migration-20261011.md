@@ -10,6 +10,8 @@
 
 完成/恢复阶段更新：终态 reconciliation、快照/Job/Attempt/Inbox/Lease 与父任务等待状态已使用 Rust 事务；completion/continuation artifact 及续轮事件也进入 journal。Callback 修复遍历和持久谱系判定由 Rust 承担；“子任务终态已保存、Reply 尚未保存”的间隙会续接结果策略。该策略仍是 Python 过渡层，以保留自动重试和取消语义，不能将它宣称为完整纯 Rust 完成编排。正在运行/排队的重试会阻止旧结果回投，显式 `record_reply=False` 的取消在重启后仍不补发。公共 API-2、自主服务、普通任务结果恢复、重试/通知策略和 Provider 执行仍需迁移。
 
+自主服务阶段更新：重试准入、重试/通知策略和结果记录已接入 Rust；新增公共 API-2 actor 与独立维护循环。在隔离的结构化进程驱动中，Lead 提交后结束首轮，Worker 完成后由守护服务自动创建并执行 Lead 续轮；普通回信也会物化为接收任务并按原 Mailbox FIFO 投递。这是实际 TCP/进程流程验证，但驱动为受控测试进程，不能替代真实 Pi/Codex/Claude + Herdr 的验证。当前生产安装和默认 selector 仍未切换；完整 CLI/config/API-2 parity、原生 token 创建、Keeper、进程树所有权、未知运行任务恢复与真实 Provider 接入仍未完成。旧 owner 存活或死亡证据不充分时，原生服务在 writer acquisition/journal recovery 前拒绝启动。
+
 ### 本地保存状态
 
 检查时工作区及暂存区均为空，现有实现已经提交到本地，无需重复创建空提交。最近的实现提交为：

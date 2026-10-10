@@ -86,7 +86,7 @@ class KernelClient:
             if info.get('service') != 'ccb-kernel' or info.get('api_version') != 1:
                 raise KernelUnavailable('incompatible Rust kernel')
             self.capabilities = frozenset(info.get('capabilities') or ())
-            required = {'mailbox','scheduler','records','bureau','callback','completion','control_plane','lifecycle','admission','finalization','callback_recovery'}
+            required = {'mailbox','scheduler','records','bureau','callback','completion','control_plane','lifecycle','admission','finalization','callback_recovery','result_policy','retry'}
             if not required <= self.capabilities:
                 raise KernelUnavailable('Rust kernel lacks required core capabilities; rebuild ccb-kernel')
         except Exception:
@@ -171,7 +171,7 @@ class KernelClient:
         if info.get('pid')!=descriptor.get('pid') or info.get('service')!='ccb-kernel':
             raise KernelUnavailable('Native control-plane owner identity mismatch')
         client.capabilities=frozenset(info.get('capabilities') or ())
-        if not {'mailbox','scheduler','records','bureau','callback','completion','control_plane','lifecycle','admission','finalization','callback_recovery'} <= client.capabilities:
+        if not {'mailbox','scheduler','records','bureau','callback','completion','control_plane','lifecycle','admission','finalization','callback_recovery','result_policy','retry'} <= client.capabilities:
             raise KernelUnavailable('Attached Rust kernel lacks required core capabilities')
         return client
 

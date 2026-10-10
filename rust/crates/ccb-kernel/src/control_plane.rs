@@ -34,6 +34,52 @@ impl Drop for PeerPermit {
     }
 }
 pub fn serve(root: &Path, token_path: &Path) -> Result<()> {
+    serve_runtime(root, token_path, None, false)
+}
+pub fn serve_daemon(root: &Path, token_path: &Path, config: &Path, standalone: bool) -> Result<()> {
+    serve_runtime(root, token_path, Some(config), standalone)
+}
+enum Runtime {
+    Kernel(Kernel),
+    Daemon(crate::daemon::Daemon),
+}
+impl Runtime {
+    fn mount(&mut self, endpoint: &Value) -> Result<()> {
+        if let Self::Daemon(daemon) = self {
+            daemon.mount(endpoint)?;
+        }
+        Ok(())
+    }
+    fn unmount(&mut self) -> Result<()> {
+        if let Self::Daemon(daemon) = self {
+            daemon.unmount()?;
+        }
+        Ok(())
+    }
+    fn execute(&mut self, line: &str) -> Result<Value> {
+        match self {
+            Self::Kernel(kernel) => rpc::execute(kernel, line),
+            Self::Daemon(daemon) => daemon.execute(line),
+        }
+    }
+    fn tick(&mut self, endpoint: &Value, token: &Path) -> Result<bool> {
+        match self {
+            Self::Kernel(_) => Ok(false),
+            Self::Daemon(daemon) => {
+                if !daemon.stopping {
+                    daemon.tick(endpoint, token)?;
+                }
+                Ok(daemon.stopping)
+            }
+        }
+    }
+}
+fn serve_runtime(
+    root: &Path,
+    token_path: &Path,
+    config: Option<&Path>,
+    standalone: bool,
+) -> Result<()> {
     ensure!(
         token_path
             .parent()
@@ -54,24 +100,42 @@ pub fn serve(root: &Path, token_path: &Path) -> Result<()> {
         .filter(|s| !s.is_empty())
         .context("missing token generation")?
         .to_owned();
-    let mut kernel = Kernel::open(root)?;
+    if config.is_some() {
+        crate::daemon::verify_owner(root)?;
+    }
+    let kernel = Kernel::open(root)?;
+    let mut runtime = if let Some(config) = config {
+        Runtime::Daemon(crate::daemon::Daemon::new(
+            kernel,
+            serde_json::from_slice(&fs::read(config)?)?,
+            &generation,
+        )?)
+    } else {
+        Runtime::Kernel(kernel)
+    };
     let listener = TcpListener::bind(("127.0.0.1", 0))?;
     let stop = Arc::new(AtomicBool::new(false));
     let owner_stop = stop.clone();
     let (commands, requests) = mpsc::sync_channel::<Event>(64);
     let owner_commands = commands.clone();
     // Creator pipe EOF fences ownership without relying on a reusable PID.
-    thread::spawn(move || {
-        let mut bytes = [0u8; 256];
-        let mut input = io::stdin().lock();
-        while input.read(&mut bytes).is_ok_and(|n| n > 0) {}
-        owner_stop.store(true, Ordering::Release);
-        let _ = owner_commands.try_send(Event::Stop);
-    });
+    if !standalone {
+        thread::spawn(move || {
+            let mut bytes = [0u8; 256];
+            let mut input = io::stdin().lock();
+            while input.read(&mut bytes).is_ok_and(|n| n > 0) {}
+            owner_stop.store(true, Ordering::Release);
+            let _ = owner_commands.try_send(Event::Stop);
+        });
+    }
     let peers = Arc::new(AtomicUsize::new(0));
     let ready = json!({"service":"ccb-kernel","transport":"tcp_loopback","host":"127.0.0.1","port":listener.local_addr()?.port(),"generation":generation,"pid":std::process::id()});
     let mut descriptor = ready.clone();
     descriptor["token_ref"] = json!(token_path);
+    if config.is_some() {
+        descriptor["public_api_version"] = json!(2);
+    }
+    runtime.mount(&descriptor)?;
     let descriptor_path = root.join("kernel/control-plane.json");
     let temporary = descriptor_path.with_extension("tmp");
     fs::write(&temporary, serde_json::to_vec(&descriptor)?)?;
@@ -112,15 +176,23 @@ pub fn serve(root: &Path, token_path: &Path) -> Result<()> {
         }
     });
     while !stop.load(Ordering::Acquire) {
-        if let Ok(event) = requests.recv_timeout(Duration::from_secs(1)) {
+        if let Ok(event) = requests.recv_timeout(if config.is_some() {
+            Duration::from_millis(50)
+        } else {
+            Duration::from_secs(1)
+        }) {
             let command = match event {
                 Event::Stop => break,
                 Event::Request(command) => command,
             };
-            let response = rpc::execute(&mut kernel, &command.line)?;
+            let response = runtime.execute(&command.line)?;
             let _ = command.reply.send(response);
         }
+        if runtime.tick(&descriptor, token_path)? {
+            break;
+        }
     }
+    runtime.unmount()?;
     // Only this exact generation may remove its published endpoint.
     if fs::read(&descriptor_path)
         .ok()
@@ -159,7 +231,11 @@ fn connection(
         Duration::from_millis(500),
     )?;
     let value: Value = serde_json::from_slice(&raw)?;
-    ensure!(value["generation"] == generation, "stale kernel generation");
+    ensure!(
+        value["api_version"] == 2 && value["generation"].is_null()
+            || value["generation"] == generation,
+        "stale kernel generation"
+    );
     ensure!(!stop.load(Ordering::Acquire), "kernel stopping");
     let line = String::from_utf8(raw)?;
     let (reply, result) = mpsc::sync_channel(1);

@@ -11,14 +11,30 @@ fn main() {
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     ensure!(
-        (args.len() == 2 || args.len() == 4) && args[0] == "--state-root",
-        "usage: ccb-kernel --state-root <directory> [--token-file <path>]"
+        [2,4,6,7].contains(&args.len()) && args[0] == "--state-root",
+        "usage: ccb-kernel --state-root <directory> [--token-file <path> [--daemon-config <path> [--standalone]]]"
     );
-    if args.len() == 4 {
+    if args.len() >= 4 {
         ensure!(
             args[2] == "--token-file",
             "invalid network serving arguments"
         );
+        if args.len() >= 6 {
+            ensure!(
+                args[4] == "--daemon-config",
+                "invalid daemon configuration argument"
+            );
+            ensure!(
+                args.len() != 7 || args[6] == "--standalone",
+                "invalid standalone argument"
+            );
+            return control_plane::serve_daemon(
+                &PathBuf::from(&args[1]),
+                &PathBuf::from(&args[3]),
+                &PathBuf::from(&args[5]),
+                args.len() == 7,
+            );
+        }
         return control_plane::serve(&PathBuf::from(&args[1]), &PathBuf::from(&args[3]));
     }
     let mut kernel = Kernel::open(&PathBuf::from(&args[1]))?;

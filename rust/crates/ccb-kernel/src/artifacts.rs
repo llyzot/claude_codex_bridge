@@ -20,6 +20,56 @@ pub fn preview(text: &str, limit: usize) -> String {
         )
     }
 }
+pub fn validate_reference(kernel: &Kernel, reference: &Value) -> Result<Value> {
+    let mut reference = reference.clone();
+    anyhow::ensure!(reference.is_object(), "body_artifact must be an object");
+    let candidate = std::path::Path::new(string(&reference, "path")?)
+        .canonicalize()
+        .context("text artifact path does not exist")?;
+    let probe = kernel
+        .store
+        .owned_path("artifacts/text/reference/probe.txt")?;
+    let base = probe.parent().unwrap().parent().unwrap();
+    let relative = candidate
+        .strip_prefix(base)
+        .context("text artifact path escapes CCB artifact directory")?;
+    let owned = kernel.store.owned_path(&format!(
+        "artifacts/text/{}",
+        relative.to_string_lossy().replace('\\', "/")
+    ))?;
+    let data = std::fs::read(&owned)?;
+    if !reference["bytes"].is_null() {
+        let size = reference["bytes"]
+            .as_u64()
+            .or_else(|| reference["bytes"].as_str().and_then(|s| s.parse().ok()))
+            .context("invalid text artifact byte size")?;
+        anyhow::ensure!(
+            size == data.len() as u64,
+            "text artifact byte size mismatch"
+        );
+    }
+    let digest = format!("{:x}", Sha256::digest(&data));
+    if let Some(expected) = reference["sha256"].as_str().filter(|s| !s.is_empty()) {
+        anyhow::ensure!(expected == digest, "text artifact sha256 mismatch");
+    }
+    let path = owned.to_string_lossy().into_owned();
+    #[cfg(windows)]
+    let path = if let Some(unc) = path.strip_prefix("\\\\?\\UNC\\") {
+        format!("\\\\{unc}")
+    } else {
+        path.strip_prefix("\\\\?\\").unwrap_or(&path).to_owned()
+    };
+    reference["path"] = json!(path);
+    reference["bytes"] = json!(data.len());
+    reference["sha256"] = json!(digest);
+    if reference.get("encoding").is_none() {
+        reference["encoding"] = json!("utf-8");
+    }
+    if reference.get("preview").is_none() {
+        reference["preview"] = json!(preview(&String::from_utf8_lossy(&data), 1200));
+    }
+    Ok(reference)
+}
 fn safe(value: &str, fallback: &str) -> String {
     let s = value
         .trim()

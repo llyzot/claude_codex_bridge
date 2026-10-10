@@ -2,8 +2,11 @@ mod bureau;
 mod callback;
 mod completion;
 mod completion_gate;
+pub mod control_plane;
+mod lifecycle;
 pub mod models;
 mod records;
+pub mod rpc;
 mod scheduler;
 pub mod store;
 
@@ -30,6 +33,33 @@ impl Kernel {
         })
     }
     pub fn dispatch(&mut self, op: &str, args: &Value) -> Result<Value> {
+        if let Some(method) = op.strip_prefix("daemon_lease.") {
+            return lifecycle::dispatch(self, method, args);
+        }
+        if op == "daemon_ownership.inspect" {
+            return lifecycle::ownership(args);
+        }
+        if op == "daemon_ownership.verify_claim" || op == "daemon_ownership.expected_claim" {
+            let current = self.store.json("lease.json")?.unwrap_or(Value::Null);
+            let inspected = &args["lease"];
+            let same = current.is_null() && inspected.is_null()
+                || !current.is_null()
+                    && !inspected.is_null()
+                    && [
+                        "project_id",
+                        "ccbd_pid",
+                        "socket_path",
+                        "mount_state",
+                        "last_heartbeat_at",
+                        "daemon_instance_id",
+                    ]
+                    .iter()
+                    .all(|key| current[*key] == inspected[*key])
+                    && current["generation"].as_u64().unwrap_or(1)
+                        == inspected["generation"].as_u64().unwrap_or(1);
+            ensure!(same, "ccbd lease changed during ownership inspection");
+            return lifecycle::claim(args, op == "daemon_ownership.expected_claim");
+        }
         if op == "completion.gate" {
             return completion_gate::validate(args);
         }
@@ -71,7 +101,7 @@ impl Kernel {
         if op == "ping" {
             return Ok(
                 json!({"service":"ccb-kernel", "api_version":API_VERSION, "pid":std::process::id(),
-                    "capabilities":["mailbox","scheduler","records","bureau","callback","completion"]}),
+                    "capabilities":["mailbox","scheduler","records","bureau","callback","completion","control_plane","lifecycle"]}),
             );
         }
         if op == "lease.list" || op == "mailbox.list" {

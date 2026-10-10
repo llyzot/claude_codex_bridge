@@ -1,18 +1,7 @@
 use anyhow::{ensure, Result};
-use ccb_kernel::{Kernel, API_VERSION};
-use serde::Deserialize;
-use serde_json::{json, Value};
+use ccb_kernel::{control_plane, rpc, Kernel};
 use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
-
-#[derive(Deserialize)]
-struct Request {
-    api_version: u32,
-    id: u64,
-    op: String,
-    #[serde(default)]
-    args: Value,
-}
 fn main() {
     if let Err(error) = run() {
         eprintln!("ccb-kernel: {error:#}");
@@ -22,9 +11,16 @@ fn main() {
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     ensure!(
-        args.len() == 2 && args[0] == "--state-root",
-        "usage: ccb-kernel --state-root <ccbd-directory>"
+        (args.len() == 2 || args.len() == 4) && args[0] == "--state-root",
+        "usage: ccb-kernel --state-root <directory> [--token-file <path>]"
     );
+    if args.len() == 4 {
+        ensure!(
+            args[2] == "--token-file",
+            "invalid network serving arguments"
+        );
+        return control_plane::serve(&PathBuf::from(&args[1]), &PathBuf::from(&args[3]));
+    }
     let mut kernel = Kernel::open(&PathBuf::from(&args[1]))?;
     let stdin = io::stdin();
     let mut stdout = io::stdout().lock();
@@ -33,28 +29,7 @@ fn run() -> Result<()> {
         if line.trim().is_empty() {
             continue;
         }
-        let response = match serde_json::from_str::<Request>(&line) {
-            Ok(request) if request.api_version == API_VERSION => {
-                match kernel.dispatch(&request.op, &request.args) {
-                    Ok(result) => {
-                        // A failed commit exits with its journal intact. Do not
-                        // serve further requests against a half-applied state.
-                        kernel.store.commit()?;
-                        json!({"api_version":API_VERSION,"id":request.id,"ok":true,"result":result})
-                    }
-                    Err(error) => {
-                        kernel.store.rollback();
-                        json!({"api_version":API_VERSION,"id":request.id,"ok":false,"error":error.to_string()})
-                    }
-                }
-            }
-            Ok(request) => {
-                json!({"api_version":API_VERSION,"id":request.id,"ok":false,"error":"unsupported api_version"})
-            }
-            Err(error) => {
-                json!({"api_version":API_VERSION,"id":null,"ok":false,"error":error.to_string()})
-            }
-        };
+        let response = rpc::execute(&mut kernel, &line)?;
         writeln!(stdout, "{response}")?;
         stdout.flush()?;
     }

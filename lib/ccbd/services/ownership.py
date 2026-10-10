@@ -47,6 +47,15 @@ class OwnershipGuard:
         assume_mounted_socket_connectable: bool = False,
     ) -> LeaseInspection:
         current = lease if lease is not None else self._mount_manager.load_state()
+        native=getattr(self._mount_manager,'_native',None)
+        if native is not None:
+            alive=False if current is None else self._pid_exists(current.ccbd_pid)
+            socket=False if current is None else (True if assume_mounted_socket_connectable and current.mount_state is MountState.MOUNTED else self._mounted_socket_connectable(current))
+            payload=native.call('daemon_ownership.inspect',lease=None if current is None else current.to_record(),
+                                pid_alive=alive,socket_connectable=socket,now=self._clock(),heartbeat_grace_seconds=self._heartbeat_grace_seconds)
+            return LeaseInspection(lease=current,health=LeaseHealth(payload['health']),pid_alive=payload['pid_alive'],
+                                   socket_connectable=payload['socket_connectable'],heartbeat_fresh=payload['heartbeat_fresh'],
+                                   takeover_allowed=payload['takeover_allowed'],reason=payload['reason'])
         if current is None:
             return self._missing_inspection()
 
@@ -98,6 +107,9 @@ class OwnershipGuard:
 
     def verify_or_takeover(self, *, project_id: str, pid: int, socket_path: str | Path) -> int:
         current = self._mount_manager.load_state()
+        native=getattr(self._mount_manager,'_native',None)
+        if native is not None:
+            return self._native_claim(native,'verify_claim',current,project_id=project_id,pid=pid,socket_path=socket_path)
         if current is None:
             return 1
         if current.project_id != project_id and current.mount_state is MountState.UNMOUNTED:
@@ -121,6 +133,11 @@ class OwnershipGuard:
         daemon_instance_id: str,
         expected_generation: int,
     ) -> None:
+        native=getattr(self._mount_manager,'_native',None)
+        if native is not None:
+            self._native_claim(native,'expected_claim',self._mount_manager.load_state(),project_id=project_id,pid=pid,
+                               socket_path=socket_path,daemon_instance_id=daemon_instance_id,expected_generation=expected_generation)
+            return
         generation = int(expected_generation)
         if generation <= 0:
             raise OwnershipConflictError('expected ccbd generation must be positive')
@@ -257,6 +274,15 @@ class OwnershipGuard:
         current_socket = str(Path(lease.socket_path))
         desired_socket = str(Path(socket_path))
         return lease.ccbd_pid == pid and current_socket == desired_socket
+
+    def _native_claim(self,native,method,current,**args):
+        inspection=self.inspect(current)
+        args['socket_path']=str(Path(args['socket_path']))
+        try:
+            return native.call('daemon_ownership.'+method,lease=None if current is None else current.to_record(),
+                               inspection={'takeover_allowed':inspection.takeover_allowed,'reason':inspection.reason},**args)
+        except ValueError as error:
+            raise OwnershipConflictError(str(error)) from error
 
 
 __all__ = ['OwnershipConflictError', 'OwnershipGuard']

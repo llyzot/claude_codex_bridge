@@ -31,12 +31,19 @@
     "Completion snapshots use the Rust single-writer journal and retain their version-2 schema",
     "Retired completion and scheduler groups release native memory without restarting the kernel",
     "Only gate-relevant runtime values cross the wire; Python reader handles remain in the adapter",
-    "Local JSON encoding errors are rejected before sending and do not poison the kernel connection"
+    "Local JSON encoding errors are rejected before sending and do not poison the kernel connection",
+    "Native authenticated loopback listener with bounded peer reads and a blocking single-writer actor",
+    "Shared state clients attach across processes; borrowed connections cannot stop the owning kernel",
+    "Creator pipe EOF stops only its kernel and generation-fenced endpoint cleanup preserves later owners",
+    "Endpoint recovery requires confirmed process exit; access-denied and observation timeouts are not terminal evidence",
+    "Daemon lease/lifecycle IO, heartbeat debounce, expected-holder mutation and ownership/claim policy execute in Rust",
+    "Ownership claims reject changed lease identity or heartbeat snapshots",
+    "Kernel launch uses a cross-process creation lock; TCP_NODELAY and single-write framing avoid delayed-ACK stalls"
   ],
   "remaining": [
     "Finish callback registration/recovery orchestration and notice/artifact handling in Rust",
     "Finish callback repair orchestration and remaining provider completion-orchestrator adapters",
-    "Migrate ccbd RPC control plane, lifecycle fencing, supervision and recovery",
+    "Finish public ccbd API-2 handlers, autonomous Rust supervisor/keeper and startup/stop orchestration",
     "Migrate CLI and integrate native build/install/release paths",
     "Integrate Pi and Codex provider execution, then Claude hooks/session/cancel/restore",
     "Verify actual Pi Lead + Codex Worker and Claude Lead callback execution in isolated Windows projects",
@@ -45,10 +52,14 @@
     "Remove transitional Python core dependencies after native runtime parity is proven"
   ],
   "verification": {
-    "native_contract_tests": 44,
+    "native_contract_tests": 56,
     "rust_store_tests": 3,
     "clippy": "passed with warnings denied",
-    "integration_suite": "272 passed using Rust records/mailbox/scheduler/callback/completion/snapshot paths; 13 deselected (Windows symlink privileges, legacy external helpers, Python-only cache backend fixture)",
+    "integration_suite": "284 passed with shared native TCP state serving; 13 deselected (Windows symlink privileges, legacy external helpers, Python-only cache backend fixture)",
+    "control_plane_lifecycle": "12 real network and lifecycle contract tests passed after final transport changes; startup-fence/service-graph suite 36 passed; native lease/ownership suite 19 passed",
+    "lifecycle_python_compatibility": "19 legacy lease/ownership tests passed",
+    "known_windows_baseline": "Unrelated health-monitor POSIX path assertion fails identically in Python and Rust modes (backslashes versus /tmp path)",
+    "transport_measurement": "Debug binary: protected-token initialization 1.11s, mean loopback ping 10.61ms over 100 calls; not a provider/startup performance parity claim",
     "completion_parity": "22 native tests: differential traces for five families across three seeds, foreign-event rejection, a 128-case authority/delivery matrix, group isolation, snapshot restart and retired-graph cleanup",
     "completion_python_compatibility": "38 legacy completion/selector/registry/snapshot/gate tests passed",
     "python_compatibility_suite": "222 passed; 12 deselected (Windows symlink privileges and legacy external helper fixtures)",

@@ -111,7 +111,8 @@ impl Store {
                 || relative.starts_with("leases/")
                 || parts.len() == 2 && parts[0] == "snapshots" && parts[1].ends_with(".json")
                 || agent_log
-                || stream,
+                || stream
+                || ["lease.json", "lifecycle.json"].contains(&relative),
             "unowned state path"
         );
         let base = if agent_log {

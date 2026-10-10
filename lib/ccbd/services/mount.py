@@ -9,6 +9,7 @@ from ccbd.models import CcbdLease, MountState, SCHEMA_VERSION
 from ccbd.system import current_uid, parse_utc_timestamp, read_boot_id, utc_now
 from storage.json_store import JsonStore
 from storage.paths import PathLayout
+from native_kernel import kernel_for_layout, guard_legacy_writes
 
 
 DEFAULT_HEARTBEAT_WRITE_INTERVAL_S = 5.0
@@ -26,11 +27,17 @@ class MountManager:
     ) -> None:
         self._layout = layout
         self._store = store or JsonStore()
+        self._native=kernel_for_layout(layout)
+        if self._native is not None and store is not None:
+            raise ValueError('Rust daemon lease requires native state storage')
         self._clock = clock
         self._uid_getter = uid_getter
         self._boot_id_getter = boot_id_getter
 
     def load_state(self) -> CcbdLease | None:
+        if self._native is not None:
+            record=self._native.call('daemon_lease.load')
+            return None if record is None else _lease_from_record(record)
         path = self._layout.ccbd_lease_path
         if not path.exists():
             return None
@@ -77,7 +84,10 @@ class MountManager:
                 else endpoint_from_legacy_socket_path(socket_path)
             ),
         )
-        self._store.save(self._layout.ccbd_lease_path, lease, serializer=lambda value: value.to_record())
+        if self._native is not None:
+            self._native.call('daemon_lease.save',record=lease.to_record())
+        else:
+            self._store.save(self._layout.ccbd_lease_path, lease, serializer=lambda value: value.to_record())
         return lease
 
     def refresh_heartbeat(
@@ -86,6 +96,9 @@ class MountManager:
         expected_pid: int | None = None,
         expected_daemon_instance_id: str | None = None,
     ) -> CcbdLease:
+        if self._native is not None:
+            return self._native_change('heartbeat',expected_pid=expected_pid,expected_daemon_instance_id=expected_daemon_instance_id,
+                                       now=self._clock(),interval_s=_heartbeat_write_interval_s())
         lease = self.load_state()
         if lease is None:
             raise RuntimeError('ccbd lease does not exist')
@@ -111,6 +124,9 @@ class MountManager:
         expected_daemon_instance_id: str,
         expected_generation: int,
     ) -> CcbdLease:
+        if self._native is not None:
+            return self._native_change('signature',expected_pid=expected_pid,expected_daemon_instance_id=expected_daemon_instance_id,
+                                       expected_generation=expected_generation,config_signature=config_signature,now=self._clock())
         lease = self.load_state()
         if lease is None:
             raise RuntimeError('ccbd lease does not exist')
@@ -143,6 +159,8 @@ class MountManager:
         expected_pid: int | None = None,
         expected_daemon_instance_id: str | None = None,
     ) -> CcbdLease | None:
+        if self._native is not None:
+            return self._native_change('release',expected_pid=expected_pid,expected_daemon_instance_id=expected_daemon_instance_id,now=self._clock())
         lease = self.load_state()
         if lease is None:
             return None
@@ -166,6 +184,13 @@ class MountManager:
             raise RuntimeError(
                 f'ccbd lease holder changed: expected pid={expected_pid}, found pid={lease.ccbd_pid}'
             )
+
+    def _native_change(self,method,**args):
+        try:
+            record=self._native.call('daemon_lease.'+method,**args)
+        except ValueError as error:
+            raise RuntimeError(str(error)) from error
+        return None if record is None else _lease_from_record(record)
         expected_instance = str(expected_daemon_instance_id or '').strip()
         if expected_instance:
             current_instance = str(lease.daemon_instance_id or '').strip()
@@ -225,3 +250,5 @@ def _lease_from_record(record: dict) -> CcbdLease:
 
 
 __all__ = ['MountManager']
+
+guard_legacy_writes(MountManager,'mark_mounted','refresh_heartbeat','update_config_signature','mark_unmounted')

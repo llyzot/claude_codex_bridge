@@ -9,6 +9,7 @@ from ccbd.control_plane_transport.endpoint import endpoint_from_legacy_socket_pa
 from ccbd.models import MountState, SCHEMA_VERSION
 from storage.json_store import JsonStore
 from storage.paths import PathLayout
+from native_kernel import kernel_for_layout, guard_legacy_writes
 
 
 _RECORD_TYPE = 'ccbd_lifecycle'
@@ -139,14 +140,23 @@ class CcbdLifecycleStore:
     def __init__(self, layout: PathLayout, store: JsonStore | None = None) -> None:
         self._layout = layout
         self._store = store or JsonStore()
+        self._native=kernel_for_layout(layout)
+        if self._native is not None and store is not None:
+            raise ValueError('Rust lifecycle requires native state storage')
 
     def load(self) -> CcbdLifecycle | None:
+        if self._native is not None:
+            record=self._native.call('daemon_lease.lifecycle_load')
+            return None if record is None else CcbdLifecycle.from_record(record)
         path = self._layout.ccbd_lifecycle_path
         if not path.exists():
             return None
         return self._store.load(path, loader=CcbdLifecycle.from_record)
 
     def save(self, lifecycle: CcbdLifecycle) -> None:
+        if self._native is not None:
+            self._native.call('daemon_lease.lifecycle_save',record=lifecycle.to_record())
+            return
         self._store.save(self._layout.ccbd_lifecycle_path, lifecycle, serializer=lambda value: value.to_record())
 
 
@@ -284,3 +294,5 @@ __all__ = [
     'current_socket_inode',
     'lifecycle_from_inspection',
 ]
+
+guard_legacy_writes(CcbdLifecycleStore,'save')

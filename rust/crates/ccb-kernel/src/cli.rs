@@ -107,6 +107,29 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("{{\"copied\":true}}");
         return Ok(());
     }
+    if args[0] == "config" {
+        ensure!(
+            args.len() >= 3,
+            "config requires show <file> or compile <project-root> <executables-json>"
+        );
+        let operation = args[1].to_str().context("invalid config operation")?;
+        if operation == "show" {
+            ensure!(args.len() == 3, "config show requires a file");
+            let document = crate::config::parse(&std::fs::read_to_string(Path::new(&args[2]))?)?;
+            println!("{document}");
+            return Ok(());
+        }
+        ensure!(
+            operation == "compile" && args.len() == 4,
+            "config compile requires project root and executable manifest"
+        );
+        let root = Path::new(&args[2]).canonicalize()?;
+        let document =
+            crate::config::parse(&std::fs::read_to_string(root.join(".ccb/ccb.config"))?)?;
+        let executables: Value = serde_json::from_slice(&std::fs::read(Path::new(&args[3]))?)?;
+        println!("{}", crate::config::compile(&root, document, &executables)?);
+        return Ok(());
+    }
     if args[0] == "token-create" {
         ensure!(args.len() == 2, "token-create requires a new file");
         println!("{}", crate::security::create_token(Path::new(&args[1]))?);

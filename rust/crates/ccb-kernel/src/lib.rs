@@ -9,6 +9,7 @@ pub mod cli;
 mod codex_rpc;
 mod completion;
 mod completion_gate;
+pub mod config;
 pub mod control_plane;
 pub mod daemon;
 mod finalization;

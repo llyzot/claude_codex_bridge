@@ -80,7 +80,9 @@
     "Installed Claude 2.1.296 stream protocol emitted real init/replay/result error records in a private unauthenticated home; auth failure did not become success or kill the daemon",
     "Actual model-backed Codex Worker round trip completed in private CODEX_HOME/workspace",
     "Actual model-backed Pi Lead delegated via native CLI, ended its initial turn, and automatically reviewed the Codex Worker result in the same persistent Pi session",
-    "Real-model fixture uses owner-only credential copies and existing Git Bash selected only inside private Pi settings; user settings/PATH/Workspace remained unchanged"
+    "Real-model fixture uses owner-only credential copies and existing Git Bash selected only inside private Pi settings; user settings/PATH/Workspace remained unchanged",
+    "Native config reader parses existing compact, rich TOML and hybrid headers/overlays; header-owned fields and duplicate identities fail closed",
+    "Config compiler preserves existing project identity or legacy normalized-path hash and renders Pi/Codex/Claude argv/model/env fields without an interpreter"
   ],
   "remaining": [
     "Finish ordinary terminal-result recovery and explicit cancellation/termination orchestration; reconcile uncertain running executions after daemon restart",
@@ -94,6 +96,8 @@
     "Remove transitional Python core dependencies after native runtime parity is proven"
   ],
   "verification": {
+    "native_config": "11 cases passed against existing Python compact/TOML/hybrid reader and project-id normalization, including provider compilation and invalid overlay rejection",
+    "herdr_execution_constraint": "Current agent is outside Herdr (HERDR_ENV unavailable); focused-session controls were not issued under the explicit herdr skill gate. Isolated native Herdr runtime execution remains unverified",
     "claude_stream": "6 passed: same-session turns, foreign-result fencing, duplicate-result rejection, Claude Lead/Codex callback, clean session resume, installed unauthenticated CLI failure handling",
     "real_models": "Real Codex Worker model round trip passed; actual Pi Lead + Codex Worker automatic callback passed after specifying existing Git Bash in private Pi settings. No polling in initial Lead turn",
     "claude_auth_constraint": "Installed Claude auth status is loggedIn=false; successful real Claude inference remains unverified, no login or credential changes were performed",

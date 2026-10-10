@@ -7,6 +7,8 @@ from typing import Any
 
 from storage.jsonl_store import JsonlStore
 from storage.paths import PathLayout
+from native_kernel import guard_legacy_writes
+from native_records import NativeRecordStore, record_backend, record_lookup
 
 SCHEMA_VERSION = 1
 
@@ -110,12 +112,16 @@ class CallbackEdgeRecord:
 class CallbackEdgeStore:
     def __init__(self, layout: PathLayout, store: JsonlStore | None = None) -> None:
         self._layout = layout
-        self._store = store or JsonlStore()
+        self._store = record_backend(layout, store)
+        self._native = getattr(self._store, '_native', None)
         self._cache_lock = RLock()
         self._latest_by_id: dict[str, CallbackEdgeRecord] | None = None
         self._cache_signature: tuple[int, int, int, int] | None = None
 
     def append(self, record: CallbackEdgeRecord) -> None:
+        if self._native is not None:
+            self._store.append(self._layout.ccbd_callback_edges_path,record,serializer=lambda value:value.to_record())
+            return
         with self._cache_lock:
             signature_before = self._path_signature()
             self._store.append(
@@ -138,27 +144,39 @@ class CallbackEdgeStore:
             return tuple(self._latest_records_locked().values())
 
     def get_latest(self, edge_id: str) -> CallbackEdgeRecord | None:
+        if self._native is not None:
+            return self._native_latest({'edge_id':edge_id})
         with self._cache_lock:
             return self._latest_records_locked().get(edge_id)
 
     def get_latest_for_child_job(self, child_job_id: str) -> CallbackEdgeRecord | None:
+        if self._native is not None:
+            return self._native_latest({'child_job_id':child_job_id})
         return next((record for record in self.list_latest() if record.child_job_id == child_job_id), None)
 
     def get_latest_for_child_message(self, child_message_id: str) -> CallbackEdgeRecord | None:
+        if self._native is not None:
+            return self._native_latest({'child_message_id':child_message_id})
         return next((record for record in self.list_latest() if record.child_message_id == child_message_id), None)
 
     def get_latest_for_parent_job(self, parent_job_id: str) -> CallbackEdgeRecord | None:
+        if self._native is not None:
+            return self._native_latest({'parent_job_id':parent_job_id})
         return next((record for record in self.list_latest() if record.parent_job_id == parent_job_id), None)
 
     def get_latest_continuation_for_edge(self, edge_id: str) -> CallbackEdgeRecord | None:
-        return self._store.find_last(
+        return record_lookup(self._store,
             self._layout.ccbd_callback_edges_path,
             predicate=lambda payload: str(payload.get('edge_id') or '') == edge_id
             and bool(str(payload.get('continuation_job_id') or '').strip()),
             loader=CallbackEdgeRecord.from_record,
+            fields={'edge_id':edge_id},
+            nonempty=['continuation_job_id'],
         )
 
     def update(self, record: CallbackEdgeRecord, **changes) -> CallbackEdgeRecord:
+        if self._native is not None:
+            return CallbackEdgeRecord.from_record(self._native.call('callback.update',record=record.to_record(),changes=changes))
         updated = replace(record, **changes)
         self.append(updated)
         return updated
@@ -170,7 +188,14 @@ class CallbackEdgeStore:
             return None
         return int(stat.st_dev), int(stat.st_ino), int(stat.st_size), int(stat.st_mtime_ns)
 
+    def _native_latest(self, fields):
+        record = self._native.call('records.latest_find',stream='callbacks',identity='edge_id',fields=fields)
+        return None if record is None else CallbackEdgeRecord.from_record(record)
+
     def _latest_records_locked(self) -> dict[str, CallbackEdgeRecord]:
+        if self._native is not None:
+            return {record.edge_id:record for record in self._store.latest(self._layout.ccbd_callback_edges_path,
+                                                                          'edge_id',CallbackEdgeRecord.from_record)}
         signature = self._path_signature()
         if self._latest_by_id is None or signature != self._cache_signature:
             latest: dict[str, CallbackEdgeRecord] = {}
@@ -187,3 +212,5 @@ __all__ = [
     'CallbackEdgeStore',
     'SCHEMA_VERSION',
 ]
+
+guard_legacy_writes(CallbackEdgeStore,'append','update')

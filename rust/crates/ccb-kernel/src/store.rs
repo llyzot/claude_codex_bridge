@@ -2,10 +2,35 @@
 use anyhow::{bail, ensure, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Component, Path, PathBuf};
+use std::time::SystemTime;
+
+type Signature = Option<(u64, SystemTime)>;
+#[derive(Clone)]
+struct LatestIndex {
+    signature: Signature,
+    rows: Vec<Value>,
+    indices: HashMap<String, usize>,
+}
+impl LatestIndex {
+    fn insert(&mut self, identity: &str, row: Value) -> Result<()> {
+        let id = row[identity]
+            .as_str()
+            .context("missing record identity")?
+            .to_owned();
+        if let Some(index) = self.indices.get(&id) {
+            self.rows[*index] = row;
+        } else {
+            self.indices.insert(id, self.rows.len());
+            self.rows.push(row);
+        }
+        Ok(())
+    }
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -28,6 +53,9 @@ pub struct Store {
     _lock: File,
     staged: HashMap<String, Option<Vec<u8>>>,
     writes: Vec<WriteOp>,
+    latest_indices: RefCell<HashMap<(String, String), LatestIndex>>,
+    index_reads: Cell<u64>,
+    index_rows: Cell<u64>,
 }
 impl Store {
     pub fn open(root: &Path) -> Result<Self> {
@@ -50,6 +78,9 @@ impl Store {
             _lock: lock,
             staged: HashMap::new(),
             writes: Vec::new(),
+            latest_indices: RefCell::new(HashMap::new()),
+            index_reads: Cell::new(0),
+            index_rows: Cell::new(0),
         };
         store.recover()?;
         Ok(store)
@@ -60,12 +91,35 @@ impl Store {
             path.components().all(|c| matches!(c, Component::Normal(_))),
             "invalid state path"
         );
+        let parts: Vec<_> = path.iter().filter_map(|p| p.to_str()).collect();
+        let agent_log = parts.len() == 3
+            && parts[0] == "agents"
+            && ["jobs.jsonl", "events.jsonl"].contains(&parts[2]);
+        if agent_log {
+            crate::models::validate_agent(parts[1])?;
+        }
+        let stream = [
+            "messages/messages.jsonl",
+            "attempts/attempts.jsonl",
+            "replies/replies.jsonl",
+            "callbacks/edges.jsonl",
+            "submissions.jsonl",
+        ]
+        .contains(&relative);
         ensure!(
-            relative.starts_with("mailboxes/") || relative.starts_with("leases/"),
+            relative.starts_with("mailboxes/")
+                || relative.starts_with("leases/")
+                || agent_log
+                || stream,
             "unowned state path"
         );
-        let full = self.root.join(path);
-        let mut prefix = self.root.clone();
+        let base = if agent_log {
+            self.root.parent().context("missing runtime state parent")?
+        } else {
+            &self.root
+        };
+        let full = base.join(path);
+        let mut prefix = base.to_path_buf();
         for part in path.components() {
             prefix.push(part);
             if let Ok(meta) = fs::symlink_metadata(&prefix) {
@@ -108,6 +162,67 @@ impl Store {
                 Ok(v)
             })
             .collect()
+    }
+    fn signature(&self, path: &str) -> Result<Signature> {
+        match fs::metadata(self.path(path)?) {
+            Ok(metadata) => Ok(Some((metadata.len(), metadata.modified()?))),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error.into()),
+        }
+    }
+    pub fn latest_rows(&self, path: &str, identity: &str) -> Result<Vec<Value>> {
+        let key = (path.to_owned(), identity.to_owned());
+        let signature = self.signature(path)?;
+        let cached = self
+            .latest_indices
+            .borrow()
+            .get(&key)
+            .filter(|index| index.signature == signature)
+            .cloned();
+        if let Some(mut index) = cached {
+            let mut append_only = true;
+            for op in &self.writes {
+                match op {
+                    WriteOp::Append {
+                        path: target,
+                        bytes,
+                        ..
+                    } if target == path => {
+                        index.insert(identity, serde_json::from_slice(bytes)?)?
+                    }
+                    WriteOp::Save { path: target, .. } | WriteOp::Remove { path: target }
+                        if target == path =>
+                    {
+                        append_only = false;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            if append_only {
+                return Ok(index.rows);
+            }
+        }
+        let rows = self.rows(path)?;
+        self.index_reads.set(self.index_reads.get() + 1);
+        self.index_rows
+            .set(self.index_rows.get() + rows.len() as u64);
+        let mut index = LatestIndex {
+            signature,
+            rows: Vec::new(),
+            indices: HashMap::new(),
+        };
+        for row in rows {
+            index.insert(identity, row)?;
+        }
+        let result = index.rows.clone();
+        if !self.staged.contains_key(path) {
+            self.latest_indices.borrow_mut().insert(key, index);
+        }
+        Ok(result)
+    }
+    pub fn index_metrics(&self) -> Value {
+        serde_json::json!({"history_reads":self.index_reads.get(),"history_rows":self.index_rows.get()})
     }
     pub fn save(&mut self, path: &str, value: &Value) -> Result<()> {
         self.path(path)?;
@@ -185,7 +300,36 @@ impl Store {
         // Once journaled, failures are fatal to the serving process: recovery
         // must finish the accepted transaction before another command runs.
         for op in &self.writes {
+            let path = match op {
+                WriteOp::Save { path, .. }
+                | WriteOp::Append { path, .. }
+                | WriteOp::Remove { path } => path,
+            };
+            let before = self.signature(path)?;
             self.apply(op)?;
+            let after = self.signature(path)?;
+            self.latest_indices
+                .borrow_mut()
+                .retain(|(cached_path, identity), index| {
+                    if cached_path != path {
+                        return true;
+                    }
+                    if index.signature != before {
+                        return false;
+                    }
+                    match op {
+                        WriteOp::Append { bytes, .. } => {
+                            if let Ok(row) = serde_json::from_slice(bytes) {
+                                if index.insert(identity, row).is_ok() {
+                                    index.signature = after;
+                                    return true;
+                                }
+                            }
+                            false
+                        }
+                        _ => false,
+                    }
+                });
         }
         fs::remove_file(&journal)?;
         sync_parent(&journal)?;
@@ -326,5 +470,77 @@ mod tests {
         drop(restored);
         let restored = Store::open(root.path()).unwrap();
         assert_eq!(restored.rows("mailboxes/pi/inbox.jsonl").unwrap().len(), 1);
+    }
+    #[test]
+    fn cross_stream_journal_recovers_every_write_boundary() {
+        for boundary in 0..=6 {
+            let runtime = tempfile::tempdir().unwrap();
+            let root = runtime.path().join("ccbd");
+            let mut store = Store::open(&root).unwrap();
+            store
+                .append(
+                    "messages/messages.jsonl",
+                    &serde_json::json!({"message_id":"parent"}),
+                )
+                .unwrap();
+            store
+                .append(
+                    "agents/pi/jobs.jsonl",
+                    &serde_json::json!({"job_id":"continuation"}),
+                )
+                .unwrap();
+            store
+                .append(
+                    "attempts/attempts.jsonl",
+                    &serde_json::json!({"attempt_id":"once"}),
+                )
+                .unwrap();
+            store
+                .append(
+                    "mailboxes/pi/inbox.jsonl",
+                    &serde_json::json!({"inbound_event_id":"once"}),
+                )
+                .unwrap();
+            store
+                .save(
+                    "mailboxes/pi/mailbox.json",
+                    &serde_json::json!({"queue_depth":1}),
+                )
+                .unwrap();
+            store
+                .append(
+                    "callbacks/edges.jsonl",
+                    &serde_json::json!({"edge_id":"edge","continuation_job_id":"continuation"}),
+                )
+                .unwrap();
+            atomic_write(
+                &root.join("kernel/pending.json"),
+                &serde_json::to_vec(&store.writes).unwrap(),
+            )
+            .unwrap();
+            for op in store.writes.iter().take(boundary) {
+                store.apply(op).unwrap();
+            }
+            drop(store);
+            let recovered = Store::open(&root).unwrap();
+            for path in [
+                "messages/messages.jsonl",
+                "agents/pi/jobs.jsonl",
+                "attempts/attempts.jsonl",
+                "mailboxes/pi/inbox.jsonl",
+                "callbacks/edges.jsonl",
+            ] {
+                assert_eq!(
+                    recovered.rows(path).unwrap().len(),
+                    1,
+                    "boundary {boundary}: {path}"
+                );
+            }
+            assert_eq!(
+                recovered.json("mailboxes/pi/mailbox.json").unwrap(),
+                Some(serde_json::json!({"queue_depth":1}))
+            );
+            assert!(!root.join("kernel/pending.json").exists());
+        }
     }
 }

@@ -161,6 +161,11 @@ def submit_callback_continuation(
     decision: CompletionDecision,
     finished_at: str,
 ) -> CallbackEdgeRecord:
+    native = getattr(dispatcher._state,'_native',None)
+    if native is not None:
+        from .native_callbacks import submit_native_callback
+        return submit_native_callback(dispatcher,edge,child_job=child_job,child_reply_id=child_reply_id,
+                                      decision=decision,finished_at=finished_at)
     latest = dispatcher._message_bureau.callback_edge_for_child_job(child_job.job_id) or edge
     if latest.state in _TERMINAL_CALLBACK_STATES:
         return latest
@@ -421,6 +426,10 @@ def mark_callback_done(dispatcher, job, *, finished_at: str) -> None:
     options = dict(getattr(job.request, 'route_options', None) or {})
     edge_id = str(options.get('chain_edge_id') or '').strip()
     if not edge_id or dispatcher._message_bureau is None:
+        return
+    native = getattr(dispatcher._state,'_native',None)
+    if native is not None:
+        native.call('callback.done',edge_id=edge_id,finished_at=finished_at)
         return
     edge = dispatcher._message_bureau.callback_edge(edge_id)
     if edge is None or edge.state in {CallbackEdgeState.DONE, CallbackEdgeState.FAILED, CallbackEdgeState.TIMED_OUT}:

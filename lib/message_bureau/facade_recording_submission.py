@@ -17,6 +17,10 @@ def record_submission(
     accepted_at: str,
     origin_message_id: str | None = None,
 ) -> str | None:
+    native = getattr(service._message_store,'_native',None)
+    if native is not None:
+        return native.call('bureau.submit',request=request.to_record(),jobs=[job.to_record() for job in jobs],
+                           submission_id=submission_id,accepted_at=accepted_at,origin_message_id=origin_message_id)
     if not jobs:
         return None
     message_id = new_id('msg')
@@ -96,6 +100,9 @@ def claimable_request_job_ids(service, agent_name: str) -> tuple[str, ...]:
 
 
 def record_retry_attempt(service, message_id: str, job: JobRecord, *, accepted_at: str) -> str:
+    native = getattr(service._message_store,'_native',None)
+    if native is not None:
+        return native.call('bureau.retry',message_id=message_id,job=job.to_record(),accepted_at=accepted_at)
     message = service._message_store.get_latest(message_id)
     if message is None:
         raise ValueError(f'message not found: {message_id}')

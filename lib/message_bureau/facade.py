@@ -179,6 +179,10 @@ class MessageBureauFacade(MessageBureauFacadeStateMixin):
         return self._callback_edge_store.get_latest(edge_id)
 
     def pending_callback_edges(self) -> tuple[CallbackEdgeRecord, ...]:
+        native = getattr(self._callback_edge_store,'_native',None)
+        if native is not None:
+            return tuple(CallbackEdgeRecord.from_record(record) for record in native.call('records.latest_filter',
+                         stream='callbacks',identity='edge_id',in_fields={'state':['pending','child_completed']}))
         return tuple(
             edge
             for edge in self._callback_edge_store.list_latest()

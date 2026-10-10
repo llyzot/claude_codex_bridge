@@ -18,10 +18,16 @@
     "Dispatcher queue, active slot, job index and mailbox-admission-order rebuild in Rust",
     "Python interface adapters, explicit failure without automatic replay or fallback",
     "Core selection propagated through filtered keeper/daemon environment",
-    "Release build scripts; Windows release build succeeded in repository bin directory"
+    "Release build scripts; Windows release build succeeded in repository bin directory",
+    "Rust ownership of Job/Event/Submission/Message/Attempt/Reply/Callback record streams and queries",
+    "Atomic Rust message admission, retry, attempt start/terminal transitions and result mailbox delivery",
+    "Rust message-state aggregation, including notice filtering and broadcast terminal states",
+    "Atomic callback continuation job/attempt/inbox/edge admission, retry lineage correlation and completion closure",
+    "Cached Rust latest-record indices with incremental committed and staged append views",
+    "Kernel capability handshake rejects stale binaries before state operations"
   ],
   "remaining": [
-    "Migrate Job/Message/Attempt/Reply/Callback record ownership and state transitions",
+    "Finish callback registration/recovery orchestration and notice/artifact handling in Rust",
     "Migrate completion tracking, event correlation and continuation repair into Rust",
     "Migrate ccbd RPC control plane, lifecycle fencing, supervision and recovery",
     "Migrate CLI and integrate native build/install/release paths",
@@ -32,10 +38,14 @@
     "Remove transitional Python core dependencies after native runtime parity is proven"
   ],
   "verification": {
-    "native_contract_tests": 12,
-    "rust_store_tests": 2,
+    "native_contract_tests": 21,
+    "rust_store_tests": 3,
     "clippy": "passed with warnings denied",
-    "integration_suite": "213 passed with Rust mailbox and scheduler; 4 Windows symlink-permission fixtures deselected",
+    "integration_suite": "242 passed using Rust records, mailbox, scheduler and callback admission; 13 deselected (Windows symlink privileges, legacy external helpers, Python-only cache backend fixture)",
+    "python_compatibility_suite": "222 passed; 12 deselected (Windows symlink privileges and legacy external helper fixtures)",
+    "transaction_recovery": "Real Rust redo journal tested at all 7 write boundaries across messages/jobs/attempts/inbox/mailbox/callback streams; partial append replay is idempotent",
+    "legacy_recovery": "Existing restart fixture seeds interrupted legacy continuation admission and validates repair without creating a duplicate job",
+    "release_protocol": "Current release binary capability smoke passed; previous release binary rejected by new client",
     "existing_windows_changes": "219 passed",
     "baseline_failure": "runtime_env source-home pwd fixture fails identically with HEAD control_plane.py on Windows",
     "scope_limit": "No real provider runtime or performance parity has yet been proven for Rust"

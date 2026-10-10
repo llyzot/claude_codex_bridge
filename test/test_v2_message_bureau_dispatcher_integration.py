@@ -949,6 +949,20 @@ def test_dispatcher_restart_repairs_continuation_interrupted_before_mailbox_reco
         raise SystemExit('simulated daemon stop')
 
     monkeypatch.setattr(dispatcher._message_bureau, 'record_retry_attempt', crash_before_mailbox_record)
+    from native_kernel import rust_core_enabled
+    if rust_core_enabled():
+        # Seed an interrupted legacy admission using the old nontransactional
+        # writer. The new Rust transaction no longer exposes this midpoint;
+        # recovery must still accept records left by an older installation.
+        from ccbd.services.dispatcher_runtime import native_callbacks
+        from ccbd.services.dispatcher_runtime.callbacks import _continuation_request, _submit_continuation_job
+        def legacy_partial_admission(current, original, *, child_job, child_reply_id, decision, finished_at):
+            prepared=current._state._native.call('callback.prepare',edge=original.to_record(),child_job=child_job.to_record(),
+                                                child_reply_id=child_reply_id,finished_at=finished_at)
+            updated=CallbackEdgeRecord.from_record(prepared['edge'])
+            request=_continuation_request(current,edge=updated,child_job=child_job,decision=decision)
+            return _submit_continuation_job(current,request=request,parent_message_id=updated.parent_message_id,accepted_at=finished_at)
+        monkeypatch.setattr(native_callbacks,'submit_native_callback',legacy_partial_admission)
     with pytest.raises(SystemExit, match='simulated daemon stop'):
         dispatcher.complete(child_job_id, _decision(reply='child complete'))
 
@@ -1069,7 +1083,12 @@ def test_dispatcher_callback_repair_does_not_rescan_historical_continuations(
     assert bureau.pending_callback_edges() == ()
     assert dispatcher.tick() == ()
     assert dispatcher.tick() == ()
-    assert list_all_calls == 1
+    from native_kernel import rust_core_enabled
+    if rust_core_enabled():
+        assert list_all_calls == 0
+        assert callback_store._native.call('records.metrics')['history_reads'] == 1
+    else:
+        assert list_all_calls == 1
     assert job_history_scans == 0
 
 

@@ -36,6 +36,10 @@ def resolve_origin_message_id(service, reply_to: str | None) -> str | None:
 
 
 def refresh_message_state(service, message_id: str, *, updated_at: str) -> None:
+    native = getattr(service._message_store,'_native',None)
+    if native is not None:
+        native.call('message.refresh',message_id=message_id,updated_at=updated_at)
+        return
     message = service._message_store.get_latest(message_id)
     if message is None:
         return
@@ -49,6 +53,10 @@ def refresh_message_state(service, message_id: str, *, updated_at: str) -> None:
 
 
 def set_message_state(service, message_id: str, next_state: MessageState, *, updated_at: str) -> None:
+    native = getattr(service._message_store,'_native',None)
+    if native is not None:
+        native.call('message.set',message_id=message_id,state=next_state.value,updated_at=updated_at)
+        return
     current = service._message_store.get_latest(message_id)
     if current is None or current.message_state is next_state:
         return

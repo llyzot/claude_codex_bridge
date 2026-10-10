@@ -7,6 +7,8 @@ from typing import Any
 from ccbd.api_models import DeliveryScope, JobEvent, JobRecord, JobStatus, MessageEnvelope, SubmissionRecord, TargetKind
 from storage.jsonl_store import JsonlStore
 from storage.paths import PathLayout
+from native_kernel import guard_legacy_writes
+from native_records import record_backend, record_lookup
 
 SCHEMA_VERSION = 2
 PROJECT_VIEW_RECENT_JOB_STATUS_VALUES = frozenset(
@@ -52,7 +54,8 @@ class ProjectViewJobSummary:
 class JobStore:
     def __init__(self, layout: PathLayout, store: JsonlStore | None = None) -> None:
         self._layout = layout
-        self._store = store or JsonlStore()
+        self._store = record_backend(layout, store)
+        self._native = getattr(self._store, '_native', None)
 
     def append(self, record: JobRecord) -> None:
         self._store.append(
@@ -264,10 +267,11 @@ class JobStore:
         return self.get_latest_target(TargetKind.AGENT, agent_name, job_id)
 
     def get_latest_target(self, target_kind: TargetKind | str, target_name: str, job_id: str) -> JobRecord | None:
-        return self._store.find_last(
+        return record_lookup(self._store,
             self._layout.target_jobs_path(target_kind, target_name),
             predicate=lambda payload: str(payload.get('job_id') or '') == job_id,
             loader=_job_record_from_record,
+            fields={'job_id':job_id},
         )
 
 
@@ -304,7 +308,8 @@ def _job_summary_tail_helper_required() -> bool:
 class JobEventStore:
     def __init__(self, layout: PathLayout, store: JsonlStore | None = None) -> None:
         self._layout = layout
-        self._store = store or JsonlStore()
+        self._store = record_backend(layout, store)
+        self._native = getattr(self._store, '_native', None)
 
     def append(self, event: JobEvent) -> None:
         self._store.append(
@@ -337,7 +342,8 @@ class JobEventStore:
 class SubmissionStore:
     def __init__(self, layout: PathLayout, store: JsonlStore | None = None) -> None:
         self._layout = layout
-        self._store = store or JsonlStore()
+        self._store = record_backend(layout, store)
+        self._native = getattr(self._store, '_native', None)
 
     def append(self, record: SubmissionRecord) -> None:
         self._store.append(self._layout.ccbd_submissions_path, record, serializer=lambda value: value.to_record())
@@ -346,10 +352,11 @@ class SubmissionStore:
         return self._store.read_all(self._layout.ccbd_submissions_path, loader=_submission_record_from_record)
 
     def get_latest(self, submission_id: str) -> SubmissionRecord | None:
-        return self._store.find_last(
+        return record_lookup(self._store,
             self._layout.ccbd_submissions_path,
             predicate=lambda payload: str(payload.get('submission_id') or '') == submission_id,
             loader=_submission_record_from_record,
+            fields={'submission_id':submission_id},
         )
 
 
@@ -480,3 +487,8 @@ def _job_event_from_record(record: dict) -> JobEvent:
         payload=dict(record.get('payload', {})),
         timestamp=record['timestamp'],
     )
+
+
+guard_legacy_writes(JobStore,'append')
+guard_legacy_writes(JobEventStore,'append')
+guard_legacy_writes(SubmissionStore,'append')

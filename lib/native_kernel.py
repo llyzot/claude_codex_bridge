@@ -64,6 +64,10 @@ class KernelClient:
             info = self.call('ping')
             if info.get('service') != 'ccb-kernel' or info.get('api_version') != 1:
                 raise KernelUnavailable('incompatible Rust kernel')
+            self.capabilities = frozenset(info.get('capabilities') or ())
+            required = {'mailbox','scheduler','records','bureau','callback'}
+            if not required <= self.capabilities:
+                raise KernelUnavailable('Rust kernel lacks required core capabilities; rebuild ccb-kernel')
         except Exception:
             self.close()
             raise

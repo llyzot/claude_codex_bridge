@@ -1,4 +1,7 @@
+mod bureau;
+mod callback;
 pub mod models;
+mod records;
 mod scheduler;
 pub mod store;
 
@@ -23,12 +26,39 @@ impl Kernel {
         })
     }
     pub fn dispatch(&mut self, op: &str, args: &Value) -> Result<Value> {
+        match op {
+            "bureau.submit" => return bureau::submission(self, args),
+            "bureau.retry" => return bureau::retry(self, args),
+            "bureau.reply" => return bureau::reply(self, args),
+            "bureau.terminal" => return bureau::terminal(self, args),
+            "bureau.queue_reply" => return bureau::queue_reply(self, args),
+            "callback.prepare" => return callback::prepare(self, args),
+            "callback.enqueue" => return callback::enqueue(self, args),
+            "callback.done" => return callback::done(self, args),
+            "bureau.attempt_started" => return bureau::attempt_transition(self, "started", args),
+            "bureau.attempt_terminal" => return bureau::attempt_transition(self, "terminal", args),
+            _ => {}
+        }
+        if let Some(method) = op.strip_prefix("records.") {
+            return records::dispatch(&mut self.store, method, args);
+        }
+        if let Some(method) = op.strip_prefix("message.") {
+            ensure!(
+                ["set", "refresh"].contains(&method),
+                "unsupported message operation"
+            );
+            return records::message_transition(&mut self.store, method, args);
+        }
+        if op == "callback.update" {
+            return records::callback_update(&mut self.store, args);
+        }
         if let Some(method) = op.strip_prefix("scheduler.") {
             return self.scheduler.dispatch(method, args);
         }
         if op == "ping" {
             return Ok(
-                json!({"service":"ccb-kernel", "api_version":API_VERSION, "pid":std::process::id()}),
+                json!({"service":"ccb-kernel", "api_version":API_VERSION, "pid":std::process::id(),
+                    "capabilities":["mailbox","scheduler","records","bureau","callback"]}),
             );
         }
         if op == "lease.list" || op == "mailbox.list" {

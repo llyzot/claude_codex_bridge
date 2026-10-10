@@ -24,6 +24,10 @@ def record_reply(
     finished_at: str,
     deliver_to_caller: bool = True,
 ) -> str | None:
+    native = getattr(service._reply_store,'_native',None)
+    if native is not None:
+        return native.call('bureau.reply',job=job.to_record(),decision=decision.to_record(),finished_at=finished_at,
+                           deliver_to_caller=deliver_to_caller,known_mailboxes=list(service._known_mailboxes))
     attempt = service._attempt_store.get_latest_by_job_id(job.job_id)
     if attempt is None:
         return None
@@ -163,6 +167,11 @@ def record_terminal(
     deliver_to_caller: bool = True,
     record_reply_enabled: bool = True,
 ) -> str | None:
+    native = getattr(service._reply_store,'_native',None)
+    if native is not None:
+        return native.call('bureau.terminal',job=job.to_record(),decision=decision.to_record(),finished_at=finished_at,
+                           deliver_to_caller=deliver_to_caller,record_reply_enabled=record_reply_enabled,
+                           known_mailboxes=list(service._known_mailboxes))
     record_attempt_terminal(service, job, decision, finished_at=finished_at)
     if not record_reply_enabled:
         return None
@@ -178,6 +187,11 @@ def queue_reply_delivery(
     reply_id: str,
     finished_at: str,
 ) -> None:
+    native = getattr(service._reply_store,'_native',None)
+    if native is not None:
+        native.call('bureau.queue_reply',agent_name=caller_mailbox,message_id=message_id,
+                    attempt_id=attempt_id,reply_id=reply_id,timestamp=finished_at)
+        return
     service._inbound_store.append(
         InboundEventRecord(
             inbound_event_id=new_id('iev'),

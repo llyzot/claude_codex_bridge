@@ -18,6 +18,11 @@ _TERMINAL_INBOUND_STATUSES = {
 
 
 def mark_attempt_started(service, job: JobRecord, *, started_at: str) -> None:
+    native = getattr(service._attempt_store,'_native',None)
+    if native is not None:
+        native.call('bureau.attempt_started',job=job.to_record(),timestamp=started_at,
+                    lease_ttl_seconds=service._mailbox_kernel._lease_ttl_seconds)
+        return
     attempt = service._attempt_store.get_latest_by_job_id(job.job_id)
     if attempt is None:
         return
@@ -48,6 +53,10 @@ def mark_attempt_started(service, job: JobRecord, *, started_at: str) -> None:
 
 
 def record_attempt_terminal(service, job: JobRecord, decision: CompletionDecision, *, finished_at: str) -> None:
+    native = getattr(service._attempt_store,'_native',None)
+    if native is not None:
+        native.call('bureau.attempt_terminal',job=job.to_record(),timestamp=finished_at)
+        return
     del decision
     attempt = service._attempt_store.get_latest_by_job_id(job.job_id)
     if attempt is None:

@@ -15,7 +15,9 @@ _PANE_BACKED_RUNTIME_PROVIDERS = frozenset(CORE_PROVIDER_NAMES + OPTIONAL_PROVID
 # allow-list。只收录有真实 Herdr 环境启动证据的 provider；新增 provider 前必须先
 # 有 Herdr pane 实际运行验证（见 epic windows-native-herdr-ccb ITEM-1：Codex/Claude
 # 已在 Herdr pane 运行并输出内容）。自动检测触发的 herdr 后端不经过此 allow-list。
-_HERDR_NATIVE_VERIFIED_PROVIDERS = frozenset({'codex', 'claude'})
+# Pi was qualified locally with Windows Terminal/pwsh and a Codex worker:
+# asynchronous --chain completion automatically resumed the Pi lead.
+_HERDR_NATIVE_VERIFIED_PROVIDERS = frozenset({'codex', 'claude', 'pi'})
 
 
 def runtime_launcher(provider: str):

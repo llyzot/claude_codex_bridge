@@ -35,6 +35,7 @@ from provider_core.projected_assets import (
     projected_path_is_owned,
     remove_projected_path,
     route_projected_tree,
+    route_live_tree,
     seed_projected_tree,
     tree_content_fingerprint,
     write_projected_marker,
@@ -270,8 +271,8 @@ def materialize_codex_home_config(
         project_root=project_root,
         shared_cache_root=shared_cache_root,
     )
-    for relative in (Path('.tmp') / 'marketplaces', Path('plugins') / 'cache'):
-        seed_projected_tree(
+    for relative in (Path('.tmp') / 'marketplaces', Path('plugins')):
+        route_live_tree(
             source_home / relative,
             target_home / relative,
             enabled=inherited_assets_enabled,
@@ -1484,7 +1485,7 @@ def _route_inherited_tree(source: Path, target: Path, *, enabled: bool, label: s
     if not source.is_dir():
         remove_projected_path(target, label=label)
         return
-    route_projected_tree(source, target, label=label)
+    route_live_tree(source, target, label=label)
 
 
 def _materialize_inherited_skills(source: Path, target: Path, *, profile, enabled: bool = True) -> None:
@@ -1501,8 +1502,9 @@ def _materialize_inherited_skills(source: Path, target: Path, *, profile, enable
         include_patterns=include,
         exclude_patterns=exclude,
         # Codex owns a nested system-skill collection without a top-level
-        # SKILL.md.  Treat it as one immutable projection entry.
+        # SKILL.md. Reference the native collection as one live entry.
         special_entries=('.system',),
+        live=True,
     )
 
 
@@ -1535,7 +1537,7 @@ def _materialize_skill_overlays(target: Path, *, profile, project_root: Path | N
                 continue
             label = f'codex-skill-overlay:{overlay_name}:{skill_name}'
             desired_labels.add(label)
-            route_projected_tree(
+            route_live_tree(
                 entry,
                 target / skill_name,
                 enabled=True,
@@ -1613,7 +1615,6 @@ def _sync_codex_plugin_projection(
     source_sha = source_home / _CODEX_PLUGIN_SHA_RELATIVE
     target_tree = target_home / _CODEX_PLUGIN_TREE_RELATIVE
     target_sha = target_home / _CODEX_PLUGIN_SHA_RELATIVE
-    target_marker = Path(f'{target_tree}.ccb-projection.json')
     target_owned = projected_path_is_owned(target_tree, label=_CODEX_PLUGIN_PROJECTION_LABEL)
     if not enabled or not source_tree.is_dir():
         if target_owned:
@@ -1622,75 +1623,9 @@ def _sync_codex_plugin_projection(
         return
     if _same_path(source_tree, target_tree):
         return
-    target_present = target_tree.exists() or target_tree.is_symlink()
-    if (target_present or target_sha.exists() or target_marker.exists()) and not target_owned:
-        return
-    bundle_sha = _codex_plugin_bundle_sha(source_tree, source_sha)
-    if not bundle_sha:
-        return
-    bundle_tree = _codex_plugin_shared_bundle_path(
-        project_root,
-        target_home,
-        shared_cache_root=shared_cache_root,
-        bundle_sha=bundle_sha,
-    )
-    if target_owned and source_sha.is_file() and _plugin_projection_is_current(
-        source_tree=source_tree,
-        source_sha=source_sha,
-        target_tree=target_tree,
-        target_sha=target_sha,
-    ):
-        if bundle_tree is None:
-            return
-        if _same_path(target_tree, bundle_tree):
-            write_projected_marker(
-                target_tree,
-                label=_CODEX_PLUGIN_PROJECTION_LABEL,
-                mode='symlink',
-                source=bundle_tree,
-            )
-            return
-    projected = False
-    if bundle_tree is not None and copy_projected_tree_to_cache(source_tree, bundle_tree, label=_CODEX_PLUGIN_PROJECTION_LABEL):
-        remove_projected_path(target_tree, label=_CODEX_PLUGIN_PROJECTION_LABEL)
-        _remove_path(target_sha)
-        if target_tree.exists() or target_tree.is_symlink():
-            return
-        target_tree.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            target_tree.symlink_to(bundle_tree, target_is_directory=True)
-            projected = write_projected_marker(
-                target_tree,
-                label=_CODEX_PLUGIN_PROJECTION_LABEL,
-                mode='symlink',
-                source=bundle_tree,
-            )
-            if not projected:
-                _remove_path(target_tree)
-        except Exception:
-            projected = route_projected_tree(
-                bundle_tree,
-                target_tree,
-                label=_CODEX_PLUGIN_PROJECTION_LABEL,
-            )
-    else:
-        remove_projected_path(target_tree, label=_CODEX_PLUGIN_PROJECTION_LABEL)
-        _remove_path(target_sha)
-        if target_tree.exists() or target_tree.is_symlink():
-            return
-        projected = route_projected_tree(
-            source_tree,
-            target_tree,
-            label=_CODEX_PLUGIN_PROJECTION_LABEL,
-        )
-    if not projected or not _plugin_required_paths_available(source_tree, target_tree):
-        return
-    _remove_path(target_sha)
-    if source_sha.is_file():
-        _sync_file(source_sha, target_sha)
-    else:
-        target_sha.parent.mkdir(parents=True, exist_ok=True)
-        target_sha.write_text(f'{bundle_sha}\n', encoding='utf-8')
+    if route_live_tree(source_tree, target_tree, label=_CODEX_PLUGIN_PROJECTION_LABEL):
+        if source_sha.is_file():
+            _sync_file(source_sha, target_sha)
 
 
 def _install_codex_inherited_hooks(

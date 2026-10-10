@@ -41,7 +41,10 @@ def venv_base_interpreter() -> str | None:
     executable = Path(sys.executable)
     if executable.name.lower() not in {'python.exe', 'pythonw.exe'}:
         return None
-    venv_root = executable.parent.parent
+    return _base_interpreter_for_venv(executable.parent.parent, executable.name)
+
+
+def _base_interpreter_for_venv(venv_root: Path, executable_name: str) -> str | None:
     cfg = venv_root / 'pyvenv.cfg'
     if not cfg.is_file():
         return None
@@ -56,7 +59,7 @@ def venv_base_interpreter() -> str | None:
         return None
     if not home:
         return None
-    candidate = Path(home) / executable.name
+    candidate = Path(home) / executable_name
     return str(candidate) if candidate.is_file() else None
 
 
@@ -68,12 +71,26 @@ def background_spawn() -> tuple[str, dict[str, str]]:
     the spawned process and ``Popen.pid`` equals the daemon's own pid.  The
     venv site-packages are carried into ``PYTHONPATH`` (the base interpreter
     does not auto-add them without the redirector) and ``VIRTUAL_ENV`` is set.
+    A keeper already using the base executable reconstructs that dependency
+    path from its inherited venv, after matching the configured interpreter.
     Off Windows this is ``(sys.executable, {})``.
     """
     if os.name != 'nt':
         return sys.executable, {}
     interpreter = venv_base_interpreter() or sys.executable
-    venv_root = Path(sys.executable).parent.parent
+    executable = Path(sys.executable)
+    venv_root = executable.parent.parent
+    if not (venv_root / 'pyvenv.cfg').is_file():
+        inherited = str(os.environ.get('VIRTUAL_ENV') or '').strip()
+        if not inherited or executable.name.lower() not in {'python.exe', 'pythonw.exe'}:
+            return interpreter, {}
+        venv_root = Path(inherited).expanduser()
+        base = _base_interpreter_for_venv(venv_root, executable.name)
+        try:
+            if base is None or Path(base).resolve() != executable.resolve():
+                return interpreter, {}
+        except (OSError, RuntimeError):
+            return interpreter, {}
     extra: dict[str, str] = {}
     site_packages = venv_root / 'Lib' / 'site-packages'
     if site_packages.is_dir():

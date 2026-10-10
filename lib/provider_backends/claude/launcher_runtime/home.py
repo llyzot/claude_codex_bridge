@@ -36,6 +36,7 @@ from provider_core.platform_info import is_macos
 from provider_core.projected_assets import (
     remove_projected_path,
     route_projected_tree,
+    route_live_tree,
     seed_projected_tree,
 )
 from provider_core.projected_settings import rebase_json_path_fields
@@ -205,42 +206,22 @@ def _claude_plugin_environment(
         and not role_command_policy_disables_inherited_assets(command_policy)
     )
     source_seed_root = Path(source_home).expanduser() / '.claude' / 'plugins'
+    if inherited_plugins_enabled:
+        # Let Claude's own plugin manager own installation, cache and reload.
+        seed_root = source_seed_root
+        if not source_seed_root.is_dir():
+            seed_root = target_layout.claude_dir / _CLAUDE_EMPTY_PLUGIN_SEED
+            seed_root.mkdir(parents=True, exist_ok=True)
+        return {
+            _CLAUDE_PLUGIN_SEED_ENV: str(seed_root),
+            _CLAUDE_PLUGIN_CACHE_ENV: str(source_seed_root),
+        }
     empty_seed_root = target_layout.claude_dir / _CLAUDE_EMPTY_PLUGIN_SEED
-    source_seed_usable = inherited_plugins_enabled and _usable_claude_plugin_seed(source_seed_root)
-    seed_root = source_seed_root if source_seed_usable else empty_seed_root
-    normal_plugin_root = target_layout.claude_dir / 'plugins'
-    if not inherited_plugins_enabled:
-        plugin_root = target_layout.claude_dir / _CLAUDE_RESTRICTED_PLUGIN_ROOT
-    elif source_seed_usable or normal_plugin_root.exists() or normal_plugin_root.is_symlink():
-        plugin_root = normal_plugin_root
-    else:
-        plugin_root = target_layout.claude_dir / _CLAUDE_EMPTY_PLUGIN_ROOT
-    try:
-        if source_seed_usable and _claude_plugin_root_is_bootstrap_safe(plugin_root):
-            if plugin_root.exists():
-                shutil.rmtree(plugin_root)
-            seeded = seed_projected_tree(
-                source_seed_root,
-                plugin_root,
-                label=_CLAUDE_PLUGIN_BOOTSTRAP_LABEL,
-            )
-            if seeded and not rebase_json_path_fields(
-                (
-                    plugin_root / 'installed_plugins.json',
-                    plugin_root / 'known_marketplaces.json',
-                ),
-                source_root=source_seed_root,
-                target_root=plugin_root,
-                fields=_CLAUDE_PLUGIN_PATH_KEYS,
-            ):
-                remove_projected_path(plugin_root, label=_CLAUDE_PLUGIN_BOOTSTRAP_LABEL)
-        plugin_root.mkdir(parents=True, exist_ok=True)
-        (plugin_root / 'cache').mkdir(parents=True, exist_ok=True)
-        empty_seed_root.mkdir(parents=True, exist_ok=True)
-    except Exception:
-        return {}
+    plugin_root = target_layout.claude_dir / _CLAUDE_RESTRICTED_PLUGIN_ROOT
+    empty_seed_root.mkdir(parents=True, exist_ok=True)
+    (plugin_root / 'cache').mkdir(parents=True, exist_ok=True)
     return {
-        _CLAUDE_PLUGIN_SEED_ENV: str(seed_root),
+        _CLAUDE_PLUGIN_SEED_ENV: str(empty_seed_root),
         _CLAUDE_PLUGIN_CACHE_ENV: str(plugin_root),
     }
 
@@ -423,6 +404,7 @@ def _materialize_inherited_assets(
         enabled=inherited_assets_enabled and _inherits_skills(profile),
         label=_CLAUDE_SKILLS_PROJECTION_LABEL,
         exclude=required_control_skill_names('claude'),
+        live=True,
     )
     project_role_skills_to_home(
         project_root=project_root,
@@ -1843,7 +1825,7 @@ def _sync_tree(source: Path, target: Path) -> None:
 
 
 def _route_inherited_tree(source: Path, target: Path, *, enabled: bool, label: str) -> None:
-    route_projected_tree(source, target, enabled=enabled, label=label)
+    route_live_tree(source, target, enabled=enabled, label=label)
 
 
 def _system_home_root() -> Path:

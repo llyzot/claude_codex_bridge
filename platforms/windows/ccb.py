@@ -1,6 +1,11 @@
 """Native launcher entrypoint; shared source files remain unchanged."""
 from pathlib import Path
+import os
 import sys
+
+# Cold provider/plugin projection can take several minutes on Windows.
+# Set this before importing modules that capture the startup policy.
+os.environ.setdefault('CCB_STARTUP_TRANSACTION_TIMEOUT_S', '600')
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))

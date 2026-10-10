@@ -45,7 +45,7 @@ fn run() -> Result<i32, String> {
         // Initial Windows plugin projection can exceed the shared 30s budget.
         // Keep an explicit upper bound and respect a user's override.
         if env::var_os("CCB_STARTUP_TRANSACTION_TIMEOUT_S").is_none() {
-            command.env("CCB_STARTUP_TRANSACTION_TIMEOUT_S", "180");
+            command.env("CCB_STARTUP_TRANSACTION_TIMEOUT_S", "600");
         }
         suppress_child_console(&mut command);
 

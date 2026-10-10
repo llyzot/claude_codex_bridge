@@ -9,6 +9,7 @@ from provider_core.projected_assets import (
     projected_path_is_owned,
     remove_projected_path,
     route_projected_tree,
+    route_live_tree,
 )
 
 
@@ -135,6 +136,7 @@ def route_inherited_skill_entries(
     include_patterns: tuple[str, ...] = (),
     exclude_patterns: tuple[str, ...] = (),
     special_entries: tuple[str, ...] = (),
+    live: bool = False,
 ) -> tuple[str, ...]:
     """Route optional skills per entry so one broken source cannot drop all skills."""
     source_root = Path(source_dir).expanduser()
@@ -169,7 +171,7 @@ def route_inherited_skill_entries(
                 continue
             entry_label = f'{label}:{skill_name}'
             desired_labels.add(entry_label)
-            if route_projected_tree(
+            if (route_live_tree if live else route_projected_tree)(
                 source,
                 target_root / skill_name,
                 enabled=True,

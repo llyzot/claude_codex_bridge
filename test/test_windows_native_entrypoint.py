@@ -56,3 +56,22 @@ def test_native_wrapper_keeps_shared_source_guard(tmp_path):
                               cwd=tmp_path, env=env, capture_output=True, encoding='utf-8', timeout=30)
     assert version.returncode == 0
     assert version.stdout.strip() == 'v' + (root/'VERSION').read_text().strip()
+
+
+@pytest.mark.parametrize('explicit,expected', [(None, 600.0), ('120', 120.0)])
+def test_native_script_sets_cold_start_budget_before_policy_import(tmp_path, explicit, expected):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, CCB_SKIP_HERDR_CHECK='1', PYTHONUTF8='1')
+    env.pop('CCB_STARTUP_TRANSACTION_TIMEOUT_S', None)
+    if explicit is not None:
+        env['CCB_STARTUP_TRANSACTION_TIMEOUT_S'] = explicit
+    script = str(root / 'platforms/windows/ccb.py')
+    code = (
+        f'import runpy; runpy.run_path({script!r}, run_name="native_budget_probe"); '
+        'from ccbd.startup_policy import STARTUP_TRANSACTION_TIMEOUT_S; '
+        'print(STARTUP_TRANSACTION_TIMEOUT_S)'
+    )
+    result = subprocess.run([sys.executable, '-c', code], cwd=tmp_path, env=env,
+                            capture_output=True, encoding='utf-8', timeout=30)
+    assert result.returncode == 0, result.stderr
+    assert float(result.stdout.strip().splitlines()[-1]) == expected

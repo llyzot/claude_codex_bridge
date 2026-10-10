@@ -13,6 +13,7 @@ import pytest
 
 from provider_backends.pi.home import _snapshot_package_tree
 from provider_backends.pi import package_snapshot
+from provider_backends.pi.home import materialize_pi_config
 
 
 def package(path, name, deps=(), code='module.exports = {};', version='1.0.0'):
@@ -63,6 +64,30 @@ def test_same_size_same_mtime_changes_invalidate(tmp_path):
     second = snapshot(source, tmp_path)
     assert first != second
     assert node('console.log(require(process.argv[1])[0].value)', second) == '43'
+
+
+def test_npm_projection_uses_native_dependency_resolution(tmp_path):
+    home = tmp_path / 'source-home'
+    agent = home / '.pi' / 'agent'
+    modules = agent / 'npm' / 'node_modules'
+    package(modules / 'plugin', 'plugin', ['dep'], 'module.exports=require("dep");')
+    dependency = package(modules / 'dep', 'dep', [], 'module.exports={value:42};')
+    unused = package(modules / 'unused', 'unused', [], 'module.exports={value:0};')
+    (agent / 'settings.json').write_text(json.dumps({'packages': ['npm:plugin']}))
+
+    def project(name):
+        target = tmp_path / name
+        materialize_pi_config(home, target, shared_cache_root=tmp_path / 'cache')
+        return Path(json.loads((target / 'settings.json').read_text())['packages'][0])
+
+    first = project('first')
+    assert node('console.log(require(process.argv[1]).value)', first) == '42'
+    (unused / 'index.js').write_text('module.exports={value:1};')
+    assert project('unchanged-plugin') == first
+    (dependency / 'index.js').write_text('module.exports={value:43};')
+    changed = project('changed-dependency')
+    assert changed == first
+    assert node('console.log(require(process.argv[1]).value)', changed) == '43'
 
 
 def test_same_name_version_distinct_installs_are_not_merged(tmp_path):

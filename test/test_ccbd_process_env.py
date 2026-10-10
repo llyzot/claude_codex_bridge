@@ -209,6 +209,98 @@ def test_venv_base_interpreter_none_without_pyvenv_cfg(tmp_path: Path, monkeypat
     assert process_background.venv_base_interpreter() is None
 
 
+def test_windows_keeper_preserves_venv_dependencies_for_daemon(tmp_path: Path, monkeypatch) -> None:
+    _mock_process_background_os(monkeypatch, name='nt')
+    venv = tmp_path / 'venv'
+    (venv / 'Scripts').mkdir(parents=True)
+    site_packages = venv / 'Lib' / 'site-packages'
+    site_packages.mkdir(parents=True)
+    base_exe = tmp_path / 'base' / 'python.exe'
+    base_exe.parent.mkdir()
+    base_exe.write_bytes(b'')
+    (venv / 'pyvenv.cfg').write_text(f'home = {base_exe.parent}\n', encoding='utf-8')
+    monkeypatch.setattr(process_background.sys, 'executable', str(venv / 'Scripts' / 'python.exe'))
+    keeper_interpreter, keeper_extra = process_background.background_spawn()
+
+    # The keeper runs the base executable, with the venv identity retained.
+    monkeypatch.setattr(process_background.sys, 'executable', keeper_interpreter)
+    monkeypatch.setenv('VIRTUAL_ENV', keeper_extra['VIRTUAL_ENV'])
+    monkeypatch.setenv('PYTHONPATH', os.pathsep.join([str(site_packages), '/unrelated/inherited']))
+    daemon_interpreter, daemon_extra = process_background.background_spawn()
+    env = _ccbd_env(keeper_pid=123, venv_env=daemon_extra)
+
+    assert daemon_interpreter == str(base_exe)
+    assert env['PYTHONPATH'].split(os.pathsep) == [
+        str(Path(__file__).resolve().parents[1] / 'lib'), str(site_packages),
+    ]
+    assert daemon_extra['VIRTUAL_ENV'] == str(venv)
+
+
+@pytest.mark.parametrize('valid_config', [False, True])
+def test_windows_background_spawn_ignores_unrelated_inherited_venv(
+    tmp_path: Path, monkeypatch, valid_config: bool,
+) -> None:
+    _mock_process_background_os(monkeypatch, name='nt')
+    inherited = tmp_path / 'unrelated'
+    (inherited / 'Lib' / 'site-packages').mkdir(parents=True)
+    other_base = tmp_path / 'other-base'
+    other_base.mkdir()
+    (other_base / 'python.exe').write_bytes(b'')
+    if valid_config:
+        (inherited / 'pyvenv.cfg').write_text(f'home = {other_base}\n', encoding='utf-8')
+    current = tmp_path / 'current' / 'python.exe'
+    monkeypatch.setattr(process_background.sys, 'executable', str(current))
+    monkeypatch.setenv('VIRTUAL_ENV', str(inherited))
+
+    interpreter, extra = process_background.background_spawn()
+
+    assert interpreter == str(current)
+    assert extra == {}
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='Windows base-interpreter venv launch chain')
+def test_windows_two_background_hops_import_venv_only_dependency(tmp_path: Path) -> None:
+    venv = tmp_path / 'venv'
+    subprocess.run(
+        [sys.executable, '-m', 'venv', '--without-pip', str(venv)],
+        check=True, capture_output=True, text=True,
+    )
+    (venv / 'Lib' / 'site-packages' / 'ccb_venv_probe.py').write_text(
+        "VALUE = 'venv_dependency_preserved'\n", encoding='utf-8',
+    )
+    lib_root = str(Path(__file__).resolve().parents[1] / 'lib')
+    script = tmp_path / 'spawn_probe.py'
+    script.write_text(
+        'import sys, subprocess\n'
+        f'sys.path.insert(0, {lib_root!r})\n'
+        'from process_background import background_spawn, no_window_process_kwargs\n'
+        'from ccbd.daemon_process import _ccbd_env\n'
+        "if '--daemon' in sys.argv:\n"
+        '    import ccb_venv_probe\n'
+        '    print(ccb_venv_probe.VALUE)\n'
+        'else:\n'
+        '    interpreter, extra = background_spawn()\n'
+        "    mode = '--daemon' if '--keeper' in sys.argv else '--keeper'\n"
+        '    child = subprocess.run([interpreter, __file__, mode],\n'
+        '        env=_ccbd_env(keeper_pid=None, venv_env=extra),\n'
+        '        capture_output=True, text=True, timeout=20,\n'
+        '        **no_window_process_kwargs())\n'
+        '    print(child.stdout, end="")\n'
+        '    print(child.stderr, end="", file=sys.stderr)\n'
+        '    sys.exit(child.returncode)\n',
+        encoding='utf-8',
+    )
+
+    result = subprocess.run(
+        [str(venv / 'Scripts' / 'python.exe'), str(script)],
+        capture_output=True, text=True, timeout=40,
+        **process_background.no_window_process_kwargs(),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == 'venv_dependency_preserved'
+
+
 def test_spawn_failure_reclaims_only_spawned_child_and_closes_parent_logs(
     tmp_path: Path,
     monkeypatch,

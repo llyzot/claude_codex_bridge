@@ -8,8 +8,102 @@ from pathlib import Path
 import shutil
 import stat
 import tempfile
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 
 _HASH_CHUNK_SIZE = 64 * 1024
+
+
+def _is_junction(path: Path) -> bool:
+    if os.name != 'nt':
+        return False
+    try:
+        return getattr(path.lstat(), 'st_reparse_tag', None) == 0xA0000003
+    except OSError:
+        return False
+
+
+def _create_windows_junction(source: Path, target: Path) -> None:
+    import ctypes
+    from ctypes import wintypes
+    import struct
+
+    destination = str(source.absolute())
+    substitute = '\\??\\UNC\\' + destination[2:] if destination.startswith('\\\\') else '\\??\\' + destination
+    substitute_bytes = substitute.encode('utf-16-le')
+    print_bytes = destination.encode('utf-16-le')
+    paths = substitute_bytes + b'\0\0' + print_bytes + b'\0\0'
+    data = struct.pack('<IHHHHHH', 0xA0000003, 8 + len(paths), 0,
+                       0, len(substitute_bytes), len(substitute_bytes) + 2, len(print_bytes)) + paths
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                                  wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    kernel.CreateFileW.restype = wintypes.HANDLE
+    kernel.DeviceIoControl.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPVOID,
+                                      wintypes.DWORD, wintypes.LPVOID, wintypes.DWORD,
+                                      ctypes.POINTER(wintypes.DWORD), wintypes.LPVOID]
+    kernel.DeviceIoControl.restype = wintypes.BOOL
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    target.mkdir()
+    target_name = str(target.absolute())
+    if not target_name.startswith('\\\\?\\'):
+        target_name = '\\\\?\\UNC\\' + target_name[2:] if target_name.startswith('\\\\') else '\\\\?\\' + target_name
+    handle = kernel.CreateFileW(target_name, 0x40000000, 7, None, 3, 0x02200000, None)
+    if handle == ctypes.c_void_p(-1).value:
+        target.rmdir()
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        buffer = ctypes.create_string_buffer(data)
+        returned = wintypes.DWORD()
+        if not kernel.DeviceIoControl(handle, 0x000900A4, buffer, len(data), None, 0,
+                                      ctypes.byref(returned), None):
+            raise ctypes.WinError(ctypes.get_last_error())
+    except Exception:
+        kernel.CloseHandle(handle)
+        target.rmdir()
+        raise
+    else:
+        kernel.CloseHandle(handle)
+
+
+def route_live_tree(source: Path, target: Path, *, enabled: bool = True,
+                    label: str = 'projected-tree', allow_unmarked_replace: bool = False) -> bool:
+    """Reference native resources; never silently replace a link with a copy."""
+    del allow_unmarked_replace
+    source, target = Path(source).expanduser(), Path(target).expanduser()
+    marker = _default_marker_path(target)
+    if marker.exists() and not _marker_matches(marker, label=label, source=None):
+        return False
+    if not enabled or not source.is_dir():
+        remove_projected_path(target, label=label)
+        return False
+    if _same_path(source, target) and not (target.is_symlink() or _is_junction(target)):
+        return True
+    if _projection_points_to(target, source):
+        return _write_projection_marker(marker, source=source,
+                                        mode='junction' if _is_junction(target) else 'symlink', label=label)
+    if target.exists() or target.is_symlink() or _is_junction(target):
+        if not _marker_matches(marker, label=label, source=None):
+            return False
+        if not (target.is_symlink() or _is_junction(target)):
+            if not target.resolve().is_relative_to(target.parent.resolve()):
+                raise RuntimeError('live projection target escaped its owned parent')
+            if source.resolve().is_relative_to(target.resolve()):
+                raise RuntimeError('live projection source is inside replacement target')
+        _remove_path(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        target.symlink_to(source.absolute(), target_is_directory=True)
+        mode = 'symlink'
+    except OSError:
+        if os.name != 'nt':
+            raise
+        _create_windows_junction(source, target)
+        mode = 'junction'
+    if _write_projection_marker(marker, source=source, mode=mode, label=label):
+        return True
+    _remove_path(target)
+    return False
 
 
 def route_projected_tree(
@@ -106,7 +200,7 @@ def copy_projected_tree_to_cache(
     )
     candidate = staging_root / 'candidate'
     try:
-        shutil.copytree(source, candidate, symlinks=True)
+        _copy_cache_tree(source, candidate)
         if (
             not tree_symlinks_are_self_contained(candidate)
             or tree_content_fingerprint(candidate) != source_fingerprint
@@ -354,27 +448,74 @@ def tree_content_fingerprint(root: Path) -> str:
         digest.update(b'root\0')
         digest.update(str(stat.S_IMODE(root.stat().st_mode)).encode('ascii'))
         digest.update(b'\0')
+        records = []
         for entry in sorted(root.rglob('*')):
-            relative = entry.relative_to(root)
-            kind = 'l' if entry.is_symlink() else 'd' if entry.is_dir() else 'f' if entry.is_file() else 'o'
-            digest.update(kind.encode('utf-8'))
-            digest.update(b'\0')
-            digest.update(str(relative).encode('utf-8', errors='ignore'))
-            digest.update(b'\0')
-            if entry.is_symlink():
-                digest.update(str(entry.readlink()).encode('utf-8', errors='ignore'))
-            elif entry.is_file():
-                digest.update(str(stat.S_IMODE(entry.stat().st_mode)).encode('ascii'))
+            metadata = entry.lstat()
+            mode = metadata.st_mode
+            kind = 'l' if stat.S_ISLNK(mode) else 'd' if stat.S_ISDIR(mode) else 'f' if stat.S_ISREG(mode) else 'o'
+            records.append((entry, kind, metadata))
+        files = iter((entry, metadata.st_size) for entry, kind, metadata in records if kind == 'f')
+        workers = 8 if os.name == 'nt' else 1
+        with ThreadPoolExecutor(max_workers=workers) as reads:
+            pending = deque()
+
+            def queue_next():
+                item = next(files, None)
+                if item is not None:
+                    pending.append(reads.submit(_read_small_fingerprint_file, *item))
+
+            for _ in range(workers):
+                queue_next()
+            for entry, kind, metadata in records:
+                digest.update(kind.encode('utf-8'))
                 digest.update(b'\0')
-                with entry.open('rb') as handle:
-                    for chunk in iter(lambda: handle.read(_HASH_CHUNK_SIZE), b''):
-                        digest.update(chunk)
-            elif entry.is_dir():
-                digest.update(str(stat.S_IMODE(entry.stat().st_mode)).encode('ascii'))
-            digest.update(b'\0')
+                digest.update(str(entry.relative_to(root)).encode('utf-8', errors='ignore'))
+                digest.update(b'\0')
+                if kind == 'l':
+                    digest.update(str(entry.readlink()).encode('utf-8', errors='ignore'))
+                elif kind == 'f':
+                    digest.update(str(stat.S_IMODE(metadata.st_mode)).encode('ascii'))
+                    digest.update(b'\0')
+                    content = pending.popleft().result()
+                    if content is not None:
+                        digest.update(content)
+                    else:
+                        with entry.open('rb') as handle:
+                            for chunk in iter(lambda: handle.read(_HASH_CHUNK_SIZE), b''):
+                                digest.update(chunk)
+                    queue_next()
+                elif kind == 'd':
+                    digest.update(str(stat.S_IMODE(metadata.st_mode)).encode('ascii'))
+                digest.update(b'\0')
     except Exception:
         return ''
     return digest.hexdigest()
+
+
+def _read_small_fingerprint_file(path: Path, size: int) -> bytes | None:
+    # Bound buffering to at most workers * 2 MiB. Large files retain streaming.
+    limit = 2 * 1024 * 1024
+    if size > limit:
+        return None
+    with path.open('rb') as handle:
+        content = handle.read(limit + 1)
+    return content if len(content) <= limit else None
+
+
+def _copy_cache_tree(source: Path, target: Path) -> None:
+    if os.name != 'nt':
+        shutil.copytree(source, target, symlinks=True)
+        return
+    with ThreadPoolExecutor(max_workers=8) as copies:
+        pending = []
+
+        def copy_file(src, dst):
+            pending.append(copies.submit(shutil.copy2, src, dst))
+            return dst
+
+        shutil.copytree(source, target, symlinks=True, copy_function=copy_file)
+        for copy in pending:
+            copy.result()
 
 
 def tree_metadata_fingerprint(root: Path) -> str:
@@ -427,7 +568,7 @@ def _remove_projected_target(target: Path, marker: Path, *, label: str) -> None:
 
 
 def _projection_points_to(target: Path, source: Path) -> bool:
-    if not target.is_symlink():
+    if not (target.is_symlink() or _is_junction(target)):
         return False
     try:
         return target.resolve() == source.resolve()
@@ -494,7 +635,7 @@ def _marker_matches(marker: Path, *, label: str, source: Path | None) -> bool:
     marker_source = str(payload.get('source') or '').strip()
     if not marker_source:
         return False
-    if str(payload.get('mode') or '') not in {'symlink', 'copy', 'copy-seed'}:
+    if str(payload.get('mode') or '') not in {'symlink', 'junction', 'copy', 'copy-seed'}:
         return False
     if source is None:
         return True
@@ -553,6 +694,9 @@ def _write_projection_marker(
 
 
 def _remove_path(path: Path) -> None:
+    if _is_junction(path):
+        path.rmdir()
+        return
     if path.is_symlink() or path.is_file():
         path.unlink(missing_ok=True)
         return
@@ -574,6 +718,7 @@ __all__ = [
     'remove_projected_path',
     'remove_projected_tree',
     'route_projected_tree',
+    'route_live_tree',
     'seed_projected_file',
     'seed_projected_tree',
     'tree_content_fingerprint',

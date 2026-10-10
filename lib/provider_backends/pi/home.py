@@ -35,7 +35,7 @@ def materialize_pi_config(
     profile=None,
     shared_cache_root: Path | None = None,
 ) -> None:
-    """Project Pi configuration and immutable extension authority one way."""
+    """Keep a small runtime settings overlay referencing native Pi resources."""
     if not _inherits_config(profile):
         return
 
@@ -44,53 +44,88 @@ def materialize_pi_config(
     copy_regular_file(source_agent / 'my-pi-setup.json', target_agent / 'my-pi-setup.json')
 
     source_settings = source_agent / 'settings.json'
-    if not source_settings.is_file():
-        return
-    settings = _read_json_object(source_settings)
+    settings = _read_json_object(source_settings) if source_settings.is_file() else {}
     if settings is None:
         copy_regular_file(source_settings, target_agent / 'settings.json')
         return
 
-    cache_root = (
-        Path(shared_cache_root).expanduser()
-        if shared_cache_root is not None
-        else ensure_provider_user_cache_dir('pi')
-    )
-    asset_root = cache_root / 'profile-assets'
-    npm_source = source_agent / 'npm' / 'node_modules'
-    npm_target = None
-    if _configured_npm_package_names(settings):
-        npm_target = _snapshot_tree(
-            npm_source,
-            cache_root=asset_root,
-            category='npm-trees',
-            target_name='node_modules',
-            digest=_npm_install_fingerprint(source_agent / 'npm', npm_source),
-        )
-
+    del shared_cache_root  # Native resources need no CCB cache.
     package_roots = _configured_package_roots(settings, source_agent)
-    direct_extensions = _snapshot_direct_extensions(
-        source_agent / 'extensions',
-        cache_root=asset_root,
-        package_roots=package_roots,
-    )
-    settings['packages'] = _rewrite_packages(
-        settings.get('packages'),
-        source_agent=source_agent,
-        cache_root=asset_root,
-        npm_target=npm_target,
-        direct_extensions=direct_extensions,
-    )
-    settings['extensions'] = _rewrite_extensions(
-        settings.get('extensions'),
-        source_agent=source_agent,
-        cache_root=asset_root,
-        direct_extensions=tuple(direct_extensions.values()),
-    )
+    packages = []
+    raw_packages = settings.get('packages')
+    for entry in raw_packages if isinstance(raw_packages, list) else []:
+        raw = entry if isinstance(entry, str) else entry.get('source') if isinstance(entry, dict) else None
+        if not isinstance(raw, str):
+            packages.append(_clone_json_value(entry))
+            continue
+        projected = _live_package_source(raw, source_agent)
+        if isinstance(entry, dict):
+            value = _clone_json_value(entry)
+            value['source'] = projected
+            packages.append(value)
+        else:
+            packages.append(projected)
+    settings['packages'] = packages
+    raw_extensions = settings.get('extensions')
+    extensions = [_live_resource_path(value, source_agent) for value in raw_extensions] if isinstance(raw_extensions, list) else []
+    extensions.append('!extensions/**')
+    source_extensions = source_agent / 'extensions'
+    if source_extensions.is_dir():
+        for entry in sorted(source_extensions.iterdir()):
+            try:
+                if not entry.name.startswith('.') and entry.resolve() not in package_roots:
+                    if entry.is_dir() or (entry.is_file() and entry.suffix in {'.js', '.ts'}):
+                        extensions.append(str(entry.absolute()))
+            except (OSError, RuntimeError):
+                continue
+    settings['extensions'] = _unique_live_resources(extensions)
+    for key in ('skills', 'prompts', 'themes'):
+        raw = settings.get(key)
+        values = [_live_resource_path(value, source_agent) for value in raw] if isinstance(raw, list) else []
+        directory = source_agent / key
+        if directory.is_dir():
+            values.append(str(directory.absolute()))
+        if key == 'skills' and (Path(source_home) / '.agents' / 'skills').is_dir():
+            values.append(str((Path(source_home) / '.agents' / 'skills').absolute()))
+        if values:
+            settings[key] = _unique_live_resources(values)
     atomic_write_text(
         target_agent / 'settings.json',
         json.dumps(settings, ensure_ascii=False, indent=2) + '\n',
     )
+
+
+def _live_resource_path(value, source_agent: Path):
+    if not isinstance(value, str) or not value:
+        return value
+    prefix = value[:1] if value[:1] in {'!', '+', '-'} else ''
+    path = Path(value[len(prefix):]).expanduser()
+    if not path.is_absolute():
+        path = source_agent / path
+    return prefix + str(path.absolute())
+
+
+def _unique_live_resources(values):
+    result = []
+    for value in values:
+        if value not in result:
+            result.append(value)
+    return result
+
+
+def _live_package_source(source: str, source_agent: Path) -> str:
+    npm_name = _npm_package_name(source)
+    if npm_name:
+        path = source_agent / 'npm' / 'node_modules' / Path(*_package_name_parts(npm_name))
+        return str(path.absolute()) if path.is_dir() else source
+    git = _git_package_parts(source)
+    if git:
+        path = source_agent / 'git' / git[0] / git[1]
+        return str(path.absolute()) if path.is_dir() else source
+    path = Path(source).expanduser()
+    if not path.is_absolute():
+        path = source_agent / path
+    return str(path.absolute()) if path.exists() else source
 
 
 def _snapshot_direct_extensions(

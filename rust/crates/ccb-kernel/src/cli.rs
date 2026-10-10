@@ -98,6 +98,15 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> ask <agent> --project <id> [--from <actor>] [--chain] [--silence] <message>\nccb-native --state-root <dir> ping|watch <target>|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native token-create <new-file>");
         return Ok(());
     }
+    if args[0] == "private-copy" {
+        ensure!(
+            args.len() == 3,
+            "private-copy requires source and new destination"
+        );
+        crate::security::copy_private(Path::new(&args[1]), Path::new(&args[2]))?;
+        println!("{{\"copied\":true}}");
+        return Ok(());
+    }
     if args[0] == "token-create" {
         ensure!(args.len() == 2, "token-create requires a new file");
         println!("{}", crate::security::create_token(Path::new(&args[1]))?);

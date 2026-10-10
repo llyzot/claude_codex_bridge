@@ -41,6 +41,21 @@ pub fn create_token(path: &Path) -> Result<Value> {
         "fingerprint":format!("{:x}",Sha256::digest(secret.as_bytes()))[..16].to_owned()}),
     )
 }
+pub fn copy_private(source: &Path, destination: &Path) -> Result<()> {
+    let bytes = std::fs::read(source)?;
+    std::fs::create_dir_all(
+        destination
+            .parent()
+            .context("private destination requires parent")?,
+    )?;
+    let mut created = false;
+    let result =
+        write_private(destination, &bytes, &mut created).and_then(|_| verify_token(destination));
+    if result.is_err() && created {
+        let _ = std::fs::remove_file(destination);
+    }
+    result
+}
 
 #[cfg(not(windows))]
 fn random_bytes(bytes: &mut [u8]) -> Result<()> {

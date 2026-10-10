@@ -60,6 +60,7 @@ pub struct Daemon {
     running: HashMap<String, Running>,
     pi: HashMap<String, crate::pi_rpc::Session>,
     codex: HashMap<String, crate::codex_rpc::Session>,
+    claude: HashMap<String, crate::claude_stream::Session>,
     pub stopping: bool,
     heartbeat: Instant,
 }
@@ -104,7 +105,7 @@ impl Daemon {
             );
             ensure!(
                 spec["driver_kind"].is_null()
-                    || ["command", "pi_rpc", "codex_app_server"]
+                    || ["command", "pi_rpc", "codex_app_server", "claude_stream"]
                         .contains(&spec["driver_kind"].as_str().unwrap_or("")),
                 "unknown native driver kind"
             );
@@ -131,6 +132,12 @@ impl Daemon {
                     ensure!(
                         spec["provider"] == "codex",
                         "Codex app-server requires codex provider"
+                    );
+                }
+                if spec["driver_kind"] == "claude_stream" {
+                    ensure!(
+                        spec["provider"] == "claude",
+                        "Claude stream requires claude provider"
                     );
                 }
                 ensure!(
@@ -177,6 +184,7 @@ impl Daemon {
             running: HashMap::new(),
             pi: HashMap::new(),
             codex: HashMap::new(),
+            claude: HashMap::new(),
             stopping: false,
             heartbeat: Instant::now(),
         })
@@ -210,6 +218,7 @@ impl Daemon {
     pub fn unmount(&mut self) -> Result<()> {
         self.pi.clear();
         self.codex.clear();
+        self.claude.clear();
         for running in self.running.values_mut() {
             let _ = running.child.kill();
             let _ = running.child.wait();
@@ -937,6 +946,78 @@ impl Daemon {
                     };
                     if !job.is_null() {
                         self.codex.get_mut(&agent).unwrap().start(&job)?;
+                    }
+                }
+                continue;
+            }
+            if spec["driver_kind"] == "claude_stream" {
+                if self
+                    .claude
+                    .get(&agent)
+                    .is_some_and(|session| session.closed)
+                {
+                    let depth = self.kernel.dispatch(
+                        "scheduler.queue_depth_for",
+                        &json!({"state_id":self.state,"target_kind":"agent","target_name":agent}),
+                    )?;
+                    if depth.as_u64().unwrap_or(0) > 0 {
+                        self.claude.remove(&agent);
+                    }
+                }
+                if !self.claude.contains_key(&agent) {
+                    let saved = self
+                        .kernel
+                        .store
+                        .json(&format!("providers/claude/{agent}/session.json"))?
+                        .unwrap_or(Value::Null);
+                    let session = crate::claude_stream::Session::spawn(
+                        &agent, &spec, endpoint, token_path, &saved,
+                    )?;
+                    self.claude.insert(agent.clone(), session);
+                }
+                let (completion, metadata, ready) = {
+                    let session = self.claude.get_mut(&agent).unwrap();
+                    let completion = session.poll()?;
+                    let metadata = if session.dirty {
+                        session.dirty = false;
+                        Some(
+                            json!({"schema_version":1,"record_type":"claude_stream_session","agent_name":agent,"runtime_instance_id":session.runtime,"pid":session.pid(),"state":session.state,"observed_at":now()}),
+                        )
+                    } else {
+                        None
+                    };
+                    (completion, metadata, session.ready)
+                };
+                if let Some(metadata) = metadata {
+                    self.kernel
+                        .store
+                        .save(&format!("providers/claude/{agent}/session.json"), &metadata)?;
+                    self.kernel.store.commit()?;
+                }
+                if let Some((job, decision)) = completion {
+                    let checkpoint = self.kernel.memory_checkpoint();
+                    if let Err(error) = self.complete(&job, &decision) {
+                        self.kernel.store.rollback();
+                        self.kernel.restore_memory(checkpoint);
+                        return Err(error);
+                    }
+                    self.kernel.store.commit()?;
+                }
+                if ready {
+                    let checkpoint = self.kernel.memory_checkpoint();
+                    let job = match self.start(&agent) {
+                        Ok(job) => {
+                            self.kernel.store.commit()?;
+                            job
+                        }
+                        Err(error) => {
+                            self.kernel.store.rollback();
+                            self.kernel.restore_memory(checkpoint);
+                            return Err(error);
+                        }
+                    };
+                    if !job.is_null() {
+                        self.claude.get_mut(&agent).unwrap().start(&job)?;
                     }
                 }
                 continue;

@@ -1,5 +1,7 @@
+mod admission;
 mod bureau;
 mod callback;
+mod callback_policy;
 mod completion;
 mod completion_gate;
 pub mod control_plane;
@@ -70,6 +72,8 @@ impl Kernel {
             return self.completion.dispatch(method, args);
         }
         match op {
+            "dispatcher.submit" => return admission::submit(self, args),
+            "callback.validate" => return callback_policy::validate(self, args),
             "bureau.submit" => return bureau::submission(self, args),
             "bureau.retry" => return bureau::retry(self, args),
             "bureau.reply" => return bureau::reply(self, args),
@@ -101,7 +105,7 @@ impl Kernel {
         if op == "ping" {
             return Ok(
                 json!({"service":"ccb-kernel", "api_version":API_VERSION, "pid":std::process::id(),
-                    "capabilities":["mailbox","scheduler","records","bureau","callback","completion","control_plane","lifecycle"]}),
+                    "capabilities":["mailbox","scheduler","records","bureau","callback","completion","control_plane","lifecycle","admission"]}),
             );
         }
         if op == "lease.list" || op == "mailbox.list" {

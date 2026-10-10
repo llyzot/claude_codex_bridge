@@ -102,6 +102,20 @@ impl State {
                     .unwrap_or(Value::Null))
             }
             "rebuild" => return self.rebuild(args),
+            "admit" => {
+                let jobs = args["jobs"]
+                    .as_array()
+                    .ok_or_else(|| anyhow::anyhow!("jobs must be an array"))?;
+                for record in jobs {
+                    ensure!(record["target_kind"] == "agent", "invalid target kind");
+                    let name = string(record, "target_name")?;
+                    let id = string(record, "job_id")?;
+                    ensure!(!self.index.contains_key(id), "job already indexed");
+                    self.index.insert(id.into(), name.into());
+                    self.slot(name).queue.push_back(id.into());
+                }
+                return Ok(Value::Null);
+            }
             "record" => {
                 let record = &args["record"];
                 ensure!(record["target_kind"] == "agent", "invalid target kind");

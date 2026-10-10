@@ -293,6 +293,17 @@ impl Store {
         self.staged.clear();
         self.writes.clear();
     }
+    #[cfg(test)]
+    pub(crate) fn interrupt_for_test(&self, boundary: usize) -> Result<usize> {
+        atomic_write(
+            &self.root.join("kernel/pending.json"),
+            &serde_json::to_vec(&self.writes)?,
+        )?;
+        for op in self.writes.iter().take(boundary) {
+            self.apply(op)?;
+        }
+        Ok(self.writes.len())
+    }
     pub fn commit(&mut self) -> Result<()> {
         if self.writes.is_empty() {
             return Ok(());

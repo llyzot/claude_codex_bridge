@@ -83,6 +83,9 @@ def _build_job_record(
 
 
 def _submit_plan(dispatcher, plan: _SubmissionPlan, *, accepted_at: str) -> tuple[SubmitReceipt, str | None]:
+    if getattr(dispatcher._state, '_native', None) is not None:
+        from .native_admission import submit_native_plan
+        return submit_native_plan(dispatcher, plan, accepted_at=accepted_at)
     receipts: list[AcceptedJobReceipt] = []
     job_ids: list[str] = []
     jobs: list[JobRecord] = []

@@ -97,6 +97,18 @@ def register_callback_edge(dispatcher, *, request: MessageEnvelope, jobs: tuple,
 
 
 def validate_callback_request(dispatcher, request: MessageEnvelope) -> None:
+    native = getattr(dispatcher._state, '_native', None)
+    if native is not None:
+        from .native_admission import callback_context
+        try:
+            parent = native.call('callback.validate', **callback_context(dispatcher, request))
+        except ValueError as error:
+            raise dispatcher._dispatch_error(str(error)) from error
+        if parent and bool(parent['request']['route_options'].get('bind_chain_workspace_tree')):
+            from jobs.store import _job_record_from_record
+            request.route_options['bind_chain_workspace_tree'] = True
+            _bind_callback_workspace_tree(dispatcher, request=request, parent=_job_record_from_record(parent))
+        return
     parent = _active_parent_job(dispatcher, request.from_actor)
     allowed_targets = _allowed_chain_targets(parent)
     if not request_callback_route(request):

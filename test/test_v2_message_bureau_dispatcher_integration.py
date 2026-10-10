@@ -72,6 +72,31 @@ from storage.paths import PathLayout
 from storage.text_artifacts import TEXT_ARTIFACT_SPILL_BYTES
 
 
+def _block_callback_admission(monkeypatch, dispatcher, entered, release):
+    """Pause the actual admission seam in either core implementation."""
+    native = getattr(dispatcher._state, '_native', None)
+    if native is not None:
+        original = native.call
+
+        def blocking_call(op, **args):
+            if op == 'dispatcher.submit':
+                entered.set()
+                assert release.wait(timeout=2)
+            return original(op, **args)
+
+        monkeypatch.setattr(native, 'call', blocking_call)
+    else:
+        from ccbd.services.dispatcher_runtime import submission_recording
+        original = submission_recording.register_callback_edge
+
+        def blocking_register(*args, **kwargs):
+            entered.set()
+            assert release.wait(timeout=2)
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(submission_recording, 'register_callback_edge', blocking_register)
+
+
 def _bootstrap_test_project(project_root: Path) -> ProjectContext:
     project_root.mkdir()
     config_dir = project_root / '.ccb'
@@ -1761,14 +1786,7 @@ def test_chain_submission_linearizes_parent_terminalization_before_edge_registra
     allow_registration = threading.Event()
     completion_started = threading.Event()
     completion_done = threading.Event()
-    original_register = submission_recording.register_callback_edge
-
-    def blocking_register(*args, **kwargs):
-        registration_entered.set()
-        assert allow_registration.wait(timeout=2)
-        return original_register(*args, **kwargs)
-
-    monkeypatch.setattr(submission_recording, 'register_callback_edge', blocking_register)
+    _block_callback_admission(monkeypatch, dispatcher, registration_entered, allow_registration)
     submitted: list[object] = []
     submission_errors: list[BaseException] = []
 
@@ -1921,14 +1939,7 @@ def test_chain_submission_linearizes_cancel_and_terminate_without_locking_provid
     dispatcher._execution_service = ExecutionSpy()
     registration_entered = threading.Event()
     allow_registration = threading.Event()
-    original_register = submission_recording.register_callback_edge
-
-    def blocking_register(*args, **kwargs):
-        registration_entered.set()
-        assert allow_registration.wait(timeout=2)
-        return original_register(*args, **kwargs)
-
-    monkeypatch.setattr(submission_recording, 'register_callback_edge', blocking_register)
+    _block_callback_admission(monkeypatch, dispatcher, registration_entered, allow_registration)
     submitted: list[object] = []
 
     def submit_child() -> None:

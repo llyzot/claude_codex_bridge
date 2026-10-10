@@ -38,10 +38,16 @@
     "Endpoint recovery requires confirmed process exit; access-denied and observation timeouts are not terminal evidence",
     "Daemon lease/lifecycle IO, heartbeat debounce, expected-holder mutation and ownership/claim policy execute in Rust",
     "Ownership claims reject changed lease identity or heartbeat snapshots",
-    "Kernel launch uses a cross-process creation lock; TCP_NODELAY and single-write framing avoid delayed-ACK stalls"
+    "Kernel launch uses a cross-process creation lock; TCP_NODELAY and single-write framing avoid delayed-ACK stalls",
+    "Normal submission plans atomically admit Job/Event/Submission/Message/Attempt/Mailbox and callback edge records through one Rust journal",
+    "Rust validates nested-ask, active parent, one-edge, continuation upstream, reviewer, depth and cycle admission policy against durable state",
+    "Admission rechecks policy after Python preflight and rejects terminal parents even while their active index is stale",
+    "Restricted review chain admission requires workspace-tree binding metadata; Git tree observation remains a transitional Python adapter",
+    "Scheduler batch admission publishes a validated candidate state only after all durable operations stage successfully",
+    "Failed derived runtime/project-view projection does not discard a committed receipt or replay admission; diagnostic logging preserves the accepted outcome"
   ],
   "remaining": [
-    "Finish callback registration/recovery orchestration and notice/artifact handling in Rust",
+    "Finish callback recovery orchestration, Git tree observation and notice/artifact handling in Rust",
     "Finish callback repair orchestration and remaining provider completion-orchestrator adapters",
     "Finish public ccbd API-2 handlers, autonomous Rust supervisor/keeper and startup/stop orchestration",
     "Migrate CLI and integrate native build/install/release paths",
@@ -52,8 +58,12 @@
     "Remove transitional Python core dependencies after native runtime parity is proven"
   ],
   "verification": {
-    "native_contract_tests": 56,
-    "rust_store_tests": 3,
+    "native_contract_tests": 66,
+    "native_admission_tests": "10 passed: Python history parity for single/queued/broadcast/chain artifacts, rollback, stale parent, restricted tree, duplicate edge, restart FIFO and post-commit projection failure",
+    "admission_regression": "Final native debug build: 73 passed, 61 deselected by focused selection across native contracts and existing chain/callback/nested-ask/reviewer integration tests; separate five concurrency/reviewer tests passed in Python mode",
+    "admission_crash_recovery": "Actual full chain admission interrupted at every staged write boundary, journal replay completes Job/Message/Attempt/Mailbox/Callback linkage; another restart preserves one callback edge",
+    "admission_release": "Release build succeeded and authenticated TCP dispatcher.submit smoke passed in a temporary state directory; no provider executed",
+    "rust_store_tests": 4,
     "clippy": "passed with warnings denied",
     "integration_suite": "284 passed with shared native TCP state serving; 13 deselected (Windows symlink privileges, legacy external helpers, Python-only cache backend fixture)",
     "control_plane_lifecycle": "12 real network and lifecycle contract tests passed after final transport changes; startup-fence/service-graph suite 36 passed; native lease/ownership suite 19 passed",

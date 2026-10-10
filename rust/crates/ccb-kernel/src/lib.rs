@@ -1,10 +1,13 @@
 mod admission;
+mod artifacts;
 mod bureau;
 mod callback;
 mod callback_policy;
+mod callback_recovery;
 mod completion;
 mod completion_gate;
 pub mod control_plane;
+mod finalization;
 mod lifecycle;
 pub mod models;
 mod records;
@@ -73,6 +76,16 @@ impl Kernel {
         }
         match op {
             "dispatcher.submit" => return admission::submit(self, args),
+            "dispatcher.persist_terminal" => return finalization::persist(self, args, false),
+            "dispatcher.revise_reply" => return finalization::persist(self, args, true),
+            "artifact.spill_completion" => {
+                return artifacts::spill_completion(
+                    self,
+                    &args["job"],
+                    &args["decision"],
+                    records::string(args, "timestamp")?,
+                )
+            }
             "callback.validate" => return callback_policy::validate(self, args),
             "bureau.submit" => return bureau::submission(self, args),
             "bureau.retry" => return bureau::retry(self, args),
@@ -82,6 +95,7 @@ impl Kernel {
             "callback.prepare" => return callback::prepare(self, args),
             "callback.enqueue" => return callback::enqueue(self, args),
             "callback.done" => return callback::done(self, args),
+            "callback.repair" => return callback_recovery::repair(self, args),
             "bureau.attempt_started" => return bureau::attempt_transition(self, "started", args),
             "bureau.attempt_terminal" => return bureau::attempt_transition(self, "terminal", args),
             _ => {}
@@ -105,7 +119,7 @@ impl Kernel {
         if op == "ping" {
             return Ok(
                 json!({"service":"ccb-kernel", "api_version":API_VERSION, "pid":std::process::id(),
-                    "capabilities":["mailbox","scheduler","records","bureau","callback","completion","control_plane","lifecycle","admission"]}),
+                    "capabilities":["mailbox","scheduler","records","bureau","callback","completion","control_plane","lifecycle","admission","finalization","callback_recovery"]}),
             );
         }
         if op == "lease.list" || op == "mailbox.list" {

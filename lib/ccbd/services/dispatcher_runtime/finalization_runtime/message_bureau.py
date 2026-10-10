@@ -36,7 +36,8 @@ def record_message_bureau_completion(
     if dispatcher._message_bureau is None:
         return terminal, reply_decision, False
 
-    dispatcher._message_bureau.record_attempt_terminal(terminal, decision, finished_at=finished_at)
+    if getattr(dispatcher._state, '_native', None) is None:
+        dispatcher._message_bureau.record_attempt_terminal(terminal, decision, finished_at=finished_at)
     if is_reply_delivery_job(current):
         return terminal, reply_decision, False
     parent_edge = delegated_parent_edge(dispatcher, terminal)
@@ -45,6 +46,8 @@ def record_message_bureau_completion(
         CallbackEdgeState.TIMED_OUT,
         CallbackEdgeState.DONE,
     }:
+        if getattr(dispatcher._state, '_native', None) is not None:
+            return terminal, reply_decision, False
         terminal = persist_delegated_terminal_job(dispatcher, terminal, parent_edge, finished_at=finished_at)
         mark_parent_message_waiting(dispatcher, parent_edge, updated_at=finished_at)
         return terminal, reply_decision, False
@@ -72,20 +75,14 @@ def record_message_bureau_completion(
         deliver_to_caller=_should_deliver_to_caller(terminal),
     )
     if reply_decision is not decision:
-        reply_decision = spill_terminal_reply_if_needed(
-            dispatcher,
-            current,
-            reply_decision,
-            finished_at=finished_at,
-        )
-        terminal = persist_reply_decision(
-            dispatcher,
-            current,
-            terminal,
-            reply_decision,
-            prior_snapshot=prior_snapshot,
-            finished_at=finished_at,
-        )
+        if getattr(dispatcher._state, '_native', None) is not None:
+            from ..native_finalization import persist_native_terminal
+            terminal, reply_decision, _ = persist_native_terminal(dispatcher, current, reply_decision,
+                finished_at=finished_at, revise=True, prior_snapshot=prior_snapshot)
+        else:
+            reply_decision = spill_terminal_reply_if_needed(dispatcher, current, reply_decision, finished_at=finished_at)
+            terminal = persist_reply_decision(dispatcher, current, terminal, reply_decision,
+                prior_snapshot=prior_snapshot, finished_at=finished_at)
     _record_terminal_result(
         dispatcher,
         terminal,
@@ -103,14 +100,12 @@ def record_message_bureau_cancellation(
     *,
     finished_at: str,
     record_reply: bool,
+    attempt_recorded: bool = False,
 ) -> None:
     if dispatcher._message_bureau is None:
         return
-    dispatcher._message_bureau.record_attempt_terminal(
-        terminal,
-        decision,
-        finished_at=finished_at,
-    )
+    if not attempt_recorded:
+        dispatcher._message_bureau.record_attempt_terminal(terminal, decision, finished_at=finished_at)
     if not record_reply:
         return
     parent_edge = delegated_parent_edge(dispatcher, terminal)

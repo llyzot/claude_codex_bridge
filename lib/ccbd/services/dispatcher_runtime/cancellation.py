@@ -67,6 +67,8 @@ def cancel_with_decision(
     cancel_evidence: CompletionDecision | None = None,
 ) -> CancelReceipt:
     diagnostics = _cancel_diagnostics(cancel_evidence)
+    if getattr(dispatcher._state, '_native', None) is not None:
+        diagnostics['result_reply_enabled'] = bool(record_reply)
     decision = CompletionDecision(
         terminal=True,
         status=CompletionStatus.CANCELLED,

@@ -106,12 +106,17 @@ impl Store {
             "submissions.jsonl",
         ]
         .contains(&relative);
+        let artifact = parts.len() == 4
+            && parts[0] == "artifacts"
+            && parts[1] == "text"
+            && parts[3].ends_with(".txt");
         ensure!(
             relative.starts_with("mailboxes/")
                 || relative.starts_with("leases/")
                 || parts.len() == 2 && parts[0] == "snapshots" && parts[1].ends_with(".json")
                 || agent_log
                 || stream
+                || artifact
                 || ["lease.json", "lifecycle.json"].contains(&relative),
             "unowned state path"
         );
@@ -236,6 +241,18 @@ impl Store {
             bytes,
         });
         Ok(())
+    }
+    pub(crate) fn save_bytes(&mut self, path: &str, bytes: &[u8]) -> Result<()> {
+        self.path(path)?;
+        self.staged.insert(path.into(), Some(bytes.to_vec()));
+        self.writes.push(WriteOp::Save {
+            path: path.into(),
+            bytes: bytes.to_vec(),
+        });
+        Ok(())
+    }
+    pub(crate) fn owned_path(&self, path: &str) -> Result<PathBuf> {
+        self.path(path)
     }
     pub fn append(&mut self, path: &str, value: &Value) -> Result<()> {
         self.path(path)?;
@@ -413,6 +430,11 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     let temp = path.with_extension("kernel-tmp");
     reject_link(&temp)?;
     let mut file = File::create(&temp)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        file.set_permissions(fs::Permissions::from_mode(0o600))?;
+    }
     file.write_all(bytes)?;
     file.sync_all()?;
     drop(file);

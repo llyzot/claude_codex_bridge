@@ -13,6 +13,11 @@ def spill_terminal_reply_if_needed(
     *,
     finished_at: str,
 ) -> CompletionDecision:
+    native = getattr(dispatcher._state, '_native', None)
+    if native is not None:
+        from completion.snapshot_store import _decision_from_record
+        return _decision_from_record(native.call('artifact.spill_completion', job=current.to_record(),
+                                                  decision=decision.to_record(), timestamp=finished_at))
     diagnostics = dict(decision.diagnostics or {})
     if isinstance(diagnostics.get('reply_artifact'), dict):
         return decision

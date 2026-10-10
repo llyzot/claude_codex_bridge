@@ -17,6 +17,10 @@ def persist_reply_decision(
     prior_snapshot,
     finished_at: str,
 ):
+    if getattr(dispatcher._state, '_native', None) is not None:
+        from ..native_finalization import persist_native_terminal
+        return persist_native_terminal(dispatcher, current, reply_decision, finished_at=finished_at,
+                                       revise=True, prior_snapshot=prior_snapshot)[0]
     terminal = replace(terminal, terminal_decision=reply_decision.to_record())
     append_job(dispatcher, terminal)
     dispatcher._snapshot_writer.write_completion(

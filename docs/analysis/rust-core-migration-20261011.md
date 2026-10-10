@@ -8,6 +8,8 @@
 
 后续重构更新：普通提交计划及 callback 注册已接入同一个 Rust journal 事务，包含 Job、事件、广播记录、消息、尝试、Mailbox 和 callback edge；队列在全部写入暂存成功后一次发布。Rust 在事务内重新校验父任务、单边、深度、循环和评审策略，并拒绝活动索引尚未清除的终态父任务。Git tree 观测、callback 修复编排、公共 API-2、自主调度及 Provider 执行仍未完成迁移。下面以 `53d66ea1` 为基线的表格保留为此前检查记录；最新迁移范围与验证见[进度记录](rust-core-refactor-progress.json)。
 
+完成/恢复阶段更新：终态 reconciliation、快照/Job/Attempt/Inbox/Lease 与父任务等待状态已使用 Rust 事务；completion/continuation artifact 及续轮事件也进入 journal。Callback 修复遍历和持久谱系判定由 Rust 承担；“子任务终态已保存、Reply 尚未保存”的间隙会续接结果策略。该策略仍是 Python 过渡层，以保留自动重试和取消语义，不能将它宣称为完整纯 Rust 完成编排。正在运行/排队的重试会阻止旧结果回投，显式 `record_reply=False` 的取消在重启后仍不补发。公共 API-2、自主服务、普通任务结果恢复、重试/通知策略和 Provider 执行仍需迁移。
+
 ### 本地保存状态
 
 检查时工作区及暂存区均为空，现有实现已经提交到本地，无需重复创建空提交。最近的实现提交为：

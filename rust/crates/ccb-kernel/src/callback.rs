@@ -1,16 +1,16 @@
 //! Durable callback planning and atomic continuation admission.
-use crate::{bureau, records, Kernel};
+use crate::{admission, artifacts, bureau, records, Kernel};
 use anyhow::{ensure, Result};
 use serde_json::{json, Value};
 
-fn lookup(kernel: &mut Kernel, fields: Value) -> Result<Value> {
+pub(crate) fn lookup(kernel: &mut Kernel, fields: Value) -> Result<Value> {
     records::dispatch(
         &mut kernel.store,
         "latest_find",
         &json!({"stream":"callbacks","identity":"edge_id","fields":fields}),
     )
 }
-fn update(kernel: &mut Kernel, record: &Value, changes: Value) -> Result<Value> {
+pub(crate) fn update(kernel: &mut Kernel, record: &Value, changes: Value) -> Result<Value> {
     records::callback_update(
         &mut kernel.store,
         &json!({"record":record,"changes":changes}),
@@ -20,7 +20,7 @@ fn terminal(edge: &Value) -> bool {
     ["continuation_submitted", "done", "failed", "timed_out"]
         .contains(&edge["state"].as_str().unwrap_or(""))
 }
-fn latest_reply(kernel: &mut Kernel, edge: &Value) -> Result<Value> {
+pub(crate) fn latest_reply(kernel: &mut Kernel, edge: &Value) -> Result<Value> {
     if records::truthy(&edge["child_reply_id"]) {
         let reply = records::dispatch(
             &mut kernel.store,
@@ -44,9 +44,9 @@ fn latest_reply(kernel: &mut Kernel, edge: &Value) -> Result<Value> {
         .cloned()
         .unwrap_or(Value::Null))
 }
-fn repair_attempt(kernel: &mut Kernel, edge: &Value, job: &Value) -> Result<()> {
+pub(crate) fn repair_attempt(kernel: &mut Kernel, edge: &Value, job: &Value) -> Result<bool> {
     if !["accepted", "queued"].contains(&job["status"].as_str().unwrap_or("")) {
-        return Ok(());
+        return Ok(false);
     }
     let attempt = records::dispatch(
         &mut kernel.store,
@@ -67,8 +67,9 @@ fn repair_attempt(kernel: &mut Kernel, edge: &Value, job: &Value) -> Result<()> 
             kernel,
             &json!({"message_id":edge["parent_message_id"],"job":job,"accepted_at":timestamp}),
         )?;
+        return Ok(true);
     }
-    Ok(())
+    Ok(false)
 }
 pub fn prepare(kernel: &mut Kernel, args: &Value) -> Result<Value> {
     let mut edge = lookup(kernel, json!({"child_job_id":args["child_job"]["job_id"]}))?;
@@ -128,6 +129,13 @@ pub fn prepare(kernel: &mut Kernel, args: &Value) -> Result<Value> {
         )?;
         return Ok(json!({"action":"existing","edge":updated}));
     }
+    if edge["state"] == "child_completed"
+        && edge["child_reply_id"] == args["child_reply_id"]
+        && edge["child_status"] == args["child_job"]["status"]
+        && edge["updated_at"] == args["finished_at"]
+    {
+        return Ok(json!({"action":"submit","edge":edge}));
+    }
     let updated = update(
         kernel,
         &edge,
@@ -145,7 +153,18 @@ pub fn enqueue(kernel: &mut Kernel, args: &Value) -> Result<Value> {
         edge["state"] == "child_completed",
         "callback child not completed"
     );
-    let request = &args["request"];
+    let built = if args["request"].is_null() {
+        build_request(
+            kernel,
+            &edge,
+            &args["child_job"],
+            &args["decision"],
+            records::string(args, "finished_at")?,
+        )?
+    } else {
+        args["request"].clone()
+    };
+    let request = &built;
     let agent = records::string(request, "to_agent")?;
     ensure!(
         edge["callback_target_agent"] == agent
@@ -221,14 +240,116 @@ pub fn enqueue(kernel: &mut Kernel, args: &Value) -> Result<Value> {
         &edge,
         json!({"state":"continuation_submitted","continuation_job_id":job_id,"continuation_message_id":edge["parent_message_id"],"updated_at":timestamp}),
     )?;
+    if !args["child_job"].is_null() {
+        admission::event(
+            kernel,
+            &args["child_job"],
+            "chain_continuation_submitted",
+            json!({"edge_id":updated["edge_id"],
+            "continuation_job_id":updated["continuation_job_id"],"continuation_message_id":updated["continuation_message_id"],
+            "callback_target_agent":updated["callback_target_agent"]}),
+            timestamp,
+        )?;
+    }
     // No fallible persistence operations follow in-memory index publication.
     // Commit failures terminate the process; restart rebuilds from its journal.
     kernel.dispatch(
-        "scheduler.record",
-        &json!({"state_id":args["state_id"],"record":job}),
+        "scheduler.admit",
+        &json!({"state_id":args["state_id"],"jobs":[job]}),
     )?;
-    kernel.dispatch("scheduler.enqueue_for",&json!({"state_id":args["state_id"],"target_kind":"agent","target_name":agent,"job_id":job_id}))?;
     Ok(json!({"created":true,"edge":updated,"job":job}))
+}
+
+fn build_request(
+    kernel: &mut Kernel,
+    edge: &Value,
+    child: &Value,
+    decision: &Value,
+    timestamp: &str,
+) -> Result<Value> {
+    records::validate("jobs", child, Some(&child["agent_name"]))?;
+    ensure!(
+        decision["terminal"] == true && decision["status"] == child["status"],
+        "invalid callback result decision"
+    );
+    let mut reply = decision["reply"].as_str().unwrap_or("").to_owned();
+    let artifact = &decision["diagnostics"]["reply_artifact"];
+    if artifact.is_object() {
+        if reply.is_empty() {
+            reply = "(reply body stored as artifact)".into();
+        }
+        reply.push_str(&format!(
+            "\n\nFull child reply artifact:\npath: {}",
+            artifact["path"].as_str().unwrap_or("").trim()
+        ));
+        if records::truthy(&artifact["bytes"]) {
+            reply.push_str(&format!(
+                "\nbytes: {}",
+                artifact["bytes"]
+                    .as_str()
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| artifact["bytes"].to_string())
+                    .trim()
+            ));
+        }
+        if let Some(hash) = artifact["sha256"].as_str().filter(|s| !s.trim().is_empty()) {
+            reply.push_str(&format!("\nsha256: {}", hash.trim()));
+        }
+        reply = reply.trim_end().to_owned();
+    }
+    let mut lines = vec![
+        "CCB result-chain continuation.".into(),
+        String::new(),
+        format!(
+            "Original caller: {}",
+            edge["original_caller"].as_str().unwrap_or("")
+        ),
+        format!(
+            "Parent job: {}",
+            edge["parent_job_id"].as_str().unwrap_or("")
+        ),
+        format!("Child job: {}", child["job_id"].as_str().unwrap_or("")),
+        format!(
+            "Child agent: {}",
+            child["agent_name"].as_str().unwrap_or("")
+        ),
+        format!("Child status: {}", child["status"].as_str().unwrap_or("")),
+    ];
+    for (key, label) in [
+        ("parent_body", "Original task context:"),
+        ("child_body", "Delegated child task:"),
+    ] {
+        let body = edge["diagnostics"][key].as_str().unwrap_or("").trim_end();
+        if !body.is_empty() {
+            lines.extend([String::new(), label.into(), body.into()]);
+        }
+    }
+    lines.extend([String::new(),"Child result:".into(),if reply.is_empty() {"(no reply body)".into()} else {reply},String::new(),
+        "Continue the original task using the child result.".into(),"Finish this current response with the final result.".into(),
+        "Do not call ask, --chain, or --silence to the original caller; CCB will deliver this chain result upstream.".into()]);
+    let mut body = lines.join("\n");
+    let artifact = if body.len() > 4096 {
+        let artifact = artifacts::write(
+            kernel,
+            &body,
+            "result-chain-continuation",
+            records::string(edge, "edge_id")?,
+            timestamp,
+        )?;
+        body=artifacts::stub(&format!("CCB result-chain continuation {} is larger than 4 KiB and was stored as an artifact.",records::string(edge,"edge_id")?),&artifact,true,None);
+        artifact
+    } else {
+        Value::Null
+    };
+    Ok(
+        json!({"project_id":child["request"]["project_id"],"to_agent":edge["callback_target_agent"],"from_actor":edge["original_caller"],
+        "body":body,"task_id":edge["original_task_id"],"reply_to":edge["parent_message_id"],"message_type":"chain_continuation",
+        "delivery_scope":"single","silence_on_success":false,"body_artifact":artifact,"route_options":{
+            "mode":"chain_continuation","chain_edge_id":edge["edge_id"],"chain_parent_job_id":edge["parent_job_id"],
+            "chain_child_job_id":edge["child_job_id"],"chain_child_message_id":edge["child_message_id"],
+            "allowed_chain_targets":edge["diagnostics"]["allowed_chain_targets"].as_array().cloned().unwrap_or_default(),
+            "bind_chain_workspace_tree":records::truthy(&edge["diagnostics"]["bind_chain_workspace_tree"])}}),
+    )
 }
 pub fn done(kernel: &mut Kernel, args: &Value) -> Result<Value> {
     let edge = lookup(kernel, json!({"edge_id":args["edge_id"]}))?;

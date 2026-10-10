@@ -19,6 +19,9 @@ def persist_terminal_completion(
     *,
     finished_at: str,
 ) -> tuple[JobRecord, CompletionDecision, object | None]:
+    if getattr(dispatcher._state, '_native', None) is not None:
+        from ..native_finalization import persist_native_terminal
+        return persist_native_terminal(dispatcher, current, decision, finished_at=finished_at)
     prior_snapshot = dispatcher._snapshot_writer.load(current.job_id)
     terminal_decision = merge_terminal_decision(
         current.job_id,

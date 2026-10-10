@@ -251,6 +251,9 @@ def repair_callback_edges(dispatcher) -> tuple[CallbackEdgeRecord, ...]:
 
 
 def _repair_callback_edges_locked(dispatcher) -> tuple[CallbackEdgeRecord, ...]:
+    if getattr(dispatcher._state, '_native', None) is not None:
+        from .native_callbacks import repair_native_callbacks
+        return repair_native_callbacks(dispatcher)
     repaired: list[CallbackEdgeRecord] = []
     latest_edges = _latest_callback_edges(dispatcher)
     repair_candidates = tuple(

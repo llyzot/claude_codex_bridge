@@ -3,10 +3,18 @@ from __future__ import annotations
 
 import inspect
 from uuid import uuid4
+from weakref import finalize
 
 from ccbd.api_models import TargetKind
 from native_kernel import kernel_for_layout
 from .state_agents import DispatcherStateAgentMixin
+
+
+def _release_state(client,state_id):
+    try:
+        client.call('scheduler.drop',state_id=state_id)
+    except Exception:
+        pass  # A retired graph does not revive a closed kernel.
 
 
 class NativeDispatcherState(DispatcherStateAgentMixin):
@@ -14,6 +22,7 @@ class NativeDispatcherState(DispatcherStateAgentMixin):
         self._native = client
         self._id = uuid4().hex
         client.call('scheduler.create', state_id=self._id, agent_names=list(agent_names))
+        self._cleanup=finalize(self,_release_state,client,self._id)
 
     @property
     def _queues(self):

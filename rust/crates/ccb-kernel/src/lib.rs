@@ -1,5 +1,7 @@
 mod bureau;
 mod callback;
+mod completion;
+mod completion_gate;
 pub mod models;
 mod records;
 mod scheduler;
@@ -17,15 +19,26 @@ pub const API_VERSION: u32 = 1;
 pub struct Kernel {
     pub store: Store,
     scheduler: scheduler::Scheduler,
+    completion: completion::Completion,
 }
 impl Kernel {
     pub fn open(root: &Path) -> Result<Self> {
         Ok(Self {
             store: Store::open(root)?,
             scheduler: scheduler::Scheduler::default(),
+            completion: completion::Completion::default(),
         })
     }
     pub fn dispatch(&mut self, op: &str, args: &Value) -> Result<Value> {
+        if op == "completion.gate" {
+            return completion_gate::validate(args);
+        }
+        if let Some(method) = op.strip_prefix("completion_snapshot.") {
+            return completion::snapshot(self, method, args);
+        }
+        if let Some(method) = op.strip_prefix("completion.") {
+            return self.completion.dispatch(method, args);
+        }
         match op {
             "bureau.submit" => return bureau::submission(self, args),
             "bureau.retry" => return bureau::retry(self, args),
@@ -58,7 +71,7 @@ impl Kernel {
         if op == "ping" {
             return Ok(
                 json!({"service":"ccb-kernel", "api_version":API_VERSION, "pid":std::process::id(),
-                    "capabilities":["mailbox","scheduler","records","bureau","callback"]}),
+                    "capabilities":["mailbox","scheduler","records","bureau","callback","completion"]}),
             );
         }
         if op == "lease.list" || op == "mailbox.list" {

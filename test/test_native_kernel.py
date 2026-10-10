@@ -239,3 +239,12 @@ def test_python_cannot_write_while_rust_owns_the_state(tmp_path, monkeypatch):
     # the owning process has exited remains possible.
     python.append(event(2))
     assert len(python.list_agent('pi_lead')) == 2
+
+
+def test_local_encoding_error_does_not_stop_or_restart_kernel(tmp_path,monkeypatch):
+    _,_,_,_,service=setup(tmp_path/'repo','rust',monkeypatch)
+    client=service._native
+    before=client.call('ping')['pid']
+    with pytest.raises(TypeError):
+        client.call('ping',opaque=object())
+    assert client.call('ping')['pid']==before

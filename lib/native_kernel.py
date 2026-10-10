@@ -65,7 +65,7 @@ class KernelClient:
             if info.get('service') != 'ccb-kernel' or info.get('api_version') != 1:
                 raise KernelUnavailable('incompatible Rust kernel')
             self.capabilities = frozenset(info.get('capabilities') or ())
-            required = {'mailbox','scheduler','records','bureau','callback'}
+            required = {'mailbox','scheduler','records','bureau','callback','completion'}
             if not required <= self.capabilities:
                 raise KernelUnavailable('Rust kernel lacks required core capabilities; rebuild ccb-kernel')
         except Exception:
@@ -87,10 +87,13 @@ class KernelClient:
         with self._lock:
             if self._failure:
                 raise KernelUnavailable(self._failure)
-            self._sequence += 1
-            request_id = self._sequence
+            request_id = self._sequence + 1
+            # Reject invalid local data before a write can have an unknown
+            # outcome. Python adapter handles never belong on this wire.
+            request = json.dumps({'api_version': 1, 'id': request_id, 'op': op, 'args': args}, ensure_ascii=False, allow_nan=False) + '\n'
+            self._sequence = request_id
             try:
-                self.process.stdin.write(json.dumps({'api_version': 1, 'id': request_id, 'op': op, 'args': args}, ensure_ascii=False) + '\n')
+                self.process.stdin.write(request)
                 self.process.stdin.flush()
                 response = self._responses.get(timeout=self.timeout)
                 if isinstance(response, BaseException):

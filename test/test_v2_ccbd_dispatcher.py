@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 
 import ccbd.services.dispatcher_runtime.frontdesk_direct_handoff as direct_handoff
@@ -294,6 +295,9 @@ class ScriptedTerminalExecutionService:
     def start(self, job, *, runtime_context=None):
         del runtime_context
         self._job = job
+        # Bind the scripted source template to its actual request, as a real
+        # execution adapter does. Foreign request events have separate tests.
+        self._items = tuple(replace(item,req_id=job.job_id) if item.req_id=='job-hard-gate' else item for item in self._items)
         return self._submission(job)
 
     def cancel(self, job_id: str) -> None:

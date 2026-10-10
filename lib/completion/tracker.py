@@ -41,6 +41,13 @@ class CompletionTrackerView:
 
 
 class CompletionTrackerService:
+    def __new__(cls, config, provider_catalog, registry=None, *, request_timeout_s=_DEFAULT_REQUEST_TIMEOUT_S, layout=None):
+        from native_kernel import rust_core_enabled
+        if cls is CompletionTrackerService and rust_core_enabled():
+            from completion.native_tracker import NativeCompletionTracker
+            return NativeCompletionTracker(config,provider_catalog,registry,request_timeout_s=request_timeout_s,layout=layout)
+        return super().__new__(cls)
+
     def __init__(
         self,
         config: ProjectConfig,
@@ -48,6 +55,7 @@ class CompletionTrackerService:
         registry: CompletionRegistry | None = None,
         *,
         request_timeout_s: float = _DEFAULT_REQUEST_TIMEOUT_S,
+        layout=None,
     ) -> None:
         self._config = config
         self._provider_catalog = provider_catalog

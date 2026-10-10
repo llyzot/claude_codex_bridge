@@ -109,6 +109,7 @@ impl Store {
         ensure!(
             relative.starts_with("mailboxes/")
                 || relative.starts_with("leases/")
+                || parts.len() == 2 && parts[0] == "snapshots" && parts[1].ends_with(".json")
                 || agent_log
                 || stream,
             "unowned state path"

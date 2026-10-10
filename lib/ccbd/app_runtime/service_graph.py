@@ -114,6 +114,7 @@ def build_ccbd_service_graph(deps: CcbdServiceGraphDependencies) -> CcbdServiceG
         deps.config,
         deps.provider_catalog,
         request_timeout_s=deps.request_timeout_s,
+        layout=deps.paths,
     )
     agent_lifecycle_bridge = None
     try:

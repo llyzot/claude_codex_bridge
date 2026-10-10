@@ -65,10 +65,11 @@ def _resolve_update_decision(dispatcher, update, tracked, job):
     decision = update.decision
     if decision is None and tracked is not None and tracked.decision.terminal:
         decision = tracked.decision
-    return _validate_provider_completion_decision(getattr(update, 'submission', None), decision, job)
+    return _validate_provider_completion_decision(getattr(update, 'submission', None), decision, job,
+                                                 native=getattr(dispatcher._state,'_native',None))
 
 
-def _validate_provider_completion_decision(submission, decision, job=None):
+def _validate_provider_completion_decision(submission, decision, job=None, *, native=None):
     """Shared provider turn-end gate for ordinary asks and reply deliveries.
 
     The provider's own terminal decision is the turn-end judgement for both
@@ -78,6 +79,9 @@ def _validate_provider_completion_decision(submission, decision, job=None):
     one delivery-specific policy: a reply delivery owes transport plus one
     processing turn, not a reply body.
     """
+    if native is not None:
+        from completion.native_gate import validate_native_completion
+        return validate_native_completion(native,submission,decision,job)
     decision = annotate_completion_authority(
         submission,
         decision,
@@ -227,7 +231,8 @@ def _tick_tracker(dispatcher, completed: list, completed_ids: set[str]) -> None:
             completed.append(
                 dispatcher.complete(
                     tracked.job_id,
-                    _validate_provider_completion_decision(submission, tracked.decision, current),
+                    _validate_provider_completion_decision(submission, tracked.decision, current,
+                                                         native=getattr(dispatcher._state,'_native',None)),
                 )
             )
             completed_ids.add(tracked.job_id)

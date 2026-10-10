@@ -24,11 +24,18 @@
     "Rust message-state aggregation, including notice filtering and broadcast terminal states",
     "Atomic callback continuation job/attempt/inbox/edge admission, retry lineage correlation and completion closure",
     "Cached Rust latest-record indices with incremental committed and staged append views",
-    "Kernel capability handshake rejects stale binaries before state operations"
+    "Kernel capability handshake rejects stale binaries before state operations",
+    "Rust completion trackers implement all five completion families and reply candidate selection",
+    "Foreign job/agent/provider events are fenced before completion state mutation",
+    "Completion authority, Codex acceptance and empty reply-delivery turn gates execute in Rust",
+    "Completion snapshots use the Rust single-writer journal and retain their version-2 schema",
+    "Retired completion and scheduler groups release native memory without restarting the kernel",
+    "Only gate-relevant runtime values cross the wire; Python reader handles remain in the adapter",
+    "Local JSON encoding errors are rejected before sending and do not poison the kernel connection"
   ],
   "remaining": [
     "Finish callback registration/recovery orchestration and notice/artifact handling in Rust",
-    "Migrate completion tracking, event correlation and continuation repair into Rust",
+    "Finish callback repair orchestration and remaining provider completion-orchestrator adapters",
     "Migrate ccbd RPC control plane, lifecycle fencing, supervision and recovery",
     "Migrate CLI and integrate native build/install/release paths",
     "Integrate Pi and Codex provider execution, then Claude hooks/session/cancel/restore",
@@ -38,10 +45,12 @@
     "Remove transitional Python core dependencies after native runtime parity is proven"
   ],
   "verification": {
-    "native_contract_tests": 21,
+    "native_contract_tests": 44,
     "rust_store_tests": 3,
     "clippy": "passed with warnings denied",
-    "integration_suite": "242 passed using Rust records, mailbox, scheduler and callback admission; 13 deselected (Windows symlink privileges, legacy external helpers, Python-only cache backend fixture)",
+    "integration_suite": "272 passed using Rust records/mailbox/scheduler/callback/completion/snapshot paths; 13 deselected (Windows symlink privileges, legacy external helpers, Python-only cache backend fixture)",
+    "completion_parity": "22 native tests: differential traces for five families across three seeds, foreign-event rejection, a 128-case authority/delivery matrix, group isolation, snapshot restart and retired-graph cleanup",
+    "completion_python_compatibility": "38 legacy completion/selector/registry/snapshot/gate tests passed",
     "python_compatibility_suite": "222 passed; 12 deselected (Windows symlink privileges and legacy external helper fixtures)",
     "transaction_recovery": "Real Rust redo journal tested at all 7 write boundaries across messages/jobs/attempts/inbox/mailbox/callback streams; partial append replay is idempotent",
     "legacy_recovery": "Existing restart fixture seeds interrupted legacy continuation admission and validates repair without creating a duplicate job",

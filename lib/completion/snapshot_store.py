@@ -12,6 +12,7 @@ from completion.models import (
 )
 from storage.json_store import JsonStore
 from storage.paths import PathLayout
+from native_kernel import guard_legacy_writes, kernel_for_layout
 
 SCHEMA_VERSION = 2
 
@@ -20,14 +21,23 @@ class CompletionSnapshotStore:
     def __init__(self, layout: PathLayout, store: JsonStore | None = None) -> None:
         self._layout = layout
         self._store = store or JsonStore()
+        self._native = kernel_for_layout(layout)
+        if self._native is not None and store is not None:
+            raise ValueError('Rust completion snapshots require native state storage')
 
     def load(self, job_id: str) -> CompletionSnapshot | None:
+        if self._native is not None:
+            record=self._native.call('completion_snapshot.load',job_id=job_id)
+            return None if record is None else _completion_snapshot_from_record(record)
         path = self._layout.snapshot_path(job_id)
         if not path.exists():
             return None
         return self._store.load(path, loader=_completion_snapshot_from_record)
 
     def save(self, snapshot: CompletionSnapshot) -> None:
+        if self._native is not None:
+            self._native.call('completion_snapshot.save',job_id=snapshot.job_id,record=snapshot.to_record())
+            return
         self._store.save(self._layout.snapshot_path(snapshot.job_id), snapshot, serializer=lambda value: value.to_record())
 
 
@@ -99,3 +109,5 @@ def _completion_snapshot_from_record(record: dict) -> CompletionSnapshot:
         latest_reply_preview=record.get('latest_reply_preview', ''),
         updated_at=record['updated_at'],
     )
+
+guard_legacy_writes(CompletionSnapshotStore,'save')

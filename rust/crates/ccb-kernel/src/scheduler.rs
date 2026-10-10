@@ -22,7 +22,14 @@ pub struct Scheduler {
 }
 impl Scheduler {
     pub fn dispatch(&mut self, op: &str, args: &Value) -> Result<Value> {
+        if op == "stats" {
+            return Ok(json!({"state_count":self.states.len()}));
+        }
         let id = string(args, "state_id")?;
+        if op == "drop" {
+            self.states.remove(id);
+            return Ok(Value::Null);
+        }
         if op == "create" {
             ensure!(
                 !self.states.contains_key(id),

@@ -5,6 +5,7 @@ mod callback;
 mod callback_policy;
 mod callback_recovery;
 pub mod cli;
+mod codex_rpc;
 mod completion;
 mod completion_gate;
 pub mod control_plane;

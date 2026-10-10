@@ -290,6 +290,9 @@ fn guidance(job: &Value) -> String {
 pub fn plan(kernel: &mut Kernel, args: &Value) -> Result<Value> {
     let job = &args["job"];
     let mut d = args["decision"].clone();
+    if d["diagnostics"]["result_reply_enabled"] == false {
+        return Ok(json!({"action":"silenced","decision":d,"events":[]}));
+    }
     let outgoing = callback::lookup(kernel, json!({"parent_job_id":job["job_id"]}))?;
     if job["request"]["message_type"] == "reply_delivery"
         || records::truthy(&job["provider_options"]["reply_delivery"])

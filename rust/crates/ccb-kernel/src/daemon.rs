@@ -59,6 +59,7 @@ pub struct Daemon {
     state: String,
     running: HashMap<String, Running>,
     pi: HashMap<String, crate::pi_rpc::Session>,
+    codex: HashMap<String, crate::codex_rpc::Session>,
     pub stopping: bool,
     heartbeat: Instant,
 }
@@ -103,7 +104,8 @@ impl Daemon {
             );
             ensure!(
                 spec["driver_kind"].is_null()
-                    || ["command", "pi_rpc"].contains(&spec["driver_kind"].as_str().unwrap_or("")),
+                    || ["command", "pi_rpc", "codex_app_server"]
+                        .contains(&spec["driver_kind"].as_str().unwrap_or("")),
                 "unknown native driver kind"
             );
             if spec["driver_kind"] == "pi_rpc" {
@@ -125,6 +127,12 @@ impl Daemon {
                 "invalid native completion family"
             );
             if let Some(argv) = spec["command"].as_array() {
+                if spec["driver_kind"] == "codex_app_server" {
+                    ensure!(
+                        spec["provider"] == "codex",
+                        "Codex app-server requires codex provider"
+                    );
+                }
                 ensure!(
                     !argv.is_empty()
                         && argv.iter().all(Value::is_string)
@@ -168,6 +176,7 @@ impl Daemon {
             state,
             running: HashMap::new(),
             pi: HashMap::new(),
+            codex: HashMap::new(),
             stopping: false,
             heartbeat: Instant::now(),
         })
@@ -200,6 +209,7 @@ impl Daemon {
     }
     pub fn unmount(&mut self) -> Result<()> {
         self.pi.clear();
+        self.codex.clear();
         for running in self.running.values_mut() {
             let _ = running.child.kill();
             let _ = running.child.wait();
@@ -350,6 +360,10 @@ impl Daemon {
                 );
                 ensure!(job["status"] == "running", "job is not running");
                 ensure!(
+                    self.config["agents"][job["agent_name"].as_str().unwrap()]["command"].is_null(),
+                    "managed completion requires provider evidence"
+                );
+                ensure!(
                     job["provider_options"]["native_daemon_instance"] == self.state
                         && job["provider_options"]["native_execution_instance"]
                             == p["execution_instance_id"],
@@ -357,6 +371,21 @@ impl Daemon {
                 );
                 let result = self.complete(&job, &p["decision"])?;
                 Ok(json!({"job":result}))
+            }
+            "cancel" => {
+                let id = records::string(p, "job_id")?;
+                let job = self.get_job(id)?;
+                ensure!(
+                    job["status"] == "running",
+                    "native cancel requires a running owned provider task"
+                );
+                let agent = records::string(&job, "agent_name")?;
+                if let Some(session) = self.pi.get_mut(agent) {
+                    session.abort(id, p["record_reply"] != false)?;
+                } else {
+                    bail!("native cancellation control is not yet implemented for this provider");
+                }
+                Ok(json!({"job_id":id,"agent_name":agent,"status":"cancellation_requested"}))
             }
             "shutdown" => {
                 self.stopping = true;
@@ -790,8 +819,20 @@ impl Daemon {
             let spec = self.spec(&agent)?;
             if spec["driver_kind"] == "pi_rpc" {
                 if !self.pi.contains_key(&agent) {
+                    let saved = self
+                        .kernel
+                        .store
+                        .json(&format!("providers/pi/{agent}/session.json"))?
+                        .unwrap_or(Value::Null);
+                    let saved = if self.config["agents"][&agent]["resume_session"] == false
+                        || saved["state"]["sessionFile"].is_null()
+                    {
+                        Value::Null
+                    } else {
+                        saved
+                    };
                     let session =
-                        crate::pi_rpc::Session::spawn(&agent, &spec, endpoint, token_path)?;
+                        crate::pi_rpc::Session::spawn(&agent, &spec, endpoint, token_path, &saved)?;
                     self.pi.insert(agent.clone(), session);
                 }
                 let (completion, metadata, ready) = {
@@ -837,6 +878,65 @@ impl Daemon {
                     };
                     if !job.is_null() {
                         self.pi.get_mut(&agent).unwrap().start(&job)?;
+                    }
+                }
+                continue;
+            }
+            if spec["driver_kind"] == "codex_app_server" {
+                if !self.codex.contains_key(&agent) {
+                    let saved = self
+                        .kernel
+                        .store
+                        .json(&format!("providers/codex/{agent}/session.json"))?
+                        .unwrap_or(Value::Null);
+                    let session = crate::codex_rpc::Session::spawn(
+                        &agent, &spec, endpoint, token_path, &saved,
+                    )?;
+                    self.codex.insert(agent.clone(), session);
+                }
+                let (completion, metadata, ready) = {
+                    let session = self.codex.get_mut(&agent).unwrap();
+                    let completion = session.poll()?;
+                    let metadata = if session.dirty {
+                        session.dirty = false;
+                        Some(
+                            json!({"schema_version":1,"record_type":"codex_app_server_session","agent_name":agent,"runtime_instance_id":session.runtime,"pid":session.pid(),"state":session.state,"observed_at":now()}),
+                        )
+                    } else {
+                        None
+                    };
+                    (completion, metadata, session.ready)
+                };
+                if let Some(metadata) = metadata {
+                    self.kernel
+                        .store
+                        .save(&format!("providers/codex/{agent}/session.json"), &metadata)?;
+                    self.kernel.store.commit()?;
+                }
+                if let Some((job, decision)) = completion {
+                    let checkpoint = self.kernel.memory_checkpoint();
+                    if let Err(error) = self.complete(&job, &decision) {
+                        self.kernel.store.rollback();
+                        self.kernel.restore_memory(checkpoint);
+                        return Err(error);
+                    }
+                    self.kernel.store.commit()?;
+                }
+                if ready {
+                    let checkpoint = self.kernel.memory_checkpoint();
+                    let job = match self.start(&agent) {
+                        Ok(job) => {
+                            self.kernel.store.commit()?;
+                            job
+                        }
+                        Err(error) => {
+                            self.kernel.store.rollback();
+                            self.kernel.restore_memory(checkpoint);
+                            return Err(error);
+                        }
+                    };
+                    if !job.is_null() {
+                        self.codex.get_mut(&agent).unwrap().start(&job)?;
                     }
                 }
                 continue;

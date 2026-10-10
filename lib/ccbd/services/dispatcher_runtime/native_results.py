@@ -37,7 +37,7 @@ def complete_native_result(dispatcher,current,terminal,decision,*,finished_at,pr
         resume=False
     args=dict(job=terminal.to_record(),decision=decision.to_record(),supports_resume=resume)
     plan=client.call('result.plan',**args)
-    if plan['action'] in {'delegated','delivery'}:
+    if plan['action'] in {'delegated','delivery','silenced'}:
         return terminal,decision,False
     if plan['action']=='retry':
         try:

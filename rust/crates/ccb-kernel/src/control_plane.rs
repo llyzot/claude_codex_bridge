@@ -40,8 +40,8 @@ pub fn serve_daemon(root: &Path, token_path: &Path, config: &Path, standalone: b
     serve_runtime(root, token_path, Some(config), standalone)
 }
 enum Runtime {
-    Kernel(Kernel),
-    Daemon(crate::daemon::Daemon),
+    Kernel(Box<Kernel>),
+    Daemon(Box<crate::daemon::Daemon>),
 }
 impl Runtime {
     fn mount(&mut self, endpoint: &Value) -> Result<()> {
@@ -106,13 +106,13 @@ fn serve_runtime(
     }
     let kernel = Kernel::open(root)?;
     let mut runtime = if let Some(config) = config {
-        Runtime::Daemon(crate::daemon::Daemon::new(
+        Runtime::Daemon(Box::new(crate::daemon::Daemon::new(
             kernel,
             serde_json::from_slice(&fs::read(config)?)?,
             &generation,
-        )?)
+        )?))
     } else {
-        Runtime::Kernel(kernel)
+        Runtime::Kernel(Box::new(kernel))
     };
     let listener = TcpListener::bind(("127.0.0.1", 0))?;
     let stop = Arc::new(AtomicBool::new(false));

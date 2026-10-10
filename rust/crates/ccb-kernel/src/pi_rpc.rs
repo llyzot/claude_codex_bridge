@@ -5,6 +5,7 @@ use std::{
     io::{BufRead, BufReader, Read, Write},
     process::{Child, Command, Stdio},
     sync::mpsc,
+    time::Instant,
 };
 struct Turn {
     job: Value,
@@ -16,6 +17,9 @@ struct Turn {
     check: String,
     decision: Option<Value>,
     session_id: String,
+    cancel: Option<bool>,
+    started: Instant,
+    deadline_triggered: bool,
 }
 pub struct Session {
     child: Child,
@@ -27,6 +31,8 @@ pub struct Session {
     pub ready: bool,
     active: Option<Turn>,
     pub dirty: bool,
+    expected_session: String,
+    timeout_s: f64,
 }
 impl Drop for Session {
     fn drop(&mut self) {
@@ -40,6 +46,7 @@ impl Session {
         spec: &Value,
         endpoint: &Value,
         token: &std::path::Path,
+        saved: &Value,
     ) -> Result<Self> {
         let argv = spec["command"]
             .as_array()
@@ -51,6 +58,25 @@ impl Session {
         let mut command = Command::new(argv[0].as_str().unwrap());
         for arg in &argv[1..] {
             command.arg(arg.as_str().unwrap());
+        }
+        let expected_session = if spec["resume_session"] != false {
+            saved["state"]["sessionId"]
+                .as_str()
+                .unwrap_or("")
+                .to_owned()
+        } else {
+            String::new()
+        };
+        if !expected_session.is_empty() {
+            let file = saved["state"]["sessionFile"]
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .context("Pi exact session resume requires a saved session file")?;
+            ensure!(
+                std::path::Path::new(file).is_file(),
+                "Pi saved session file is missing"
+            );
+            command.arg("--session").arg(file);
         }
         if let Some(cwd) = spec["workspace_path"].as_str() {
             command.current_dir(cwd);
@@ -127,6 +153,8 @@ impl Session {
             ready: false,
             active: None,
             dirty: false,
+            expected_session,
+            timeout_s: spec["timeout_s"].as_f64().unwrap_or(3600.0),
         })
     }
     pub fn start(&mut self, job: &Value) -> Result<()> {
@@ -163,11 +191,26 @@ impl Session {
                 .as_str()
                 .context("Pi session identity unavailable")?
                 .to_owned(),
+            cancel: None,
+            started: Instant::now(),
+            deadline_triggered: false,
         });
         self.ready = false;
         Ok(())
     }
     pub fn poll(&mut self) -> Result<Option<(Value, Value)>> {
+        if self.timeout_s > 0.0
+            && self.active.as_ref().is_some_and(|turn| {
+                turn.cancel.is_none() && turn.started.elapsed().as_secs_f64() > self.timeout_s
+            })
+        {
+            let id = self.active.as_ref().unwrap().job["job_id"]
+                .as_str()
+                .unwrap()
+                .to_owned();
+            self.abort(&id, true)?;
+            self.active.as_mut().unwrap().deadline_triggered = true;
+        }
         for _ in 0..128 {
             let Ok(record) = self.events.try_recv() else {
                 break;
@@ -199,6 +242,18 @@ impl Session {
         }
         Ok(None)
     }
+    pub fn abort(&mut self, job_id: &str, record_reply: bool) -> Result<()> {
+        let turn = self.active.as_mut().context("Pi has no active task")?;
+        ensure!(
+            turn.job["job_id"] == job_id,
+            "Pi cancel task identity mismatch"
+        );
+        self.commands
+            .try_send(json!({"id":format!("abort-{}",turn.id),"type":"abort"}))
+            .context("Pi abort queue unavailable")?;
+        turn.cancel = Some(record_reply);
+        Ok(())
+    }
     fn ingest(&mut self, record: &Value) -> Result<()> {
         if record["type"] == "response" && record["id"] == self.init {
             ensure!(
@@ -209,6 +264,11 @@ impl Session {
             ensure!(
                 !self.state["sessionId"].as_str().unwrap_or("").is_empty(),
                 "Pi initialization session identity missing"
+            );
+            ensure!(
+                self.expected_session.is_empty()
+                    || self.state["sessionId"] == self.expected_session,
+                "Pi resumed wrong session"
             );
             self.ready = idle(&self.state);
             self.dirty = true;
@@ -317,6 +377,13 @@ impl Session {
                 if stop == "error" {
                     decision["diagnostics"]["error_message"] =
                         turn.assistant["errorMessage"].clone();
+                }
+                if let Some(record_reply) = turn.cancel {
+                    decision["diagnostics"]["result_reply_enabled"] = json!(record_reply);
+                    decision["diagnostics"]["cancel_requested"] = json!(true);
+                }
+                if turn.deadline_triggered {
+                    decision["diagnostics"]["deadline_triggered"] = json!(true);
                 }
                 turn.decision = Some(decision);
             }

@@ -66,6 +66,49 @@ def test_foreign_prompt_anchor_cannot_complete_current_task(tmp_path):
     finally:server.close()
 
 
+def test_clean_restart_uses_exact_saved_pi_session(tmp_path):
+    root=tmp_path/'state';config=pi_spec('persist');config['command'].append(str(tmp_path/'session.json'))
+    server=Server(root,{'pi_agent':config})
+    try:
+        receipt=submit(server,'pi_agent');await_watch(server,receipt['job_id'],lambda r:r['terminal'])
+        before=json.loads((root/'providers/pi/pi_agent/session.json').read_text())
+    finally:server.close()
+    restored=Server(root,{'pi_agent':config})
+    try:
+        receipt=submit(restored,'pi_agent');await_watch(restored,receipt['job_id'],lambda r:r['terminal'])
+        after=json.loads((root/'providers/pi/pi_agent/session.json').read_text())
+        assert before['state']['sessionId']==after['state']['sessionId']
+        assert before['runtime_instance_id']!=after['runtime_instance_id']
+        assert after['state']['messageCount']==4
+    finally:restored.close()
+
+
+def test_pi_cancel_ack_is_not_completion_and_silent_cancel_emits_no_reply(tmp_path):
+    server=Server(tmp_path/'state',{'pi_agent':pi_spec('hang')})
+    try:
+        receipt=submit(server,'pi_agent');await_watch(server,receipt['job_id'],lambda r:r['status']=='running')
+        time.sleep(.1)
+        result=server.rpc('cancel',{'job_id':receipt['job_id'],'record_reply':False})
+        assert result['status']=='cancellation_requested'
+        row=await_watch(server,receipt['job_id'],lambda r:r['terminal'])
+        assert row['status']=='cancelled'
+        assert row['completion_reason']=='pi_aborted'
+        assert server.rpc('records.list',{'stream':'replies'},version=1)['result']==[]
+    finally:server.close()
+
+
+def test_pi_deadline_requests_abort_and_waits_for_settled_evidence(tmp_path):
+    config=pi_spec('hang');config['timeout_s']=.2
+    server=Server(tmp_path/'state',{'pi_agent':config})
+    try:
+        receipt=submit(server,'pi_agent');row=await_watch(server,receipt['job_id'],lambda r:r['terminal'])
+        assert row['status']=='cancelled'
+        records=server.rpc('records.latest',dict(stream='jobs',agent_name='pi_agent',identity='job_id'),version=1)['result']
+        assert records[0]['terminal_decision']['diagnostics']['deadline_triggered'] is True
+        assert records[0]['terminal_decision']['diagnostics']['completion_authority']=='pi_rpc_agent_settled'
+    finally:server.close()
+
+
 @pytest.mark.skipif(os.name!='nt',reason='Uses the installed Windows Pi package discovered in this workspace')
 def test_installed_pi_read_only_rpc_handshake_in_private_home(tmp_path):
     node=Path('C:/Users/user/scoop/apps/nodejs-lts/current/node.exe')

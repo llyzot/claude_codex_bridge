@@ -1,6 +1,6 @@
 # Native provider protocol checkpoint
 
-This checkpoint implements owned Pi RPC and Codex app-server processes. Existing Herdr Workspace/Agents, installed CCB, user provider settings and `codex_impl` were not controlled or changed.
+This checkpoint implements owned Pi RPC, Codex app-server and Claude stream processes. Existing Herdr Workspace/Agents, installed CCB, user provider settings and `codex_impl` were not controlled or changed.
 
 ## Local primary sources
 
@@ -15,6 +15,16 @@ Turn submission sets the owned thread, unique request ID and `clientUserMessageI
 
 An actual installed app-server completed initialize/thread-start in a private `CODEX_HOME`, private working folder and ephemeral thread. No turn/model request was sent. This is real transport/schema evidence, not proof of real model execution.
 
+Later model-backed Pi/Codex checks are recorded separately in [the real-model checkpoint](native-real-model-checkpoint-20261011.md).
+
+### Codex cancellation and deadlines
+
+Explicit API-2 cancellation and configured `timeout_s` deadlines append a Job cancellation intent and event through the native journal before provider IO. The intent fixes the reply policy and binds the running execution; duplicate requests do not send another interrupt. If the start response is delayed, the intent waits for its accepted turn ID. The owned driver then sends `turn/interrupt` with that exact thread/turn pair. The empty response is acknowledgement only, as defined in the [official App Server protocol](https://learn.chatgpt.com/docs/app-server) and the installed TurnInterruptParams/Response schemas.
+
+Neither acknowledgement, rejection, elapsed time nor a foreign terminal event frees the slot. Completion still requires the matching terminal turn and idle-thread verification. A natural completion racing cancellation retains the provider's actual status; silent cancellation suppresses its reply. A failure after a cancellation request cannot automatically retry the task. Control acknowledgements/errors are visible in safe session metadata and the final decision.
+
+Daemon death preserves the explicit intent; an old running execution remains fenced. This is durable intent and replay prevention, not completed running-task reconciliation. These controls were tested with owned protocol fixtures; successful real-model interruption remains a separate acceptance check.
+
 ## Pi restore and cancellation
 
 When a saved Pi binding has a session file, native startup passes that exact file via `--session` and checks the returned session ID. A missing file or different ID fails closed. A `--no-session` binding has no durable history to resume.
@@ -23,4 +33,4 @@ The public native cancel operation queues Pi `abort`; its response reports cance
 
 ## Unfinished scope
 
-Running-task reconciliation across daemon crashes, Codex interruption/approval UI/deadlines, Claude transport/hooks, Herdr attachment/startup/Agent management, full config/CLI parity, production installer activation, actual model-based Pi Lead + Codex Worker, performance comparisons and default Rust selection remain incomplete. These implementations do not connect to or adopt an existing user app-server/session merely because its process or pathname exists.
+Running-task reconciliation across daemon crashes, Codex approval/user-input handling, Claude hooks/cancellation/deadlines, Herdr attachment/startup/Agent management, full config/CLI parity, production installer activation, successful real Claude inference, performance comparisons and default Rust selection remain incomplete. Claude stream execution and real Pi/Codex automatic callback evidence are recorded in [the real-model checkpoint](native-real-model-checkpoint-20261011.md). These implementations do not connect to or adopt an existing user app-server/session merely because its process or pathname exists.

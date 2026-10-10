@@ -5,6 +5,7 @@ use std::{
     io::{BufRead, BufReader, Read, Write},
     process::{Child, Command, Stdio},
     sync::mpsc,
+    time::Instant,
 };
 struct Active {
     job: Value,
@@ -16,6 +17,12 @@ struct Active {
     completed: Value,
     check: String,
     decision: Option<Value>,
+    cancel: Option<bool>,
+    interrupt: String,
+    interrupt_acknowledged: bool,
+    interrupt_error: Value,
+    started: Instant,
+    deadline_triggered: bool,
 }
 pub struct Session {
     child: Child,
@@ -179,8 +186,16 @@ impl Session {
             completed: Value::Null,
             check: String::new(),
             decision: None,
+            cancel: None,
+            interrupt: String::new(),
+            interrupt_acknowledged: false,
+            interrupt_error: Value::Null,
+            started: Instant::now(),
+            deadline_triggered: false,
         });
         self.ready = false;
+        self.state["control"] = Value::Null;
+        self.dirty = true;
         Ok(())
     }
     pub fn poll(&mut self) -> Result<Option<(Value, Value)>> {
@@ -190,16 +205,18 @@ impl Session {
             };
             self.ingest(record)?;
         }
+        self.send_pending_interrupt()?;
         if let Some(exit) = self.child.try_wait()? {
             self.ready = false;
             if let Some(active) = self.active.take() {
-                let decision = active.decision.unwrap_or_else(|| {
+                let mut decision = active.decision.clone().unwrap_or_else(|| {
                     failure(
                         "incomplete",
                         "codex_process_exit",
                         &format!("Codex exited before turn completion: {exit}"),
                     )
                 });
+                control_diagnostics(&active, &mut decision);
                 return Ok(Some((active.job, decision)));
             }
             anyhow::bail!("Codex app-server exited");
@@ -207,9 +224,85 @@ impl Session {
         if self.active.as_ref().is_some_and(|a| a.decision.is_some()) {
             let active = self.active.take().unwrap();
             self.ready = true;
-            return Ok(Some((active.job, active.decision.unwrap())));
+            let mut decision = active.decision.clone().unwrap();
+            control_diagnostics(&active, &mut decision);
+            return Ok(Some((active.job, decision)));
         }
         Ok(None)
+    }
+    pub fn active_job_id(&self) -> Option<&str> {
+        self.active.as_ref().and_then(|a| a.job["job_id"].as_str())
+    }
+    pub fn deadline_due(&self) -> bool {
+        let timeout = self.spec["timeout_s"].as_f64().unwrap_or(0.0);
+        self.active.as_ref().is_some_and(|a| {
+            timeout.is_finite()
+                && timeout > 0.0
+                && a.started.elapsed().as_secs_f64() > timeout
+                && a.cancel.is_none()
+                && a.decision.is_none()
+        })
+    }
+    pub fn validate_interrupt(&self, job_id: &str, record_reply: bool) -> Result<()> {
+        let active = self.active.as_ref().context("Codex has no active task")?;
+        ensure!(
+            active.job["job_id"] == job_id,
+            "Codex cancel task identity mismatch"
+        );
+        ensure!(
+            active.cancel.is_none_or(|prior| prior == record_reply),
+            "Codex cancellation reply policy already fixed"
+        );
+        Ok(())
+    }
+    // The actor commits explicit cancellation intent before applying it here.
+    pub fn sync_job(&mut self, job: &Value) -> Result<()> {
+        let active = self.active.as_mut().context("Codex has no active task")?;
+        ensure!(
+            active.job["job_id"] == job["job_id"]
+                && active.job["agent_name"] == job["agent_name"]
+                && active.job["provider"] == job["provider"]
+                && active.job["request"] == job["request"]
+                && active.job["provider_options"]["native_execution_instance"]
+                    == job["provider_options"]["native_execution_instance"]
+                && active.job["provider_options"]["native_daemon_instance"]
+                    == job["provider_options"]["native_daemon_instance"],
+            "Codex active execution identity changed"
+        );
+        active.job = job.clone();
+        active.deadline_triggered =
+            job["provider_options"]["native_cancel_intent"]["deadline_triggered"] == true;
+        if let Some(record_reply) =
+            job["provider_options"]["native_cancel_intent"]["record_reply"].as_bool()
+        {
+            self.interrupt(
+                job["job_id"].as_str().context("missing job identity")?,
+                record_reply,
+            )?;
+        }
+        Ok(())
+    }
+    fn interrupt(&mut self, job_id: &str, record_reply: bool) -> Result<()> {
+        self.validate_interrupt(job_id, record_reply)?;
+        self.active.as_mut().unwrap().cancel = Some(record_reply);
+        Ok(())
+    }
+    fn send_pending_interrupt(&mut self) -> Result<()> {
+        let Some(active) = self.active.as_ref() else {
+            return Ok(());
+        };
+        if active.cancel.is_none()
+            || active.turn.is_empty()
+            || !active.interrupt.is_empty()
+            || active.decision.is_some()
+        {
+            return Ok(());
+        }
+        let id = format!("interrupt-{}", active.start);
+        self.send(json!({"id":id,"method":"turn/interrupt","params":{
+            "threadId":self.state["thread_id"],"turnId":active.turn}}))?;
+        self.active.as_mut().unwrap().interrupt = id;
+        Ok(())
     }
     fn ingest(&mut self, record: Value) -> Result<()> {
         if record["id"] == self.init {
@@ -254,6 +347,16 @@ impl Session {
         let Some(active) = self.active.as_mut() else {
             return Ok(());
         };
+        if !active.interrupt.is_empty() && record["id"] == active.interrupt {
+            active.interrupt_acknowledged =
+                record["error"].is_null() && record["result"].is_object();
+            active.interrupt_error = record["error"].clone();
+            self.state["control"] = json!({"job_id":active.job["job_id"],
+                "turn_id":active.turn,"interrupt_acknowledged":active.interrupt_acknowledged,
+                "interrupt_error":active.interrupt_error});
+            self.dirty = true;
+            return Ok(());
+        }
         if record["id"] == active.start {
             if !record["error"].is_null() {
                 active.decision = Some(failure(
@@ -370,6 +473,17 @@ impl Session {
     }
     pub fn pid(&self) -> u32 {
         self.child.id()
+    }
+}
+fn control_diagnostics(active: &Active, decision: &mut Value) {
+    if let Some(record_reply) = active.cancel {
+        decision["diagnostics"]["result_reply_enabled"] = json!(record_reply);
+        decision["diagnostics"]["cancel_requested"] = json!(true);
+        decision["diagnostics"]["interrupt_acknowledged"] = json!(active.interrupt_acknowledged);
+        decision["diagnostics"]["interrupt_error"] = active.interrupt_error.clone();
+    }
+    if active.deadline_triggered {
+        decision["diagnostics"]["deadline_triggered"] = json!(true);
     }
 }
 fn capture(active: &mut Active, item: &Value) {

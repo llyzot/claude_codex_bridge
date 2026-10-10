@@ -12,7 +12,7 @@ The config has `schema_version: 2`, a `project_id`, and an `agents` object. Each
 
 ## Verified behavior
 
-- Public API-2 requests keep the existing `{api_version, op, request}` and flattened success/error envelope. The current operations are ping, submit, watch, queue, retry, inbox, mailbox-head, work, complete and shutdown. Complete operation/output-shape parity is not yet claimed.
+- Public API-2 requests keep the existing `{api_version, op, request}` and flattened success/error envelope. The current operations are ping, submit, watch, queue, retry, inbox, mailbox-head, work, complete, cancel and shutdown. Complete operation/output-shape parity is not yet claimed. Cancellation controls are implemented for owned Pi and Codex sessions.
 - A serialized actor owns durable mutation and a separate periodic tick. A request receipt does not wait for command execution. Child stdin writing runs separately from the actor; stdout records are bounded.
 - A transient command receives a Job JSON on stdin. A result envelope must contain matching job ID, agent, provider, execution-instance ID, and a version-2 CompletionDecision. Process exit and stdout EOF are required before terminal admission. Foreign output is diagnostic failure, not task evidence.
 - A Worker result can atomically record its reply and prepare a continuation. The daemon admits that continuation and starts the configured Lead executor. Lead does not poll during its initial submission turn.
@@ -24,14 +24,14 @@ The config has `schema_version: 2`, a `project_id`, and an `agents` object. Each
 
 An agent can select `driver_kind: "pi_rpc"`, `provider: "pi"`, and a command argv which starts Pi RPC mode. The process is persistent across tasks. A task completes only after its prompt ID is accepted, the user message contains its matching `CCB_REQ_ID` anchor, `agent_settled` arrives and an ID-correlated `get_state` confirms the same session is idle. `agent_end`, command acceptance and foreign anchors do not complete a task. Session identity/activity metadata is persisted separately from model/auth configuration.
 
-The installed local primary source is `@earendil-works/pi-coding-agent 1.1.0`; its `docs/rpc.md`, `docs/cli-integration.md`, `docs/rpc-commands.md` and `dist/modes/rpc/rpc-mode.js` establish this contract. A real read-only `get_state` handshake passed with a private home and automatic resources disabled; model execution was not exercised. Protocol fixtures verified same-process task/callback continuation and out-of-order acceptance handling. Exact-session restart restoration, cancellation/deadlines and real Pi/Codex collaboration remain incomplete.
+The installed local primary source is `@earendil-works/pi-coding-agent 1.1.0`; its `docs/rpc.md`, `docs/cli-integration.md`, `docs/rpc-commands.md` and `dist/modes/rpc/rpc-mode.js` establish this contract. Initial transport checks exercised only read-only `get_state`. Later fixtures verified exact-session clean restart and provider-confirmed cancellation/deadlines; real Pi/Codex automatic collaboration is recorded in [the real-model checkpoint](native-real-model-checkpoint-20261011.md).
 
 On Windows the daemon owns a nested Job Object with kill-on-job-close and is assigned before spawning executors. A daemon-death test verified cleanup of an owned descendant. Unix process-tree ownership is still an explicit remaining requirement.
 
 ## Remaining requirements
 
-The command fixture is not a real provider adapter. Native Pi RPC is integrated as above, but Codex session evidence, Claude hooks, Herdr startup/Agent management, complete native CLI/config/install integration, full public operation parity and Keeper behavior still require implementation and verification.
+Native Pi/Codex/Claude execution is integrated, as detailed in [the provider checkpoint](native-provider-protocols-20261011.md). Remaining work includes Codex approval/user-input handling, Claude control/hooks and successful real inference, Herdr startup/Agent management, complete native CLI/config/install integration, full public operation parity and Keeper behavior.
 
 An old running Job with no owned process handle is kept active/fenced after restart. This avoids interpreting an observation gap as completion or replaying uncertain work. Durable provider recovery, operator reconciliation and Unix process-tree ownership are not finished. Windows descendant cleanup is verified for this owned-process driver; it is not a claim of controlling unrelated Herdr Agents.
 
-Performance against the Python baseline, true persistent-session Lead wakeup, state rollback across all supported providers, and a default Rust runtime are still unproven. See [migration progress](rust-core-refactor-progress.json) for recorded checks and remaining scope.
+Performance against the Python baseline, state rollback across all supported providers, and a default Rust runtime are still unproven. Real persistent Pi Lead wakeup has been verified separately; it does not establish successful Claude or Herdr-integrated execution. See [migration progress](rust-core-refactor-progress.json) for recorded checks and remaining scope.

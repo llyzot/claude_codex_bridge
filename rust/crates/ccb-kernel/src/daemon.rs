@@ -388,9 +388,13 @@ impl Daemon {
                     job["status"] == "running",
                     "native cancel requires a running owned provider task"
                 );
-                let agent = records::string(&job, "agent_name")?;
-                if let Some(session) = self.pi.get_mut(agent) {
+                let agent = records::string(&job, "agent_name")?.to_owned();
+                if let Some(session) = self.pi.get_mut(&agent) {
                     session.abort(id, p["record_reply"] != false)?;
+                } else if let Some(session) = self.codex.get(&agent) {
+                    let record_reply = p["record_reply"] != false;
+                    session.validate_interrupt(id, record_reply)?;
+                    self.mark_codex_cancel(job, record_reply, false)?;
                 } else {
                     bail!("native cancellation control is not yet implemented for this provider");
                 }
@@ -402,6 +406,38 @@ impl Daemon {
             }
             _ => bail!("unsupported native daemon operation: {op}"),
         }
+    }
+    fn mark_codex_cancel(
+        &mut self,
+        mut job: Value,
+        record_reply: bool,
+        deadline: bool,
+    ) -> Result<Value> {
+        let prior = &job["provider_options"]["native_cancel_intent"];
+        if !prior.is_null() {
+            ensure!(
+                prior["record_reply"] == record_reply,
+                "Codex cancellation reply policy already fixed"
+            );
+            return Ok(job);
+        }
+        let timestamp = now();
+        job["cancel_requested_at"] = json!(timestamp);
+        job["updated_at"] = json!(timestamp);
+        job["provider_options"]["native_cancel_intent"] = json!({"record_reply":record_reply,"requested_at":timestamp,"deadline_triggered":deadline});
+        records::dispatch(
+            &mut self.kernel.store,
+            "append",
+            &json!({"stream":"jobs","agent_name":job["agent_name"],"record":job}),
+        )?;
+        admission::event(
+            &mut self.kernel,
+            &job,
+            "job_cancel_requested",
+            json!({"status":"running","record_reply":record_reply,"deadline_triggered":deadline}),
+            &timestamp,
+        )?;
+        Ok(job)
     }
     fn spec(&self, agent: &str) -> Result<Value> {
         let spec = &self.config["agents"][agent];
@@ -903,6 +939,10 @@ impl Daemon {
                     )?;
                     self.codex.insert(agent.clone(), session);
                 }
+                if let Some(id) = self.codex[&agent].active_job_id().map(str::to_owned) {
+                    let job = self.get_job(&id)?;
+                    self.codex.get_mut(&agent).unwrap().sync_job(&job)?;
+                }
                 let (completion, metadata, ready) = {
                     let session = self.codex.get_mut(&agent).unwrap();
                     let completion = session.poll()?;
@@ -930,6 +970,13 @@ impl Daemon {
                         return Err(error);
                     }
                     self.kernel.store.commit()?;
+                } else if self.codex[&agent].deadline_due() {
+                    let id = self.codex[&agent].active_job_id().unwrap().to_owned();
+                    let job = self.get_job(&id)?;
+                    let marked = self.mark_codex_cancel(job, true, true)?;
+                    // Provider IO happens only after the intent is durable.
+                    self.kernel.store.commit()?;
+                    self.codex.get_mut(&agent).unwrap().sync_job(&marked)?;
                 }
                 if ready {
                     let checkpoint = self.kernel.memory_checkpoint();

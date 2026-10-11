@@ -302,3 +302,37 @@ older exported refs are not falsely marked as supporting it. The PowerShell
 entry checks this contract before installation. This is not a production/default rollout; full
 in-place upgrade/removal, installer-death recovery, signed release provenance,
 Herdr integration and the remaining core feature parity still need work.
+
+## Actual Windows release-package validation
+
+A complete local ZIP was built from exported commit
+`36846f81d89c0d607d814a23cdfe519de2ee58ba`, including the four Windows command
+launchers, Rust kernel/CLI and both auxiliary Rust executables. Its 2,021 archive
+entries, version/commit metadata, SHA256 sidecar and eight x64 PE entries were
+checked. The artifact is
+`dist/windows/rust-validation-36846f81/ccb-windows-x86_64.zip` (30,780,713 bytes).
+Checksums and the exact validation scope are recorded in
+[native-release-validation-20261011.json](native-release-validation-20261011.json).
+
+Testing the first actual artifact exposed a launcher interaction that isolated
+CLI tests had missed: `ask.exe` in native-selection mode forwarded help/version
+queries as `ask --help`/`ask --version`, which attempted project discovery. The
+core now handles those leading metadata queries before project discovery while
+retaining capability-argument validation. The rebuilt package passed all eight
+launcher metadata queries without a project or Python on PATH.
+
+The extracted package's own PowerShell installer installed Rust into a new
+validation prefix. The packaged kernel passed its stdio capability probe. The
+installed `ask.exe` submitted to a fixture Pi Lead; a fixture Codex Worker
+completed, the native daemon delivered its result, and the same workflow reached
+the reviewed Lead reply with a closed callback edge. The owned validation daemon
+was stopped afterwards. Account PATH, production installation and existing user
+workspaces were unchanged. Python was available by explicit path only for the
+test harness/provider fixtures; the installed core did not use it.
+
+This is a local validation build, not a published or promoted release. The
+archive still defaults to the legacy Python lane unless Rust installation is
+explicitly selected. Auxiliary executables were built and PE-checked, not
+interactively tested; the sidebar retained one pre-existing unused-import
+warning on Windows. Real model inference, real Herdr integration, code signing,
+in-place upgrades and full runtime parity remain outside this package smoke.

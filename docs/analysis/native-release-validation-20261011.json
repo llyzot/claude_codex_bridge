@@ -1,0 +1,53 @@
+{
+  "source_commit": "36846f81d89c0d607d814a23cdfe519de2ee58ba",
+  "version": "8.7.10",
+  "archive_sha256": "4c1bf0f494d0d80ee41a0d908a913b8a505d93e7270fa12f26d8b05ee6de878f",
+  "archive_bytes": 30780713,
+  "entry_count": 2021,
+  "binary_sha256": {
+    "ask": "6f22e053abe72260a4e24f57f9d364b09d591cac1b189913356f947e799fd0a7",
+    "autonew": "6f22e053abe72260a4e24f57f9d364b09d591cac1b189913356f947e799fd0a7",
+    "ccb": "6f22e053abe72260a4e24f57f9d364b09d591cac1b189913356f947e799fd0a7",
+    "ccb-agent-sidebar": "e554f369f8a32c49ad7e52be3e1157255ba73cd6659ae3eb320e68d7e9e24251",
+    "ccb-kernel": "d4ce6969cf832058e836e5f9012a7745e8513f3bbdcc4c2659292acaa9305e71",
+    "ccb-native": "9310ac11ac84bea5f13e8abc286d4209f121602dd961d46a1ac583c52f876043",
+    "ccb-rs-helper": "774e892fc2479a53f8833518e309e85237eba6557919af8a0ea8c5a0d7a9dd73",
+    "ctx-transfer": "6f22e053abe72260a4e24f57f9d364b09d591cac1b189913356f947e799fd0a7"
+  },
+  "pe_architecture": "x86_64",
+  "native_capabilities": {
+    "core_version": "0.1.0",
+    "native_prefix_installation": {
+      "commands": [
+        "ccb",
+        "ask",
+        "ccb-native"
+      ],
+      "in_place_upgrade": false,
+      "modifies_account_settings": false,
+      "schema_version": 1,
+      "supported": true
+    },
+    "public_api_version": 2,
+    "runtime": "rust",
+    "schema_version": 1,
+    "service": "ccb-native",
+    "version": "8.7.10"
+  },
+  "kernel_probe": "passed",
+  "launcher_metadata_queries": 8,
+  "native_powershell_install": "passed",
+  "account_path_changed": false,
+  "fixture_pi_lead_codex_worker_callback": "passed",
+  "daemon_stopped": true,
+  "model_inference": false,
+  "herdr_live_validation": false,
+  "production_install_changed": false,
+  "default_archive_runtime": "python",
+  "validation_directory": "dist/windows/rust-validation-36846f81/smoke-3f8119285fd340249a98441f1606f7e4",
+  "core_python_unavailable_on_path": true,
+  "archive_path": "dist/windows/rust-validation-36846f81/ccb-windows-x86_64.zip",
+  "checksum_path": "dist/windows/rust-validation-36846f81/ccb-windows-x86_64.zip.sha256",
+  "artifact_kind": "local validation build; not published or promoted to production",
+  "helper_scope": "All 8 entries compiled and PE-checked. Sidebar/helper interactive runtime behavior was not exercised; the sidebar emitted one pre-existing unused-import warning on Windows."
+}

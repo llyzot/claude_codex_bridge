@@ -40,7 +40,18 @@ elif args[:2]==['pane','process-info']:
     pane=state['panes'][option('--pane')]
     pid=pane.get('foreground_pid',state.get('shell_pid'))
     result={'process_info':{'pane_id':pane['pane_id'],'shell_pid':state.get('shell_pid'),
-            'foreground_processes':[{'pid':pid,'name':'fixture','cwd':pane.get('cwd')}],'tty':None,'foreground_process_group_id':None}}
+            'foreground_processes':[{'pid':pid,'name':state.get('shell_name','fixture'),'cwd':pane.get('cwd'),'argv':pane.get('argv',[])}],'tty':None,'foreground_process_group_id':None}}
+elif args[:2]==['pane','run']:
+    import re
+    pane=state['panes'][args[2]]
+    assert 'codex-tui-attach' in args[3]
+    quoted=re.findall(r"'((?:[^']|'')*)'",args[3]);host=json.loads((Path(quoted[-1].replace("''","'"))/'host.json').read_text(encoding='utf-8'))
+    pid=state['provider_pids'].pop(0);pane['foreground_pid']=pid;pane['agent']='codex'
+    pane['argv']=[host['executable'],'--remote',host['endpoint'],'resume',host['thread_id']]
+    row={'name':None,'agent':'codex','agent_status':'idle','pane_id':pane['pane_id'],'workspace_id':pane['workspace_id'],
+         'terminal_id':pane['terminal_id'],'tab_id':pane['workspace_id']+':t1','interactive_ready':True,
+         'launch_pending':False,'revision':1,'focused':False,'tokens':pane['tokens'].copy()}
+    state.setdefault('agents',{})['host-unnamed']=row;save();result={'status':'ok'}
 elif args[:2]==['agent','start']:
     name=args[2];pane=state['panes'][option('--pane')];kind=option('--kind')
     assert not pane.get('agent') and not any(a['name']==name for a in state.get('agents',{}).values())

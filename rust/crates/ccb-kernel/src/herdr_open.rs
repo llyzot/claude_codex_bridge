@@ -9,6 +9,9 @@ use std::{
     time::{Duration, Instant},
 };
 const RECORD: &str = "herdr-open.json";
+fn hosted(spec: &Value) -> bool {
+    spec["provider"] == "codex" && !spec["tui_host_root"].is_null()
+}
 #[path = "herdr_recovery.rs"]
 mod recovery;
 fn hash(v: &Value) -> Result<String> {
@@ -172,7 +175,7 @@ fn prepare_request(
             "native herdr open currently supports Pi/Codex terminal adapters"
         );
         ensure!(
-            spec["thread_options"].is_null() && spec["turn_options"].is_null(),
+            hosted(spec) || spec["thread_options"].is_null() && spec["turn_options"].is_null(),
             "headless protocol options require explicit terminal startup_args"
         );
         let mut args: Vec<String> = spec
@@ -180,10 +183,10 @@ fn prepare_request(
             .map(|v| serde_json::from_value(v.clone()))
             .transpose()?
             .unwrap_or_default();
-        if let Some(model) = spec["model"].as_str() {
+        if let Some(model) = spec["model"].as_str().filter(|_| !hosted(spec)) {
             args.extend(["--model".into(), model.into()]);
         }
-        if let Some(thinking) = spec["thinking"].as_str() {
+        if let Some(thinking) = spec["thinking"].as_str().filter(|_| !hosted(spec)) {
             if provider == "pi" {
                 args.extend(["--thinking".into(), thinking.into()]);
             } else {
@@ -208,8 +211,20 @@ fn prepare_request(
         if let Some(extra) = resume.get(name) {
             args.extend(serde_json::from_value::<Vec<String>>(extra.clone())?);
         }
-        spec["command"] = Value::Null;
-        spec["driver_kind"] = Value::Null;
+        if !hosted(spec) {
+            spec["command"] = Value::Null;
+            spec["driver_kind"] = Value::Null;
+        } else {
+            crate::codex_tui_host::validate(spec)?;
+            ensure!(
+                spec["thread_options"]["ephemeral"] != true,
+                "Herdr Codex attachment requires a persistent native thread"
+            );
+            ensure!(
+                args.is_empty(),
+                "native Codex host uses thread_options rather than terminal startup_args"
+            );
+        }
         path_env(spec, &native)?;
         let runtime = crate::config::state_root(project)?;
         for (key, value) in [
@@ -457,7 +472,7 @@ pub(crate) fn open(
         .context("missing agents")?
         .values_mut()
     {
-        if spec["driver_kind"] == "codex_app_server" {
+        if spec["driver_kind"] == "codex_app_server" && !hosted(spec) {
             if spec["thread_options"]
                 .as_object()
                 .is_some_and(|v| v.keys().all(|k| k == "model"))
@@ -475,16 +490,26 @@ pub(crate) fn open(
     config["project_root"] = json!(project);
     crate::workspaces::validate(&config)?;
     for spec in config["agents"].as_object().unwrap().values() {
+        crate::codex_tui_host::validate(spec)?;
+        ensure!(
+            !hosted(spec) || spec["thread_options"]["ephemeral"] != true,
+            "Herdr Codex attachment requires a persistent native thread"
+        );
         ensure!(
             ["pi", "codex"].contains(&spec["provider"].as_str().unwrap_or("")),
             "native herdr open currently supports Pi/Codex terminal adapters"
         );
         ensure!(
-            spec["thread_options"].is_null() && spec["turn_options"].is_null(),
+            hosted(spec) || spec["thread_options"].is_null() && spec["turn_options"].is_null(),
             "headless protocol options require explicit terminal startup_args"
         );
     }
     let runtime = crate::config::state_root(project)?;
+    let has_host = config["agents"].as_object().unwrap().values().any(hosted);
+    ensure!(
+        !has_host || options["recover_stopped"] != true,
+        "native Codex host stopped-server recovery is not integrated yet"
+    );
     let root = runtime.join("herdr");
     if options["dry_run"] == true {
         let agents=config["agents"].as_object().unwrap().iter().map(|(name,spec)|json!({"name":name,"provider":spec["provider"],"workspace_path":spec["workspace_path"]})).collect::<Vec<_>>();
@@ -585,10 +610,21 @@ pub(crate) fn open(
                     "agents_starting"
                 });
                 if mounted["status"] == "ready"
+                    || has_host
                     || record["bindings"].as_object().unwrap().len()
                         == request["config"]["agents"].as_object().unwrap().len()
                 {
                     for name in request["config"]["agents"].as_object().unwrap().keys() {
+                        if hosted(&request["config"]["agents"][name]) {
+                            record["bindings"][name] = json!({"native_host":true});
+                            continue;
+                        }
+                        if has_host
+                            && mounted["agents"][name]["status"] != "ready"
+                            && record["bindings"][name].is_null()
+                        {
+                            continue;
+                        }
                         if record["bindings"][name].is_null() {
                             if let Some(bound) =
                                 binding(&request, &bridges, options, name, &root, &mut record)?
@@ -650,6 +686,9 @@ pub(crate) fn open(
                         let mut daemon = request["config"].clone();
                         daemon["herdr"] = request.clone();
                         for (name, spec) in daemon["agents"].as_object_mut().unwrap() {
+                            if hosted(spec) {
+                                continue;
+                            }
                             spec["driver_kind"] = json!("herdr_tui");
                             spec["profile_family"] = json!("protocol_turn");
                             spec["herdr_history"] = record["bindings"][name]["history"].clone();
@@ -669,8 +708,12 @@ pub(crate) fn open(
                             daemon,
                             deadline.saturating_duration_since(Instant::now()),
                         )?;
-                        record["phase"] = json!(if started["status"] == "running" {
+                        record["phase"] = json!(if started["status"] == "running"
+                            && (!has_host || mounted["status"] == "ready")
+                        {
                             "running"
+                        } else if started["status"] == "running" {
+                            "native_hosts_starting"
                         } else {
                             "daemon_starting"
                         });

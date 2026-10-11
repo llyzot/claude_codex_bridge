@@ -102,6 +102,11 @@ fn plan(request: &Value) -> Result<Value> {
         let arguments = args(request, name)?;
         agents[name] = json!({"provider":spec["provider"],"cwd":namespace["slots"][name]["cwd"],
             "arguments_hash":hash(&json!(arguments))?,"argument_count":arguments.len()});
+        if !spec["tui_host_root"].is_null() {
+            crate::codex_tui_host::validate(spec)?;
+            agents[name]["native_host"] =
+                json!({"root":spec["tui_host_root"],"command_hash":hash(&spec["command"])?});
+        }
     }
     Ok(
         json!({"namespace_plan_hash":hash(&namespace)?,"agents":agents,"startup_timeout_ms":timeout}),
@@ -303,7 +308,9 @@ impl Manager<'_> {
             ["idle", "done", "working", "blocked", "unknown"].contains(&status),
             "unknown Herdr agent lifecycle"
         );
-        let ready = (agent["interactive_ready"] == true || pi_hook_ready(agent))
+        let ready = (agent["interactive_ready"] == true
+            || pi_hook_ready(agent)
+            || row["host_launch"].is_object())
             && ["idle", "done"].contains(&status);
         // A tool can temporarily own the PTY foreground while the recognized
         // provider remains alive. Keep its previously bound process identity;
@@ -456,7 +463,10 @@ impl Manager<'_> {
     }
     fn refresh(&mut self, name: &str, repair: bool) -> Result<()> {
         let mut snapshot = self.snapshot()?;
-        if repair && self.repair_initial_pi_name(&snapshot, name)? {
+        if repair
+            && (self.repair_initial_pi_name(&snapshot, name)?
+                || self.repair_initial_host_name(&snapshot, name)?)
+        {
             snapshot = self.snapshot()?;
         }
         let observed = self.observe(&snapshot, name)?;
@@ -465,6 +475,98 @@ impl Manager<'_> {
             .unwrap()
             .extend(observed.as_object().unwrap().clone());
         self.save()
+    }
+    fn repair_initial_host_name(&mut self, snapshot: &Value, name: &str) -> Result<bool> {
+        let row = self.record["agents"][name].clone();
+        if row["host_launch"].is_null()
+            || row["sent"] != true
+            || !row["binding"].is_null()
+            || !row["name_repair"].is_null()
+        {
+            return Ok(false);
+        }
+        let candidates = snapshot["agents"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|a| a["pane_id"] == row["pane_id"])
+            .collect::<Vec<_>>();
+        if candidates.len() != 1 {
+            return Ok(false);
+        }
+        let agent = candidates[0];
+        if !agent["name"].is_null()
+            || agent["agent"] != "codex"
+            || !["idle", "done"].contains(&agent["agent_status"].as_str().unwrap_or(""))
+        {
+            return Ok(false);
+        }
+        ensure!(
+            agent["terminal_id"] == row["terminal_id"] && self.owns(agent, Some(name)),
+            "Codex attachment target changed"
+        );
+        ensure!(
+            !snapshot["agents"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|a| a["name"] == row["herdr_name"]),
+            "Codex attachment name is occupied"
+        );
+        let runtime =
+            crate::config::state_root(Path::new(text(&self.request["config"], "project_root")?))?;
+        let host = crate::codex_tui_host::current(
+            &runtime,
+            name,
+            Path::new(text(&self.plan["agents"][name]["native_host"], "root")?),
+        )?
+        .context("Codex host not ready")?;
+        ensure!(host == row["host_launch"], "Codex attachment host changed");
+        let info = rpc(
+            self.request,
+            vec![
+                "pane".into(),
+                "process-info".into(),
+                "--pane".into(),
+                text(&row, "pane_id")?.into(),
+            ],
+        )?["process_info"]
+            .clone();
+        let argv = info["foreground_processes"][0]["argv"]
+            .as_array()
+            .context("Codex attachment argv unavailable")?;
+        for pair in [
+            [json!("--remote"), host["endpoint"].clone()],
+            [json!("resume"), host["thread_id"].clone()],
+        ] {
+            ensure!(
+                argv.windows(2).any(|args| args == pair),
+                "foreground Codex is not connected to the recorded host/thread"
+            );
+        }
+        let (process, shell, cwd) = self.foreground(self.pane(snapshot, name)?)?;
+        ensure!(
+            process["pid"] != shell
+                && crate::pi_terminal::same_session_path(&cwd, &self.plan["agents"][name]["cwd"]),
+            "Codex attachment process/cwd mismatch"
+        );
+        self.record["agents"][name]["name_repair"] = json!({"kind":"codex_host","permitted":true,"process":process,"host_process":host["host_process"],"pane_id":row["pane_id"],"terminal_id":row["terminal_id"]});
+        self.save()?;
+        let _ = rpc(
+            self.request,
+            vec![
+                "agent".into(),
+                "rename".into(),
+                text(&row, "pane_id")?.into(),
+                text(&row, "herdr_name")?.into(),
+            ],
+        );
+        let after = self.snapshot()?;
+        ensure!(
+            self.foreground(self.pane(&after, name)?)?.0 == process,
+            "Codex attachment changed during naming"
+        );
+        Ok(true)
     }
     fn run(&mut self, mount: bool) -> Result<Value> {
         let names = self.plan["agents"]
@@ -495,6 +597,23 @@ impl Manager<'_> {
         for name in &names {
             self.refresh(name, mount)?;
             if mount && self.record["agents"][name]["sent"] == false {
+                let host = if !self.plan["agents"][name]["native_host"].is_null() {
+                    let runtime = crate::config::state_root(Path::new(text(
+                        &self.request["config"],
+                        "project_root",
+                    )?))?;
+                    let Some(host) = crate::codex_tui_host::current(
+                        &runtime,
+                        name,
+                        Path::new(text(&self.plan["agents"][name]["native_host"], "root")?),
+                    )?
+                    else {
+                        continue;
+                    };
+                    Some(host)
+                } else {
+                    None
+                };
                 let snapshot = self.snapshot()?;
                 let shell = self.shell(&snapshot, name)?;
                 for key in ["pane_id", "terminal_id", "shell"] {
@@ -502,6 +621,49 @@ impl Manager<'_> {
                         shell[key] == self.record["agents"][name][key],
                         "Herdr shell changed before launch"
                     );
+                }
+                if let Some(host) = host {
+                    let row = self.record["agents"][name].clone();
+                    let info = rpc(
+                        self.request,
+                        vec![
+                            "pane".into(),
+                            "process-info".into(),
+                            "--pane".into(),
+                            text(&row, "pane_id")?.into(),
+                        ],
+                    )?["process_info"]
+                        .clone();
+                    let shell = info["foreground_processes"][0]["name"]
+                        .as_str()
+                        .unwrap_or("")
+                        .to_ascii_lowercase();
+                    ensure!(
+                        ["pwsh", "pwsh.exe", "powershell", "powershell.exe"]
+                            .contains(&shell.as_str()),
+                        "Codex native attachment requires a PowerShell pane"
+                    );
+                    let native = std::env::current_exe()?.with_file_name("ccb-native.exe");
+                    let quote = |s: &str| format!("'{}'", s.replace('\'', "''"));
+                    let line = format!(
+                        "& {} codex-tui-attach {}",
+                        quote(&native.to_string_lossy()),
+                        quote(text(&host, "path")?)
+                    );
+                    self.record["agents"][name]["host_launch"] = host;
+                    self.record["agents"][name]["sent"] = json!(true);
+                    self.save()?;
+                    let _ = rpc(
+                        self.request,
+                        vec![
+                            "pane".into(),
+                            "run".into(),
+                            text(&row, "pane_id")?.into(),
+                            line,
+                        ],
+                    );
+                    self.refresh(name, true)?;
+                    continue;
                 }
                 let native_pi = self.pi_bridge(name)?.is_some();
                 let timeout = if native_pi {
@@ -593,7 +755,12 @@ fn validate(record: &Value, plan: &Value, namespace: &Value, request: &Value) ->
                     && process_identity(&repair["process"])
                     && repair["pane_id"] == row["pane_id"]
                     && repair["terminal_id"] == row["terminal_id"]
-                    && uuid::Uuid::parse_str(text(repair, "bridge_owner")?).is_ok(),
+                    && (if repair["kind"] == "codex_host" {
+                        process_identity(&repair["host_process"])
+                            && repair["host_process"] == row["host_launch"]["host_process"]
+                    } else {
+                        uuid::Uuid::parse_str(text(repair, "bridge_owner")?).is_ok()
+                    }),
                 "invalid Pi name repair proof"
             );
         }

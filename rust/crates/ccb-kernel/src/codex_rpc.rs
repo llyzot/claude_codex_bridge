@@ -41,6 +41,9 @@ enum StreamEvent {
 }
 pub struct Session {
     tui_host: Option<std::path::PathBuf>,
+    host_name: String,
+    host_named: bool,
+    host_binding: Option<Value>,
     role_skills_bound: bool,
     child: crate::owned_process::OwnedChild,
     commands: mpsc::SyncSender<Value>,
@@ -209,6 +212,9 @@ impl Session {
         };
         Ok(Self {
             tui_host,
+            host_name: format!("CCB {agent}"),
+            host_named: false,
+            host_binding: None,
             role_skills_bound: false,
             child,
             commands,
@@ -645,6 +651,24 @@ impl Session {
         Ok(())
     }
     fn ingest(&mut self, record: Value) -> Result<()> {
+        if record["id"] == format!("host-name-{}", self.runtime) {
+            ensure!(
+                record["error"].is_null(),
+                "Codex empty thread publication failed"
+            );
+            let binding = self
+                .host_binding
+                .take()
+                .context("unexpected host publication response")?;
+            ensure!(
+                binding["result"]["thread"]["path"]
+                    .as_str()
+                    .is_some_and(|p| std::path::Path::new(p).is_file()),
+                "Codex named thread history was not persisted"
+            );
+            self.host_named = true;
+            return self.ingest(binding);
+        }
         if record["method"].is_string() && !record["id"].is_null() {
             return self.server_request(record);
         }
@@ -708,6 +732,15 @@ impl Session {
         if record["id"] == self.bind {
             ensure!(record["error"].is_null(), "Codex thread binding failed");
             let thread = &record["result"]["thread"];
+            if self.tui_host.is_some()
+                && !self.host_named
+                && self.expected.is_empty()
+                && thread["ephemeral"] != true
+            {
+                self.send(json!({"id":format!("host-name-{}",self.runtime),"method":"thread/name/set","params":{"threadId":thread["id"],"name":self.host_name}}))?;
+                self.host_binding = Some(record);
+                return Ok(());
+            }
             let id = thread["id"]
                 .as_str()
                 .filter(|s| !s.is_empty())

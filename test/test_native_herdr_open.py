@@ -90,6 +90,42 @@ def test_cold_open_composes_server_agents_binding_daemon_and_same_pi_lead_review
     assert json.loads(result.stdout)['reply']=='reviewed through native open'
     assert p['pi'].poll() is None and p['codex'].poll() is None
 
+@pytest.mark.parametrize('lost_ack',[False,True])
+def test_open_mounts_pi_before_native_codex_host_then_attaches_without_prompt_injection(project,lost_ack):
+    from test_native_codex_tui_host import CODEX
+    if not CODEX.exists():pytest.skip('Installed Codex required for no-model host initialization')
+    p=project;home=p['root']/'empty-codex-home';home.mkdir()
+    worker=p['options']['config']['agents']['worker']
+    worker.update(command=[str(CODEX),'app-server','--stdio'],driver_kind='codex_app_server',profile_family='protocol_turn',
+                  tui_host_root=str(p['root']/'native-hosts'),thread_options={},env={'CODEX_HOME':str(home)})
+    p['file'].write_text(json.dumps(p['options']),encoding='utf-8')
+    change(p['backend'],lambda s:s.update(shell_name='pwsh.exe'))
+    if lost_ack:fault(p['backend'],['pane','run'],'after-error')
+    result=p['open']();assert result.returncode==0,result.stderr
+    wait_for(lambda:json.loads((p['native']/'herdr/herdr-open.json').read_text(encoding='utf-8'))['phase']=='running',timeout=20)
+    assert mutate_count(p['backend'],['agent','start'])==1
+    assert mutate_count(p['backend'],['pane','run'])==1
+
+    assert mutate_count(p['backend'],['agent','rename'])==1
+    assert not p['prompts']()
+    session=json.loads((p['native']/'providers/codex/worker/session.json').read_text(encoding='utf-8'))
+    assert session['state']['tui_host']['input_transport']=='authenticated_websocket'
+    assert Path(session['state']['path']).is_file(), 'Empty native thread must be resumable without a model warm-up'
+    assert p['open']().returncode==0
+    assert mutate_count(p['backend'],['pane','run'])==1
+
+@pytest.mark.parametrize('root_value,ephemeral',[('relative-host',False),(None,True)])
+def test_invalid_native_host_open_is_rejected_before_mutation(setup,root_value,ephemeral):
+    root,backend,request=setup;(root/'.ccb').mkdir();(root/'.ccb/ccb.config').write_text('lead:pi; worker:codex',encoding='utf-8')
+    worker=request['config']['agents']['worker']
+    worker.update(command=[str(BIN),'app-server','--stdio'],driver_kind='codex_app_server',
+                  tui_host_root=root_value or str(root/'hosts'),thread_options={'ephemeral':ephemeral})
+    options=root/'options.json';options.write_text(json.dumps({'config':request['config'],'command':request['command'],'session':request['session']}),encoding='utf-8')
+    result=cli('--project',root,'herdr','open','--options',options,'--no-attach','--timeout-ms','1000')
+    assert result.returncode!=0
+    assert not (backend/'calls.jsonl').exists()
+    assert not (root/'.ccb/ccbd/herdr/namespace.json').exists()
+
 def test_short_observation_returns_without_restarting_live_opener(project):
     p=project;fault(p['backend'],['agent','start'],'hang-after')
     before=time.monotonic();first=p['open'](0);assert first.returncode==0,first.stderr

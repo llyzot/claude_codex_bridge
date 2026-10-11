@@ -18,6 +18,54 @@ use tungstenite::{client::IntoClientRequest, protocol::WebSocketConfig, Message}
 const LIMIT: usize = 8 * 1024 * 1024;
 const TOKEN_ENV: &str = "CCB_CODEX_TUI_HOST_TOKEN";
 
+pub(crate) fn current(runtime: &Path, agent: &str, expected_root: &Path) -> Result<Option<Value>> {
+    crate::models::validate_agent(agent)?;
+    let session = runtime.join(format!("providers/codex/{agent}/session.json"));
+    if !session.exists() {
+        return Ok(None);
+    }
+    crate::herdr_namespace::unlinked(&session)?;
+    let value: Value = serde_json::from_slice(&fs::read(session)?)?;
+    let Some(path) = value["state"]["tui_host"]["path"].as_str() else {
+        return Ok(None);
+    };
+    let root = Path::new(path);
+    ensure!(
+        value["schema_version"] == 1
+            && value["record_type"] == "codex_app_server_session"
+            && root.file_name().and_then(|s| s.to_str()) == value["runtime_instance_id"].as_str(),
+        "invalid native Codex host session record"
+    );
+    ensure!(
+        root.parent().is_some_and(|p| p == expected_root),
+        "Codex host escaped configured root"
+    );
+    for p in root.ancestors() {
+        crate::herdr_namespace::unlinked(p)?;
+    }
+    let mut host: Value = serde_json::from_slice(&fs::read(root.join("host.json"))?)?;
+    ensure!(
+        host["schema_version"] == 1
+            && host["status"] == "running"
+            && value["agent_name"] == agent
+            && value["pid"] == host["host_process"]["pid"]
+            && value["state"]["thread_id"] == host["thread_id"],
+        "Codex host/session identity mismatch"
+    );
+    for key in ["host_process", "server_process"] {
+        let pid = host[key]["pid"]
+            .as_u64()
+            .filter(|p| *p > 0 && *p <= u32::MAX as u64)
+            .context("invalid host process")?;
+        ensure!(
+            crate::owned_process::observe_external_process(pid as u32)? == host[key],
+            "Codex host lifetime changed"
+        );
+    }
+    host["path"] = json!(root);
+    Ok(Some(host))
+}
+
 pub(crate) fn validate(spec: &Value) -> Result<()> {
     if spec["tui_host_root"].is_null() {
         return Ok(());

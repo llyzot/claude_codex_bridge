@@ -1,0 +1,373 @@
+{
+  "schema_version": 1,
+  "base_commit": "1f31149",
+  "recorded_at": "2026-10-11T17:21:27.574957+00:00",
+  "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it",
+  "session": "ccb-herdr-host-final-qtj6_4it",
+  "real_models": true,
+  "herdr_version": "0.9.0",
+  "pi_mode": "original Herdr TUI with extension settlement completion",
+  "codex_mode": "owned authenticated app-server RPC and separately attached original TUI",
+  "jobs": [
+    {
+      "job_id": "job_e1f9c5bca8c7",
+      "agent": "lead",
+      "created_at": "2026-10-11T17:19:36.117166100Z",
+      "updated_at": "2026-10-11T17:19:45.615061300Z",
+      "status": "completed",
+      "result": {
+        "status": "completed",
+        "reply": "§5§ HERDR_HOST_REVIEW_OK_3127",
+        "completion_reason": "pi_agent_settled",
+        "visible_reply_source": "message_bureau_reply"
+      }
+    },
+    {
+      "job_id": "job_bc69c55293a4",
+      "agent": "lead",
+      "created_at": "2026-10-11T17:19:46.888244800Z",
+      "updated_at": "2026-10-11T17:19:52.450798600Z",
+      "status": "completed",
+      "result": {
+        "status": "completed",
+        "reply": "§5§ HERDR_HOST_REVIEW_OK_3127",
+        "completion_reason": "pi_agent_settled",
+        "visible_reply_source": "job_terminal_decision"
+      }
+    },
+    {
+      "job_id": "job_ed4be781553e",
+      "agent": "lead",
+      "created_at": "2026-10-11T17:20:20.482295400Z",
+      "updated_at": "2026-10-11T17:20:28.800113200Z",
+      "status": "completed",
+      "result": {
+        "status": "completed",
+        "reply": "§10§ HERDR_CLOSED_UI_REVIEW_OK_4087",
+        "completion_reason": "pi_agent_settled",
+        "visible_reply_source": "message_bureau_reply"
+      }
+    },
+    {
+      "job_id": "job_ade21901923d",
+      "agent": "lead",
+      "created_at": "2026-10-11T17:20:27.986126100Z",
+      "updated_at": "2026-10-11T17:20:34.155488600Z",
+      "status": "completed",
+      "result": {
+        "status": "completed",
+        "reply": "§10§ HERDR_CLOSED_UI_REVIEW_OK_4087",
+        "completion_reason": "pi_agent_settled",
+        "visible_reply_source": "job_terminal_decision"
+      }
+    },
+    {
+      "job_id": "job_7d534f40f5c2",
+      "agent": "worker",
+      "created_at": "2026-10-11T17:19:42.552138100Z",
+      "updated_at": "2026-10-11T17:19:46.888244800Z",
+      "status": "completed",
+      "result": {
+        "status": "completed",
+        "reply": "HERDR_HOST_WORKER_3127",
+        "completion_reason": "codex_turn_completed",
+        "visible_reply_source": "job_terminal_decision"
+      }
+    },
+    {
+      "job_id": "job_eb02ea7ba23e",
+      "agent": "worker",
+      "created_at": "2026-10-11T17:20:25.660858600Z",
+      "updated_at": "2026-10-11T17:20:27.986126100Z",
+      "status": "completed",
+      "result": {
+        "status": "completed",
+        "reply": "HEADLESS_HOST_4087",
+        "completion_reason": "codex_turn_completed",
+        "visible_reply_source": "job_terminal_decision"
+      }
+    }
+  ],
+  "callbacks": [
+    {
+      "callback_target_agent": "lead",
+      "child_job_id": "job_7d534f40f5c2",
+      "child_message_id": "msg_14f957b8c59e",
+      "child_reply_id": "rep_8d8febc2c87d",
+      "child_status": "completed",
+      "continuation_job_id": "job_bc69c55293a4",
+      "continuation_message_id": "msg_9d07b2dc91c4",
+      "created_at": "2026-10-11T17:19:42.552138100Z",
+      "diagnostics": {
+        "allowed_chain_targets": [],
+        "bind_chain_workspace_tree": false,
+        "child_agent": "worker",
+        "child_body": "Calculate 53*59 without tools and reply HERDR_HOST_WORKER_3127.",
+        "child_body_artifact": null,
+        "parent_body": "Native Herdr protocol acceptance. Use your bash tool to run C:/Users/user/Desktop/work/4.user/2.github/claude_codex_bridge/bin/ccb-native.exe ask --chain worker with this task: Calculate 53*59 without tools and reply HERDR_HOST_WORKER_3127. This child result is required for your review. End your current turn after submission without waiting or polling. When the result automatically returns, verify it and reply HERDR_HOST_REVIEW_OK_3127.",
+        "parent_body_artifact": null,
+        "review_tree_digest": null,
+        "review_workspace_path": null,
+        "route_mode": "chain"
+      },
+      "edge_id": "cb_e6231e5735ae",
+      "original_caller": "user",
+      "original_task_id": "msg_9d07b2dc91c4",
+      "parent_agent": "lead",
+      "parent_job_id": "job_e1f9c5bca8c7",
+      "parent_message_id": "msg_9d07b2dc91c4",
+      "record_type": "callback_edge",
+      "schema_version": 1,
+      "state": "done",
+      "timeout_at": null,
+      "updated_at": "2026-10-11T17:19:52.450798600Z"
+    },
+    {
+      "callback_target_agent": "lead",
+      "child_job_id": "job_eb02ea7ba23e",
+      "child_message_id": "msg_c728481eb8ec",
+      "child_reply_id": "rep_a0c673d46319",
+      "child_status": "completed",
+      "continuation_job_id": "job_ade21901923d",
+      "continuation_message_id": "msg_179b7bb5853b",
+      "created_at": "2026-10-11T17:20:25.660858600Z",
+      "diagnostics": {
+        "allowed_chain_targets": [],
+        "bind_chain_workspace_tree": false,
+        "child_agent": "worker",
+        "child_body": "Calculate 61*67 without tools and return HEADLESS_HOST_4087.",
+        "child_body_artifact": null,
+        "parent_body": "Test native delivery with the Codex display closing. Use bash to run C:/Users/user/Desktop/work/4.user/2.github/claude_codex_bridge/bin/ccb-native.exe ask --chain worker with the task: Calculate 61*67 without tools and return HEADLESS_HOST_4087. You need this result for review. Finish the first turn after submit without waiting or polling. On the automatic continuation verify it and reply HERDR_CLOSED_UI_REVIEW_OK_4087.",
+        "parent_body_artifact": null,
+        "review_tree_digest": null,
+        "review_workspace_path": null,
+        "route_mode": "chain"
+      },
+      "edge_id": "cb_62dda9ffe918",
+      "original_caller": "user",
+      "original_task_id": "msg_179b7bb5853b",
+      "parent_agent": "lead",
+      "parent_job_id": "job_ed4be781553e",
+      "parent_message_id": "msg_179b7bb5853b",
+      "record_type": "callback_edge",
+      "schema_version": 1,
+      "state": "done",
+      "timeout_at": null,
+      "updated_at": "2026-10-11T17:20:34.155488600Z"
+    }
+  ],
+  "mount": {
+    "agents": {
+      "lead": {
+        "agent_session": {
+          "agent": "pi",
+          "kind": "path",
+          "source": "herdr:pi",
+          "value": "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-herdr-host-final-qtj6_4it-project--\\2026-10-11T17-19-09-863Z_01a12bf9-be26-7746-8911-398194b6f18f.jsonl"
+        },
+        "binding": {
+          "process": {
+            "created": "134362127496569762",
+            "pid": 30380,
+            "windows_session": 1
+          }
+        },
+        "effective_startup_timeout_ms": 4000,
+        "herdr_name": "ccb-09c50db5fcb84d49b3f5f619",
+        "interactive_ready": true,
+        "launch_acknowledged": true,
+        "observed_lifecycle": "idle",
+        "operation_id": "09c50db5-fcb8-4d49-b3f5-f619a5ad8474",
+        "pane_id": "w1:p1",
+        "sent": true,
+        "shell": {
+          "created": "134362127478338746",
+          "pid": 39652,
+          "windows_session": 1
+        },
+        "status": "ready",
+        "terminal_id": "term_65d93c76ff3891"
+      },
+      "worker": {
+        "agent_session": null,
+        "binding": {
+          "process": {
+            "created": "134362127572987199",
+            "pid": 54588,
+            "windows_session": 1
+          }
+        },
+        "herdr_name": "ccb-bf0f62d317ef4710b0814f86",
+        "host_launch": {
+          "cwd": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project",
+          "endpoint": "ws://127.0.0.1:64733",
+          "executable": "C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe",
+          "host_process": {
+            "created": "134362127529627102",
+            "pid": 28064,
+            "windows_session": 1
+          },
+          "path": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\hosts\\9860033f-9f61-461b-b13f-6db6e03a32ec",
+          "schema_version": 1,
+          "server_process": {
+            "created": "134362127530137677",
+            "pid": 5916,
+            "windows_session": 1
+          },
+          "status": "running",
+          "thread_id": "01a12bf9-cc30-7b11-a395-6ab02a4ff10e"
+        },
+        "interactive_ready": true,
+        "name_repair": {
+          "host_process": {
+            "created": "134362127529627102",
+            "pid": 28064,
+            "windows_session": 1
+          },
+          "kind": "codex_host",
+          "pane_id": "w1:p2",
+          "permitted": true,
+          "process": {
+            "created": "134362127572987199",
+            "pid": 54588,
+            "windows_session": 1
+          },
+          "terminal_id": "term_65d93c77b622f2"
+        },
+        "observed_lifecycle": "idle",
+        "operation_id": "bf0f62d3-17ef-4710-b081-4f86149b1ec2",
+        "pane_id": "w1:p2",
+        "sent": true,
+        "shell": {
+          "created": "134362127485871405",
+          "pid": 62244,
+          "windows_session": 1
+        },
+        "status": "ready",
+        "terminal_id": "term_65d93c77b622f2"
+      }
+    },
+    "namespace_owner": "f1925468-957c-4068-94c5-fa95255499b6",
+    "plan": {
+      "agents": {
+        "lead": {
+          "argument_count": 8,
+          "arguments_hash": "1c66a7bd418f270f09908f14694edc938014f4941904a344d7dbe62caf164899",
+          "cwd": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project",
+          "provider": "pi"
+        },
+        "worker": {
+          "argument_count": 0,
+          "arguments_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "cwd": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project",
+          "native_host": {
+            "command_hash": "bbe006d1e915051edefe61cd1a97d9dc3fc75f9048f104432df823bc413bca38",
+            "root": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\hosts"
+          },
+          "provider": "codex"
+        }
+      },
+      "namespace_plan_hash": "c32675878ec99c7c8b07bfa8c22117c4dcb8c1862c046e74e5915dcf23290fab",
+      "startup_timeout_ms": 30000
+    },
+    "plan_hash": "7f888787143df2220d0e126cab2361331af59261e59d195e1ccc567f439eec56",
+    "project_id": "0b86cf6b7a2056b3a0f6df1384e3700cd90ede2cb3bd363c394646d368fa04f5",
+    "protocol": 22,
+    "record_type": "native_herdr_agents",
+    "schema_version": 1,
+    "session": "ccb-herdr-host-final-qtj6_4it",
+    "status": "ready",
+    "workspace_id": "w1"
+  },
+  "open_result": {
+    "daemon": {
+      "already_running": true,
+      "pid": 56276,
+      "project_id": "0b86cf6b7a2056b3a0f6df1384e3700cd90ede2cb3bd363c394646d368fa04f5",
+      "startup_id": "cdf925c2-2582-402e-84f1-4245d6f13a00",
+      "state_root": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project\\.ccb/ccbd",
+      "status": "running"
+    },
+    "observation_expired": false,
+    "project_id": "0b86cf6b7a2056b3a0f6df1384e3700cd90ede2cb3bd363c394646d368fa04f5",
+    "session": "ccb-herdr-host-final-qtj6_4it",
+    "state_root": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project\\.ccb/ccbd",
+    "status": "running",
+    "workspace_id": "w1"
+  },
+  "server_process": {
+    "created": "134362127473919528",
+    "pid": 36664,
+    "windows_session": 1
+  },
+  "worker_session": {
+    "agent_name": "worker",
+    "observed_at": "2026-10-11T17:20:27.986149900Z",
+    "pid": 28064,
+    "record_type": "codex_app_server_session",
+    "runtime_instance_id": "9860033f-9f61-461b-b13f-6db6e03a32ec",
+    "schema_version": 1,
+    "state": {
+      "control": null,
+      "path": "C:\\Users\\user\\.codex\\sessions\\2026\\10\\12\\rollout-2026-10-12T01-19-15-01a12bf9-cc30-7b11-a395-6ab02a4ff10e.jsonl",
+      "pending_requests": [],
+      "status": {
+        "type": "idle"
+      },
+      "thread_id": "01a12bf9-cc30-7b11-a395-6ab02a4ff10e",
+      "tui_host": {
+        "input_transport": "authenticated_websocket",
+        "path": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\hosts\\9860033f-9f61-461b-b13f-6db6e03a32ec"
+      }
+    }
+  },
+  "closed_codex_tui": {
+    "created": "134362127572987199",
+    "pid": 54588,
+    "windows_session": 1
+  },
+  "first_attempt": {
+    "failure": "Codex TUI resume rejected an unpersisted empty thread",
+    "native_thread": "01a12bf5-8b00-7913-93a7-c5758921b49f",
+    "cleanup_process_exit_codes": {
+      "52616": 1,
+      "65272": 1,
+      "52244": 1,
+      "57660": 1,
+      "63820": 1
+    }
+  },
+  "native_empty_thread_solution": "thread/name/set persists the fresh thread without a model turn; native driver waits for acknowledgement and confirms history exists before publishing readiness",
+  "production_install_changed": false,
+  "credentials_copied": false,
+  "trust_decisions": "Accepted folder trust only for the two newly created trial repositories through their scoped Codex TUI prompts",
+  "cleanup": {
+    "pending": false,
+    "native_daemon_stopped": true,
+    "named_herdr_server_stopped": true,
+    "recorded_pid_probe_exit_codes": {
+      "28064": 1,
+      "30380": 1,
+      "56276": 1,
+      "54588": 1,
+      "36664": 1,
+      "5916": 1
+    }
+  },
+  "live_release_sha256": {
+    "ccb-kernel.exe": "a813d742285fa6bf8535ba36a8f51520b4fe65d086c320b27f1399015e490190",
+    "ccb-native.exe": "0c1578aa85097dee46ae54ada0e91cabb8ab9f860ef56d44334107da51a3a572"
+  },
+  "final_release_sha256": {
+    "ccb-kernel.exe": "34cbc8ce91612ce8b9ededf5b66e567674d87bd77555bf0bd3b453304f091ee3",
+    "ccb-native.exe": "46c2c04dee8c55a6930fcde68114e8226ee3edbf6aac746a53dcca2337804b3e"
+  },
+  "repository_bin_matches_release": true,
+  "capabilities": {
+    "experimental": true,
+    "herdr_open_integrated": true,
+    "input": "authenticated_websocket",
+    "stopped_server_recovery": false,
+    "supported": true
+  }
+}

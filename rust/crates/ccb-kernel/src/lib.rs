@@ -51,6 +51,7 @@ mod project_memory;
 mod provider_fault;
 mod provider_input;
 mod records;
+mod restart_config;
 mod result_policy;
 mod retry;
 mod roles;

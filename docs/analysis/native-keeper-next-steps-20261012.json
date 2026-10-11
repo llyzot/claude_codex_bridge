@@ -1,0 +1,20 @@
+{
+  "scope": "Complete native Keeper, not an optional substitute for automatic recovery",
+  "design_to_validate": [
+    "Keep existing daemon start receipts/identity; attach one background Keeper after native startup acceptance. Split internal start_daemon from public start so supervisor restart does not spawn supervisors recursively.",
+    "Give each Keeper an exclusive lifetime lock and generation-fenced process identity journal; bootstrap initial configuration over private stdin, then consume the committed protected restart config after owner death.",
+    "Persist user shutdown intent before acknowledgement and support stop while daemon is absent/backing off; a stopped service must not be resurrected.",
+    "Revalidate all ways configuration changes before relying on the checkpoint. Resume only last committed configuration; reconcile old execution proofs without replaying tasks.",
+    "Monitor process lifetime rather than treating observation timeout as death; use bounded crash backoff and explicit failed/suppressed states. Retain source/config errors for manual repair.",
+    "Test singleton startup, timeout without duplicate start, crash/queued work/callback continuity, stop race/backoff stop, reload-then-crash and Keeper loss. Validate real Herdr host/display boundaries separately."
+  ],
+  "existing_key_sources": [
+    "rust/crates/ccb-kernel/src/startup.rs",
+    "rust/crates/ccb-kernel/src/restart_config.rs",
+    "rust/crates/ccb-kernel/src/daemon.rs",
+    "rust/crates/ccb-kernel/src/daemon_reload.rs",
+    "lib/ccbd/keeper.py",
+    "lib/ccbd/keeper_runtime/loop.py"
+  ],
+  "not_done": true
+}

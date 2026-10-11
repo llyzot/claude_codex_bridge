@@ -133,6 +133,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     if args.first().is_some_and(|s| s == "--help") {
         println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask [--compact] [--silence] [--chain] [--artifact-request|--inline-request] [--artifact-reply] <agent> [from <actor>] [--] <message...>\n  target accepts a configured agent or uniquely bound role ID; agents lists bindings\n  ask also reads redirected UTF-8 stdin; --artifact-io enables request/reply artifacts\n  --task-id <id>, --reply-to <id>, --mode <type>; native --from <actor> remains supported\nccb-native --state-root <dir> ask get|cancel <job-id>\nccb-native --state-root <dir> cancel <job-id> [--silent] | retry <job-id>\nccb-native --state-root <dir> watch <target> [--cursor <n>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> agents|ping|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> job-recovery|job-reconcile <job-id>\nccb-native --state-root <dir> provider-status <agent>\nccb-native --state-root <dir> provider-terminate <agent> [--silent]\nccb-native --state-root <dir> provider-recover <agent> <fault-id>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native workspace-tree <path> [--include-controller-state]\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
         println!("ccb-native [--project <directory>] [--state-root <dir>] reload [--config <json>|--executables <manifest>] [--dry-run] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> reload-status");
+        println!("ccb-native --state-root <dir> start --resume-config [--timeout-ms <ms>] (restore committed Windows configuration after owner exit)");
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
         println!("ccb-native installation upgrade|recover|rollback --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]\nccb-native installation status --prefix <directory>");
         println!("ccb-native installation remove --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]");
@@ -539,12 +540,14 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     if op == "start" || op == "reload" {
         let mut manifest = None;
         let mut config_file = None;
+        let mut resume_config = false;
         let mut timeout = 15_000u64;
         let mut dry_run = false;
         let mut wait = false;
         let mut i = 0;
         while i < args.len() {
             match arg(&args, i)? {
+                "--resume-config" if op == "start" => resume_config = true,
                 "--dry-run" if op == "reload" => dry_run = true,
                 "--wait" if op == "reload" => wait = true,
                 "--executables" => {
@@ -567,7 +570,10 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             }
             i += 1;
         }
-        let config = if let Some(path) = config_file {
+        let config = if resume_config {
+            ensure!(manifest.is_none() && config_file.is_none(),"--resume-config cannot be combined with an explicit configuration or executable manifest");
+            crate::restart_config::load(&root)?
+        } else if let Some(path) = config_file {
             ensure!(
                 manifest.is_none(),
                 "--config cannot be combined with --executables"

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "base_commit": "794e180bca8a8717ff3c8dc70561f8556a535205",
+  "recorded_at": "2026-10-11T23:46:47.070558+00:00",
+  "scope": "Committed protected configuration recovery required by the pending native Keeper; automatic supervision is not implemented by this checkpoint.",
+  "implemented": [
+    "Windows user-bound DPAPI protection of compiled configuration, with project/fingerprint entropy and bounded ciphertext",
+    "Protected recovery data is committed in configuration.json with its fingerprint and owner signature at mount/reload publication",
+    "Recovery replays any accepted store transaction under the writer lock after confirming owner shutdown, then validates lease/configuration identity and decrypts",
+    "Explicit start --resume-config uses the committed configuration without an original source/manifest file",
+    "Live owner, malformed/corrupt/legacy checkpoints, owner signature mismatch and incompatible override arguments fail without launching a replacement"
+  ],
+  "verification": {
+    "red": "New integration test failed with missing restart_checkpoint before implementation",
+    "integration_passed": 65,
+    "integration_seconds": 100.43,
+    "junit": "docs/analysis/native-restart-config-validation-20261012.xml",
+    "rust_unit_passed": 35,
+    "ignored_worker_entries": 2,
+    "fault_evidence": [
+      "Three transaction write boundaries replay the encrypted configuration/owner pair",
+      "Actual daemon death during gated reload preparation restores the old committed configuration while the source file still requests the uncommitted change"
+    ],
+    "fmt": "passed",
+    "clippy_all_targets_deny_warnings": "passed",
+    "release_bin_hashes_match": true
+  },
+  "binary_sha256": {
+    "ccb-kernel.exe": "6dd2617639065dd3d5bcdfdabbe78d101f352614686e4a0630eaf61bce724436",
+    "ccb-native.exe": "aa1e1e8c1655bc5317a67c0e45c62c661b3844c543f3357cdfe0878288fe3fe6"
+  },
+  "source_sha256": {
+    "rust/crates/ccb-kernel/src/cli.rs": "0272cf3511eaa226220fc8359fc06c1d4104911dda5dffb5597b4884502bbefb",
+    "rust/crates/ccb-kernel/src/lib.rs": "cfcb8b90e879c64c0cdc6f7e239a9e020d26d5f7da520c9035a34a48e77588b0",
+    "rust/crates/ccb-kernel/src/daemon_reload.rs": "f42ff493e62f170c0b3cac2bede63b756edfa672c05cfa2c0662255af9a4b07f",
+    "rust/crates/ccb-kernel/src/restart_config.rs": "66fd0b5f337550aa39377b3f20500bd4f30efa63d0c0220a5662ab1c319d7519",
+    "test/test_native_restart_config.py": "279171be124e116ffdfffd93405983a819931422c1d27f7076a432f992a26d1b"
+  },
+  "production_install_changed": false,
+  "existing_agents_controlled": false,
+  "limitations": [
+    "Automatic Keeper monitoring/restart and durable stop intent still need implementation",
+    "Windows DPAPI recovery requires the same user profile; no plaintext fallback",
+    "Legacy configurations without the protected checkpoint require explicit configuration at startup",
+    "No cross-account, cross-machine or production/default promotion claim"
+  ]
+}

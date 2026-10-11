@@ -91,6 +91,7 @@ fn configuration(kernel: &Kernel, config: &Value) -> Result<Value> {
         json!({"schema_version":1,"record_type":"native_configuration",
         "project_id":config["project_id"],"namespace_hash":hash(&namespace(config))?,
         "config_fingerprint":crate::config::fingerprint(config)?,
+        "restart_checkpoint":crate::restart_config::seal(config)?,
         "agents":agents,"history_agents":previous}),
     )
 }

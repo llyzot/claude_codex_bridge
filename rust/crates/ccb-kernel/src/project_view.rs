@@ -330,7 +330,14 @@ impl Daemon {
             } else if spec["dispatch_disabled"] == true {
                 ("offline", "dispatch_disabled")
             } else if self.reload_frozen(name) {
-                ("pending", "configuration_reload")
+                (
+                    "pending",
+                    if reload["action"] == "restart" {
+                        "provider_restart"
+                    } else {
+                        "configuration_reload"
+                    },
+                )
             } else if requests > 0 {
                 ("pending", "provider_user_input")
             } else if !active.is_null()
@@ -366,7 +373,7 @@ impl Daemon {
             agents.push(json!({"name":name,"display_name":name,"provider":preview(&spec["provider"],64),"provider_display_name":preview(&spec["provider"],64),"window":"native","order":order,"pane_id":null,"active":false,
                 "activity_state":activity,"activity_symbol":symbol,"activity_color":color,"activity_source":"native_authority","activity_reason":reason,"current_job_id":active,"queue_depth":queued.len().max(mailbox["queue_depth"].as_u64().unwrap_or(0) as usize),"pending_requests":requests,
                 "callback_parent_job_id":waiting.get(name).map(|e|e["parent_job_id"].clone()),"dispatch_blocked_by_reload_drain":self.reload_frozen(name),
-                "reload_drain":if self.reload_frozen(name){json!({"intent_kind":"configuration","phase":reload["status"],"status":reload["status"]})}else{Value::Null},
+                "reload_drain":if self.reload_frozen(name){json!({"intent_kind":if reload["action"] == "restart" {"restart"} else {"configuration"},"phase":reload["status"],"status":reload["status"]})}else{Value::Null},
                 "fault_id":fault.map(|f|f["fault_id"].clone()),"last_progress_at":current["updated_at"]}));
         }
         let mut lineages = BTreeMap::<(String, String), (u64, String)>::new();
@@ -410,9 +417,9 @@ impl Daemon {
             .unwrap_or_else(|| self.config["project_id"].as_str().unwrap_or("CCB"));
         let view = json!({"schema_version":1,"project":{"project_id":self.config["project_id"],"root":root,"display_name":preview(&json!(display),128)},
             "namespace":{"epoch":lease["generation"],"runtime":"rust","active_window":null,"entry_window":"native","backend_family":"native",
-                "sidebar":{"view":{"comms_limit":limit,"tips":["Native runtime view","Cancel queued or owned active tasks","Dismiss resolved terminal rows","Pane focus and restart integration are pending"]}}},
+                "sidebar":{"view":{"comms_limit":limit,"tips":["Native runtime view","Cancel queued or owned active tasks","Dismiss resolved terminal rows","Restart idle providers with configured session recovery; busy targets block the operation"]}}},
             "windows":[{"name":"native","label":"Native agents","kind":"native_runtime","order":0,"active":false,"show_in_sidebar":true,"agents":known}],"agents":agents,"comms":comms,
-            "controls":{"cancel":true,"dismiss_terminal":true,"stop":true,"focus":false,"restart":false,"config_ui":false}});
+            "controls":{"cancel":true,"dismiss_terminal":true,"stop":true,"focus":false,"restart":true,"config_ui":false}});
         let digest = format!("{:x}", Sha256::digest(serde_json::to_vec(&view)?));
         if digest != self.view_digest {
             self.view_digest = digest;

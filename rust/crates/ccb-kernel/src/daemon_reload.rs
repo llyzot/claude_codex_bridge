@@ -229,6 +229,13 @@ pub(super) fn startup_guard(kernel: &mut Kernel, config: &Value) -> Result<()> {
 }
 
 impl Daemon {
+    fn save_reload_record(&mut self, record: &Value) -> Result<()> {
+        self.kernel.store.save("reload.json", record)?;
+        if record["action"] == "restart" {
+            self.kernel.store.append("runtime-controls.jsonl", record)?;
+        }
+        Ok(())
+    }
     pub(super) fn initialize_configuration(&mut self) -> Result<()> {
         let next = configuration(&self.kernel, &self.config)?;
         self.known_names = next["history_agents"]
@@ -244,7 +251,7 @@ impl Daemon {
                 record["status"] = json!("interrupted");
                 record["reason"] = json!("owner_restarted_explicit_configuration_required");
                 record["finished_at"] = json!(now());
-                self.kernel.store.save("reload.json", &record)?;
+                self.save_reload_record(&record)?;
             }
         }
         Ok(())
@@ -285,6 +292,9 @@ impl Daemon {
         Ok(())
     }
     pub(super) fn reload_plan(&mut self, desired: &Value) -> Result<Value> {
+        self.change_plan(desired, &[])
+    }
+    fn change_plan(&mut self, desired: &Value, restarts: &[String]) -> Result<Value> {
         Self::validate_config(desired)?;
         ensure!(
             namespace(&self.config) == namespace(desired),
@@ -309,19 +319,25 @@ impl Daemon {
             .collect();
         let unchanged: Vec<_> = old
             .keys()
-            .filter(|k| new.get(*k) == old.get(*k))
+            .filter(|k| new.get(*k) == old.get(*k) && !restarts.contains(*k))
             .cloned()
             .collect();
         let affected: Vec<_> = removed
             .iter()
             .chain(&changed)
             .chain(&added)
+            .chain(restarts)
             .cloned()
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
             .collect();
         let mut blocked = blockers(&mut self.kernel, &affected)?;
         let mut retiring = json!({});
         for agent in &affected {
             let owned = self.owned_view(agent);
+            if restarts.contains(agent) && owned.is_null() {
+                blocked.push(json!({"agent_name":agent,"reason":"provider_not_started"}));
+            }
             if !owned.is_null() && owned["closed"] != true {
                 let scope = self.owned_scope(agent)?;
                 if owned["ready"] != true || scope["supported"] != true {
@@ -334,6 +350,7 @@ impl Daemon {
             json!({"current_fingerprint":crate::config::fingerprint(&self.config)?,
             "desired_fingerprint":crate::config::fingerprint(desired)?,"added":added,"removed":removed,
             "changed":changed,"unchanged":unchanged,"affected":affected,"retiring":retiring,
+            "restarted":restarts,
             "blockers":blocked,"can_apply":blocked.is_empty()}),
         )
     }
@@ -342,7 +359,8 @@ impl Daemon {
         let fingerprint = crate::config::fingerprint(desired)?;
         if let Some(pending) = &self.reload {
             ensure!(
-                pending.record["desired_fingerprint"] == fingerprint,
+                pending.record["action"] != "restart"
+                    && pending.record["desired_fingerprint"] == fingerprint,
                 "another configuration reload is in progress"
             );
             return Ok(json!({"reload":pending.record}));
@@ -358,11 +376,157 @@ impl Daemon {
         if plan["can_apply"] != true {
             return Ok(json!({"reload":{"status":"blocked","plan":plan}}));
         }
+        self.begin_change(
+            desired,
+            plan,
+            "reload",
+            Value::Null,
+            uuid::Uuid::new_v4().to_string(),
+        )
+    }
+    pub(super) fn restart_status(&self, request: &Value) -> Result<Value> {
+        ensure!(
+            request["operation_id"].is_null() || request["operation_id"].is_string(),
+            "invalid restart operation identity"
+        );
+        let record = if let Some(id) = request["operation_id"].as_str() {
+            ensure!(
+                uuid::Uuid::parse_str(id).is_ok(),
+                "invalid restart operation identity"
+            );
+            self.kernel
+                .store
+                .latest_by_id("runtime-controls.jsonl", "operation_id", id)?
+        } else {
+            self.kernel
+                .store
+                .project_latest("runtime-controls.jsonl", "operation_id", |rows| {
+                    rows.last().cloned().unwrap_or(Value::Null)
+                })?
+        };
+        Ok(json!({"reload":record}))
+    }
+    pub(super) fn request_restart(&mut self, request: &Value) -> Result<Value> {
+        ensure!(
+            request["dry_run"].is_null() || request["dry_run"].is_boolean(),
+            "restart dry_run must be a boolean"
+        );
+        let mut selectors: Vec<String> = if request["agent_names"].is_null() {
+            vec!["all".into()]
+        } else {
+            serde_json::from_value(request["agent_names"].clone())
+                .context("restart agent_names must be strings")?
+        };
+        if selectors.is_empty() {
+            selectors.push("all".into());
+        }
+        for name in &mut selectors {
+            *name = name.trim().to_lowercase();
+        }
+        selectors.sort();
+        selectors.dedup();
+        ensure!(
+            selectors.len() <= 32 && !selectors.iter().any(String::is_empty),
+            "invalid restart targets"
+        );
+        ensure!(
+            selectors.len() == 1 || !selectors.iter().any(|name| name == "all"),
+            "restart all cannot be combined with agent names"
+        );
+        let supplied = request["operation_id"].as_str();
+        ensure!(
+            request["operation_id"].is_null() || supplied.is_some(),
+            "invalid restart operation identity"
+        );
+        if let Some(id) = supplied {
+            ensure!(
+                uuid::Uuid::parse_str(id).is_ok(),
+                "invalid restart operation identity"
+            );
+            let old =
+                self.kernel
+                    .store
+                    .latest_by_id("runtime-controls.jsonl", "operation_id", id)?;
+            if !old.is_null() {
+                ensure!(
+                    old["requested_agents"] == json!(selectors),
+                    "restart operation identity already bound to other targets"
+                );
+                return Ok(json!({"reload":old}));
+            }
+        }
+        if let Some(pending) = &self.reload {
+            ensure!(
+                pending.record["action"] == "restart"
+                    && pending.record["requested_agents"] == json!(selectors)
+                    && supplied.is_none_or(|id| pending.record["operation_id"] == id),
+                "another runtime change is in progress"
+            );
+            return Ok(json!({"reload":pending.record}));
+        }
+        let all = selectors == ["all"];
+        let names = if all {
+            self.names()
+        } else {
+            selectors
+                .iter()
+                .map(|name| crate::roles::resolve(name, &self.config["agents"]))
+                .collect::<Result<Vec<_>>>()?
+        };
+        let mut targets = std::collections::BTreeSet::new();
+        let mut skipped = Vec::new();
+        for name in names {
+            let spec = &self.config["agents"][&name];
+            let supported = ["pi_rpc", "codex_app_server", "claude_stream"]
+                .contains(&spec["driver_kind"].as_str().unwrap_or(""))
+                && spec["dispatch_disabled"] != true;
+            if !supported {
+                if all {
+                    skipped.push(name);
+                    continue;
+                }
+                anyhow::bail!("restart requires an enabled persistent native provider");
+            }
+            targets.insert(name);
+        }
+        ensure!(
+            !targets.is_empty(),
+            "no enabled persistent native providers to restart"
+        );
+        let targets: Vec<_> = targets.into_iter().collect();
+        let desired = self.config.clone();
+        let mut plan = self.change_plan(&desired, &targets)?;
+        plan["skipped"] = json!(skipped);
+        if request["dry_run"] == true {
+            return Ok(json!({"plan":plan,"action":"restart"}));
+        }
+        if plan["can_apply"] != true {
+            return Ok(json!({"reload":{"status":"blocked","action":"restart","plan":plan}}));
+        }
+        self.begin_change(
+            &desired,
+            plan,
+            "restart",
+            json!(selectors),
+            supplied
+                .map(str::to_owned)
+                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
+        )
+    }
+    fn begin_change(
+        &mut self,
+        desired: &Value,
+        plan: Value,
+        action: &str,
+        requested_agents: Value,
+        operation_id: String,
+    ) -> Result<Value> {
+        let fingerprint = crate::config::fingerprint(desired)?;
         let affected: Vec<String> = serde_json::from_value(plan["affected"].clone())?;
-        let record = json!({"schema_version":1,"record_type":"native_reload","operation_id":uuid::Uuid::new_v4().to_string(),
+        let record = json!({"schema_version":1,"record_type":"native_reload","operation_id":operation_id,"action":action,"requested_agents":requested_agents,
             "daemon_instance_id":self.state,"status":"preparing","started_at":now(),
             "current_fingerprint":plan["current_fingerprint"],"desired_fingerprint":fingerprint,"plan":plan});
-        self.kernel.store.save("reload.json", &record)?;
+        self.save_reload_record(&record)?;
         self.kernel.store.commit()?;
         let mut prepare = desired.clone();
         prepare["agents"]
@@ -371,18 +535,25 @@ impl Daemon {
             .retain(|name, _| affected.contains(name));
         let (send, prepared) = mpsc::channel();
         // Thread creation itself is fallible; preserve a readable failed receipt.
-        let spawned = std::thread::Builder::new()
-            .name("ccb-workspace-prepare".into())
-            .spawn(move || {
-                let _ = send.send(crate::workspaces::materialize(&prepare).is_ok());
-            });
+        let spawned = if action == "restart" {
+            let _ = send.send(true);
+            None
+        } else {
+            Some(
+                std::thread::Builder::new()
+                    .name("ccb-workspace-prepare".into())
+                    .spawn(move || {
+                        let _ = send.send(crate::workspaces::materialize(&prepare).is_ok());
+                    }),
+            )
+        };
         self.reload = Some(Pending {
             config: desired.clone(),
             affected,
             record: record.clone(),
             prepared,
         });
-        if spawned.is_err() {
+        if spawned.is_some_and(|value| value.is_err()) {
             self.fail_reload("workspace_preparation_unavailable")?;
         }
         Ok(json!({"reload":self.kernel.store.json("reload.json")?}))
@@ -393,7 +564,7 @@ impl Daemon {
         record["status"] = json!("failed");
         record["reason"] = json!(reason);
         record["finished_at"] = json!(now());
-        self.kernel.store.save("reload.json", &record)?;
+        self.save_reload_record(&record)?;
         self.kernel.store.commit()?;
         self.reload = None;
         Ok(())
@@ -414,7 +585,8 @@ impl Daemon {
             }
             let pending = self.reload.as_mut().unwrap();
             pending.record["status"] = json!("retiring");
-            self.kernel.store.save("reload.json", &pending.record)?;
+            let record = pending.record.clone();
+            self.save_reload_record(&record)?;
             self.kernel.store.commit()?;
             for agent in affected {
                 let owned = self.owned_view(&agent);
@@ -530,7 +702,7 @@ impl Daemon {
         self.kernel.dispatch("scheduler.rebuild", &json!({"state_id":self.state,"agent_names":names,"records":rows,"mailbox_order":order}))?;
         self.reset_session_bindings(&next)?;
         self.kernel.store.save("configuration.json", &next)?;
-        self.kernel.store.save("reload.json", &record)?;
+        self.save_reload_record(&record)?;
         let lease = self
             .kernel
             .store

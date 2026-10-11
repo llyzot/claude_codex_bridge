@@ -133,6 +133,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native [--project <directory>] [--state-root <dir>] reload [--config <json>|--executables <manifest>] [--dry-run] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> reload-status");
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
         println!("ccb-native --state-root <dir> view [--limit <1..64>]");
+        println!("ccb-native --state-root <dir> restart [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> restart-status [operation-id]");
         return Ok(());
     }
     if std::env::current_exe()?
@@ -456,7 +457,79 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         );
         return Ok(());
     }
+    if op == "restart" {
+        let mut targets = Vec::new();
+        let mut operation = uuid::Uuid::new_v4().to_string();
+        let (mut dry_run, mut wait, mut timeout) = (false, false, 15_000u64);
+        let mut i = 0;
+        while i < args.len() {
+            match arg(&args, i)? {
+                "--dry-run" => dry_run = true,
+                "--wait" => wait = true,
+                "--operation-id" => {
+                    i += 1;
+                    operation = arg(&args, i)?.to_owned();
+                }
+                "--timeout-ms" => {
+                    i += 1;
+                    timeout = arg(&args, i)?.parse()?;
+                }
+                other if other.starts_with('-') => bail!("unknown restart option: {other}"),
+                name => targets.push(name.to_owned()),
+            }
+            i += 1;
+        }
+        ensure!(
+            timeout <= 86_400_000,
+            "restart observation timeout exceeds one day"
+        );
+        ensure!(
+            uuid::Uuid::parse_str(&operation).is_ok(),
+            "invalid restart operation identity"
+        );
+        let mut result = request(
+            &root,
+            "restart",
+            json!({"agent_names":targets,
+            "operation_id":operation,"dry_run":dry_run}),
+        ).with_context(|| format!("restart request {operation} failed; inspect restart-status {operation} before retrying"))?;
+        let deadline = std::time::Instant::now() + Duration::from_millis(timeout);
+        while wait
+            && !dry_run
+            && ["preparing", "retiring"]
+                .contains(&result["reload"]["status"].as_str().unwrap_or(""))
+        {
+            if std::time::Instant::now() >= deadline {
+                result["observation_timeout"] = json!(true);
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+            result = request(&root, "restart-status", json!({"operation_id":operation}))
+                .with_context(|| {
+                    format!("restart observation failed; resume restart-status {operation}")
+                })?;
+            ensure!(
+                result["reload"]["operation_id"] == operation,
+                "restart receipt unavailable; inspect restart-status with the operation ID"
+            );
+        }
+        println!("{result}");
+        ensure!(
+            !["blocked", "failed", "interrupted"]
+                .contains(&result["reload"]["status"].as_str().unwrap_or("")),
+            "provider restart was not applied; inspect the returned status"
+        );
+        return Ok(());
+    }
     let payload = match op.as_str() {
+        "restart-status" => {
+            ensure!(args.len() <= 1, "restart-status accepts one operation ID");
+            if args.is_empty() {
+                json!({})
+            } else {
+                json!({"operation_id":arg(&args,0)?})
+            }
+        }
         "project_view" => {
             ensure!(
                 args.is_empty() || args.len() == 2 && arg(&args, 0)? == "--limit",

@@ -137,7 +137,16 @@ impl CcbdClient {
     }
 
     pub fn restart_panes(&self) -> Result<(), String> {
-        self.request("project_restart_panes", json!({})).map(|_| ())
+        let payload = self.request("project_restart_panes", json!({}))?;
+        if self.is_native() {
+            let status = payload["reload"]["status"].as_str().unwrap_or("unknown");
+            if !matches!(status, "preparing" | "retiring" | "applied") {
+                return Err(format!(
+                    "Native provider restart {status}; inspect restart-status or use restart --dry-run for blockers"
+                ));
+            }
+        }
+        Ok(())
     }
 
     fn request(&self, op: &str, request: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -147,6 +156,7 @@ impl CcbdClient {
                 "cancel",
                 "project_view_dismiss_comms",
                 "shutdown",
+                "project_restart_panes",
             ]
             .contains(&op)
             {

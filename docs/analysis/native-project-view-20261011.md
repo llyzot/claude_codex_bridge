@@ -53,11 +53,18 @@ its production CPU/latency cost still needs measurement.
 
 Native sidebar cancellation and terminal dismissal use the selected service.
 The quit-project action also targets that native service, instead of running a
-legacy `ccb kill` from the account PATH. Focus, restart, recovery and config-UI
+legacy `ccb kill` from the account PATH. Focus, recovery and config-UI
 actions that are not integrated yet fail explicitly rather than invoking the
 legacy implementation. Existing Unix-socket mode remains available. The fresh
 native-prefix installer still installs only core/ask commands; sidebar installer
 integration and an actual terminal/Herdr UI run remain separate work.
+
+The subsequent native restart implementation connects the sidebar restart action
+to `project_restart_panes`. It restarts enabled persistent Pi/Codex/Claude provider
+processes through the journaled native retirement workflow. Busy targets block
+the whole operation; no physical terminal pane is replaced. The sidebar treats
+blocked/failed responses as errors. See [native provider restart](native-provider-restart-20261011.md)
+for status and session-recovery limits.
 
 The runtime layout has Agent journals at `runtime-parent/agents` and controller
 state at `runtime-parent/ccbd`. Independent services must use distinct runtime

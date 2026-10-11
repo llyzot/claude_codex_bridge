@@ -360,6 +360,8 @@ impl Daemon {
             "reload-plan" => Ok(json!({"plan":self.reload_plan(&p["config"])?})),
             "reload" => self.request_reload(p),
             "reload-status" => Ok(json!({"reload":self.kernel.store.json("reload.json")?})),
+            "project_restart_panes" | "restart" => self.request_restart(p),
+            "restart-status" => self.restart_status(p),
             "ping" => Ok(
                 json!({"service":"ccbd","runtime":"rust","project_id":self.config["project_id"],"pid":std::process::id(),"status":"running",
                     "startup_id":self.config["startup_id"],"config_fingerprint":crate::config::fingerprint(&self.config)?,"degraded":!self.faults.is_empty()}),

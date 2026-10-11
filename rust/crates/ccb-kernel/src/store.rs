@@ -58,6 +58,7 @@ pub struct Store {
     latest_indices: RefCell<HashMap<(String, String), LatestIndex>>,
     index_reads: Cell<u64>,
     index_rows: Cell<u64>,
+    signature_reads: Cell<u64>,
 }
 impl Store {
     pub fn open(root: &Path) -> Result<Self> {
@@ -93,6 +94,7 @@ impl Store {
             latest_indices: RefCell::new(HashMap::new()),
             index_reads: Cell::new(0),
             index_rows: Cell::new(0),
+            signature_reads: Cell::new(0),
         };
         store.recover()?;
         Ok(store)
@@ -224,6 +226,7 @@ impl Store {
             .collect()
     }
     fn signature(&self, path: &str) -> Result<Signature> {
+        self.signature_reads.set(self.signature_reads.get() + 1);
         match fs::metadata(self.path(path)?) {
             Ok(metadata) => Ok(Some((metadata.len(), metadata.modified()?))),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -282,7 +285,7 @@ impl Store {
         Ok(result)
     }
     pub fn index_metrics(&self) -> Value {
-        serde_json::json!({"history_reads":self.index_reads.get(),"history_rows":self.index_rows.get()})
+        serde_json::json!({"history_reads":self.index_reads.get(),"history_rows":self.index_rows.get(),"signature_reads":self.signature_reads.get()})
     }
     fn projection_index(&self, path: &str, identity: &str) -> Result<(String, String)> {
         ensure!(
@@ -424,6 +427,22 @@ impl Store {
                 | WriteOp::Append { path, .. }
                 | WriteOp::Remove { path } => path,
             };
+            // File signatures are needed only to advance an existing append
+            // index. Uncached writes have nothing to maintain; replacement and
+            // deletion invalidate any index regardless of the old signature.
+            let cached_append = matches!(op, WriteOp::Append { .. })
+                && self
+                    .latest_indices
+                    .borrow()
+                    .keys()
+                    .any(|(cached_path, _)| cached_path == path);
+            if !cached_append {
+                self.apply(op)?;
+                self.latest_indices
+                    .borrow_mut()
+                    .retain(|(cached_path, _), _| cached_path != path);
+                continue;
+            }
             let before = self.signature(path)?;
             self.apply(op)?;
             let after = self.signature(path)?;
@@ -569,6 +588,78 @@ fn sync_parent(path: &Path) -> Result<()> {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn uncached_commit_does_not_query_index_signatures() {
+        let root = tempfile::tempdir().unwrap();
+        let mut store = Store::open(root.path()).unwrap();
+        store
+            .append("messages/messages.jsonl", &json!({"message_id":"one"}))
+            .unwrap();
+        store
+            .save("mailboxes/pi/mailbox.json", &json!({"queue_depth":1}))
+            .unwrap();
+        store.remove("leases/pi.json").unwrap();
+        let before = store.signature_reads.get();
+        store.commit().unwrap();
+        assert_eq!(store.signature_reads.get() - before, 0);
+        assert_eq!(
+            store.rows("messages/messages.jsonl").unwrap(),
+            vec![json!({"message_id":"one"})]
+        );
+        assert_eq!(
+            store.json("mailboxes/pi/mailbox.json").unwrap(),
+            Some(json!({"queue_depth":1}))
+        );
+    }
+    #[test]
+    fn commit_keeps_append_indices_and_invalidates_replaced_history() {
+        let root = tempfile::tempdir().unwrap();
+        let mut store = Store::open(root.path()).unwrap();
+        let path = "messages/messages.jsonl";
+        store
+            .append(path, &json!({"message_id":"one","alias":"a"}))
+            .unwrap();
+        store.commit().unwrap();
+        for key in ["message_id", "alias"] {
+            store.latest_rows(path, key).unwrap();
+        }
+        let reads = store.index_reads.get();
+        store
+            .append(path, &json!({"message_id":"two","alias":"b"}))
+            .unwrap();
+        store.commit().unwrap();
+        for key in ["message_id", "alias"] {
+            assert_eq!(store.latest_rows(path, key).unwrap().len(), 2);
+        }
+        assert_eq!(store.index_reads.get(), reads);
+        // Simulate a historical writer between transactions, changing file size
+        // so stale indices cannot match even with coarse filesystem timestamps.
+        fs::write(
+            root.path().join(path),
+            b"{\"message_id\":\"external-change\",\"alias\":\"external-alias\"}\n",
+        )
+        .unwrap();
+        store
+            .append(path, &json!({"message_id":"three","alias":"c"}))
+            .unwrap();
+        store.commit().unwrap();
+        for key in ["message_id", "alias"] {
+            let rows = store.latest_rows(path, key).unwrap();
+            assert_eq!(rows.len(), 2);
+            assert_eq!(rows[0]["message_id"], "external-change");
+        }
+        store
+            .save_bytes(path, b"{\"message_id\":\"replacement\",\"alias\":\"d\"}\n")
+            .unwrap();
+        store.commit().unwrap();
+        assert_eq!(
+            store.latest_rows(path, "message_id").unwrap()[0]["message_id"],
+            "replacement"
+        );
+        store.remove(path).unwrap();
+        store.commit().unwrap();
+        assert!(store.latest_rows(path, "message_id").unwrap().is_empty());
+    }
     #[test]
     fn exclusive_writer_and_invalid_paths() {
         let root = tempfile::tempdir().unwrap();

@@ -260,16 +260,17 @@ pub fn prompt(spec: &Value, project: Option<&Path>, body: &str) -> Result<Prepar
         paths(&manifest["memory"]["files"], &mut declarations)?;
         manifest["memory"]["merge_strategy"].clone()
     };
-    let skill_roots = if ["codex", "pi"].contains(&spec["provider"].as_str().unwrap_or("")) {
-        Some(skill_roots(
-            &root,
-            &manifest,
-            &adapter,
-            spec["provider"].as_str().unwrap(),
-        )?)
-    } else {
-        None
-    };
+    let skill_roots =
+        if ["codex", "pi", "claude"].contains(&spec["provider"].as_str().unwrap_or("")) {
+            Some(skill_roots(
+                &root,
+                &manifest,
+                &adapter,
+                spec["provider"].as_str().unwrap(),
+            )?)
+        } else {
+            None
+        };
     ensure!(
         strategy.is_null() || strategy.as_str() == Some("append_after_project_memory"),
         "unsupported role memory merge strategy"

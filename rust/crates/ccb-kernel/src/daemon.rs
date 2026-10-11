@@ -1123,20 +1123,36 @@ impl Daemon {
             "active execution must be reconciled before provider recovery"
         );
         let owned = self.owned_view(agent);
-        if !owned.is_null() {
+        let keep_live = if fault["idle_recovery"] == true
+            && fault["daemon_instance_id"] == self.state
+            && owned["ready"] == true
+            && owned["closed"] == false
+            && owned["pid"] == fault["pid"]
+            && owned["runtime_instance_id"] == fault["runtime_instance_id"]
+        {
+            let job = self.get_job(records::string(&fault, "job_id")?)?;
+            known_unsent_role_delivery(&job)
+                && job["agent_name"] == agent
+                && job["provider_options"]["native_daemon_instance"] == self.state
+                && job["provider_options"]["native_execution_instance"]
+                    == fault["execution_instance_id"]
+        } else {
+            false
+        };
+        if !owned.is_null() && !keep_live {
             ensure!(
                 owned["closed"] == true
                     && owned["pid"] == fault["pid"]
                     && owned["runtime_instance_id"] == fault["runtime_instance_id"],
                 "owned provider is not confirmed closed"
             );
-        } else if !fault["recovery_scope"].is_null() {
+        } else if owned.is_null() && !fault["recovery_scope"].is_null() {
             ensure!(
                 crate::owned_process::probe_recovery(&fault["recovery_scope"])["status"]
                     == "stopped",
                 "recovery scope is not confirmed stopped"
             );
-        } else if !fault["pid"].is_null() {
+        } else if owned.is_null() && !fault["pid"].is_null() {
             ensure!(
                 owner_stopped(fault["pid"].as_u64().context("invalid fault PID")? as u32),
                 "prior owned provider is not confirmed closed"
@@ -1151,10 +1167,14 @@ impl Daemon {
         // Clear authority only after the recovery identity is durable.
         self.kernel.store.commit()?;
         self.faults.remove(agent);
-        self.pi.remove(agent);
-        self.codex.remove(agent);
-        self.claude.remove(agent);
-        Ok(json!({"agent_name":agent,"fault_id":fault["fault_id"],"status":"recovered"}))
+        if !keep_live {
+            self.pi.remove(agent);
+            self.codex.remove(agent);
+            self.claude.remove(agent);
+        }
+        Ok(
+            json!({"agent_name":agent,"fault_id":fault["fault_id"],"status":"recovered","kept_runtime":keep_live}),
+        )
     }
     fn fail_pending_provider_job(&mut self, agent: &str) -> Result<()> {
         if !self.has_dispatchable_work(agent)? {
@@ -1289,7 +1309,20 @@ impl Daemon {
             .as_str()
             .or(spec["workspace_path"].as_str())
             .map(std::path::Path::new);
-        match crate::roles::prompt(&spec, project, records::string(&job["request"], "body")?) {
+        let prepared =
+            crate::roles::prompt(&spec, project, records::string(&job["request"], "body")?)
+                .and_then(|prompt| {
+                    if spec["driver_kind"] == "claude_stream" {
+                        if let Some(roots) = &prompt.skill_roots {
+                            self.claude
+                                .get_mut(agent)
+                                .context("Claude session missing for role preparation")?
+                                .stage_role_paths(job, roots)?;
+                        }
+                    }
+                    Ok(prompt)
+                });
+        match prepared {
             Ok(prompt) => {
                 if spec["driver_kind"] == "pi_rpc" {
                     if let Some(roots) = &prompt.skill_roots {
@@ -1402,6 +1435,28 @@ impl Daemon {
                 )?;
             } else {
                 self.kernel.dispatch("rewrite_head",&json!({"agent_name":agent,"inbound_event_id":event,"payload_ref":format!("reply:{}",current["provider_options"]["reply_delivery_reply_id"].as_str().unwrap_or("")),"status":"queued","timestamp":timestamp,"clear_progress":true}))?;
+                if !self.faults.contains_key(agent)
+                    && current["provider_options"]["native_daemon_instance"] == self.state
+                    && ["pi_rpc", "codex_app_server", "claude_stream"]
+                        .contains(&spec["driver_kind"].as_str().unwrap_or(""))
+                {
+                    let owned = self.owned_view(agent);
+                    let fault = json!({"schema_version":1,"record_type":"native_provider_fault",
+                        "project_id":self.config["project_id"],"agent_name":agent,"provider":spec["provider"],
+                        "fault_id":uuid::Uuid::new_v4().to_string(),"status":"blocked","phase":"recovery","reason":"result_delivery_uncertain","delivery_failure":true,
+                        "pid":owned["pid"],"runtime_instance_id":owned["runtime_instance_id"],"daemon_instance_id":self.state,
+                        "job_id":current["job_id"],"execution_instance_id":current["provider_options"]["native_execution_instance"],
+                        "recovery_scope":current["provider_options"]["native_scope_proof"],
+                        "idle_recovery":known_unsent_role_delivery(&terminal),"observed_at":timestamp,"io_error_kind":null});
+                    self.kernel.store.save(
+                        &crate::provider_fault::path(spec["provider"].as_str().unwrap(), agent),
+                        &fault,
+                    )?;
+                    // Publish the terminal attempt, retained mailbox head and
+                    // hold together; the next tick must not rematerialize it.
+                    self.kernel.store.commit()?;
+                    self.faults.insert(agent.to_owned(), fault);
+                }
             }
         }
         Ok(terminal)
@@ -1802,9 +1857,19 @@ impl Daemon {
                         .store
                         .json(&format!("providers/claude/{agent}/session.json"))?
                         .unwrap_or(Value::Null);
-                    let session = match crate::claude_stream::Session::spawn(
-                        &agent, &spec, endpoint, token_path, &saved,
-                    ) {
+                    let session = match (|| {
+                        let surface = if !spec["role"].is_null() {
+                            Some(crate::skill_surface::Surface::provision(
+                                &self.kernel.store,
+                                &agent,
+                            )?)
+                        } else {
+                            None
+                        };
+                        crate::claude_stream::Session::spawn(
+                            &agent, &spec, endpoint, token_path, &saved, surface,
+                        )
+                    })() {
                         Ok(session) => session,
                         Err(error) => {
                             self.record_provider_fault(&agent, "startup", &error)?;
@@ -2001,6 +2066,19 @@ impl Daemon {
         }
         Ok(())
     }
+}
+fn known_unsent_role_delivery(job: &Value) -> bool {
+    let diagnostics = &job["terminal_decision"]["diagnostics"];
+    job["request"]["message_type"] == "reply_delivery"
+        && ["failed", "cancelled"].contains(&job["status"].as_str().unwrap_or(""))
+        && diagnostics["provider_prompt_sent"] == false
+        && [
+            "native_role_context",
+            "pi_role_skill_preflight",
+            "codex_role_skill_preflight",
+            "claude_role_skill_preflight",
+        ]
+        .contains(&diagnostics["completion_authority"].as_str().unwrap_or(""))
 }
 #[cfg(windows)]
 pub(crate) fn owner_stopped(pid: u32) -> bool {

@@ -31,6 +31,18 @@ pub fn validate(row: &Value, provider: &Value, agent: &str, project: &Value) -> 
                     .is_some_and(|pid| pid > 0 && pid <= u32::MAX as u64)),
         "invalid native provider fault record"
     );
+    if row["idle_recovery"] == true {
+        ensure!(
+            row["phase"] == "recovery"
+                && row["reason"] == "result_delivery_uncertain"
+                && row["delivery_failure"] == true
+                && row["job_id"].as_str().is_some_and(|id| !id.is_empty())
+                && row["execution_instance_id"]
+                    .as_str()
+                    .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok()),
+            "invalid idle delivery recovery record"
+        );
+    }
     ensure!(
         row["pid"].is_null() == row["runtime_instance_id"].is_null()
             && (row["runtime_instance_id"].is_null()

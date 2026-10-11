@@ -115,7 +115,8 @@ impl Store {
             && ["pi", "codex", "claude"].contains(&parts[1])
             && (["session.json", "fault.json"].contains(&parts[3])
                 || parts[1] == "pi"
-                    && ["role-plan.json", "native-role-bridge.mjs"].contains(&parts[3]));
+                    && ["role-plan.json", "native-role-bridge.mjs"].contains(&parts[3])
+                || parts[1] == "claude" && ["role-view.json", "role-view"].contains(&parts[3]));
         if provider_state {
             crate::models::validate_agent(parts[2])?;
         }

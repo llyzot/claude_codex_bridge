@@ -14,6 +14,7 @@ enum StreamEvent {
     End,
 }
 struct Active {
+    skills: Option<crate::claude_skills::Load>,
     job: Value,
     uuid: String,
     anchor: bool,
@@ -28,6 +29,9 @@ struct Active {
     started: Instant,
 }
 pub struct Session {
+    surface: Option<crate::skill_surface::Surface>,
+    staged_roles: Option<(String, crate::skill_surface::Routes)>,
+    initialize: Option<String>,
     child: crate::owned_process::OwnedChild,
     commands: mpsc::SyncSender<Value>,
     events: mpsc::Receiver<StreamEvent>,
@@ -52,6 +56,7 @@ impl Session {
         endpoint: &Value,
         token: &std::path::Path,
         saved: &Value,
+        surface: Option<crate::skill_surface::Surface>,
     ) -> Result<Self> {
         let argv = spec["command"]
             .as_array()
@@ -81,6 +86,9 @@ impl Session {
                 "--resume"
             })
             .arg(&session_id);
+        if let Some(surface) = &surface {
+            command.arg("--add-dir").arg(&surface.root);
+        }
         if let Some(cwd) = spec["workspace_path"].as_str() {
             command.current_dir(cwd);
         }
@@ -159,7 +167,18 @@ impl Session {
             .as_str()
             .map(|id| HashSet::from([id.to_owned()]))
             .unwrap_or_default();
+        let initialize = surface
+            .as_ref()
+            .map(|_| format!("role-init-{}", uuid::Uuid::new_v4()));
+        if let Some(id) = &initialize {
+            commands.try_send(json!({"type":"control_request","request_id":id,"request":{"subtype":"initialize"}}))
+                .context("Claude role initialization unavailable")?;
+        }
         Ok(Self {
+            staged_roles: None,
+            ready: initialize.is_none(),
+            initialize,
+            surface,
             child,
             commands,
             events,
@@ -167,7 +186,6 @@ impl Session {
             runtime: uuid::Uuid::new_v4().to_string(),
             state: json!({"session_id":session_id,"initialized":false,
                 "require_result_identity":saved["state"]["require_result_identity"]==true}),
-            ready: true,
             dirty: true,
             closed: false,
             quarantined: false,
@@ -179,15 +197,57 @@ impl Session {
             timeout_s: spec["timeout_s"].as_f64().unwrap_or(0.0),
         })
     }
+    pub fn stage_role_paths(&mut self, job: &Value, roots: &[std::path::PathBuf]) -> Result<()> {
+        ensure!(
+            self.ready && self.active.is_none(),
+            "Claude is not idle for role projection"
+        );
+        let routes = self
+            .surface
+            .as_ref()
+            .context("Claude role view missing")?
+            .sync(roots)?;
+        self.staged_roles = Some((
+            crate::records::string(&job["provider_options"], "native_execution_instance")?.into(),
+            routes,
+        ));
+        Ok(())
+    }
     pub fn start(&mut self, job: &Value, prompt: &str) -> Result<()> {
         ensure!(
             self.ready && self.active.is_none(),
             "Claude session is not idle"
         );
         let uuid = uuid::Uuid::new_v4().to_string();
-        self.commands.try_send(json!({"type":"user","uuid":uuid,"session_id":self.session_id,"parent_tool_use_id":null,
-            "message":{"role":"user","content":format!("CCB_REQ_ID: {}\n{}",job["job_id"].as_str().context("missing Claude job")?,prompt)}})).context("Claude input queue unavailable")?;
+        let input = json!({"type":"user","uuid":uuid,"session_id":self.session_id,"parent_tool_use_id":null,
+            "message":{"role":"user","content":format!("CCB_REQ_ID: {}\n{}",job["job_id"].as_str().context("missing Claude job")?,prompt)}});
+        let skills = if self.surface.is_some() {
+            let (generation, routes) = self
+                .staged_roles
+                .take()
+                .context("Claude role routes were not prepared")?;
+            ensure!(
+                generation
+                    == crate::records::string(
+                        &job["provider_options"],
+                        "native_execution_instance"
+                    )?,
+                "Claude role execution mismatch"
+            );
+            let load =
+                crate::claude_skills::Load::new(&generation, &self.session_id, routes, input);
+            self.commands
+                .try_send(load.request())
+                .context("Claude skill refresh unavailable")?;
+            Some(load)
+        } else {
+            self.commands
+                .try_send(input)
+                .context("Claude input queue unavailable")?;
+            None
+        };
         self.active = Some(Active {
+            skills,
             job: job.clone(),
             uuid,
             anchor: false,
@@ -250,6 +310,10 @@ impl Session {
             self.closed = true;
             self.state["process_state"] = json!("exited");
             self.dirty = true;
+            ensure!(
+                self.initialize.is_none(),
+                "Claude exited before role initialization"
+            );
             if let Some(active) = self.active.take() {
                 let mut decision = failure(
                     if self.forced {
@@ -282,7 +346,10 @@ impl Session {
         }
         if !self.quarantined && !self.forced && exit.is_none() && !self.stdout_closed {
             if let Some(active) = self.active.as_mut() {
-                if active.cancel.is_some() && active.interrupt_id.is_empty() {
+                if active.cancel.is_some()
+                    && active.interrupt_id.is_empty()
+                    && active.skills.is_none()
+                {
                     let id = format!("interrupt-{}-{}", self.runtime, active.uuid);
                     self.commands
                         .try_send(json!({"type":"control_request","request_id":id,
@@ -346,6 +413,24 @@ impl Session {
         Ok(())
     }
     fn ingest(&mut self, r: &Value) -> Result<()> {
+        if r["type"] == "control_response"
+            && self
+                .initialize
+                .as_ref()
+                .is_some_and(|id| r["response"]["request_id"] == *id)
+        {
+            ensure!(
+                (r["session_id"].is_null() || r["session_id"] == self.session_id)
+                    && r["response"]["subtype"] == "success"
+                    && r["response"]["response"].is_object(),
+                "Claude role initialization failed"
+            );
+            self.initialize = None;
+            self.ready = true;
+            self.state["control_initialized"] = json!(true);
+            self.dirty = true;
+            return Ok(());
+        }
         if r["type"] == "system" && r["subtype"] == "init" {
             ensure!(
                 r["session_id"] == self.session_id,
@@ -362,6 +447,39 @@ impl Session {
         let Some(active) = self.active.as_mut() else {
             return Ok(());
         };
+        if let Some(load) = active.skills.as_mut() {
+            match load.ingest(r, active.cancel.is_some())? {
+                Some(crate::claude_skills::Step::Ready(input, bindings)) => {
+                    self.state["role_skills"] =
+                        json!({"verified":true,"bindings":bindings,"job_id":active.job["job_id"]});
+                    self.dirty = true;
+                    active.skills = None;
+                    self.commands
+                        .try_send(input)
+                        .context("Claude prepared input unavailable")?;
+                }
+                Some(crate::claude_skills::Step::Stop(reason)) => {
+                    let cancelled = active.cancel.is_some();
+                    let mut decision = failure(
+                        if cancelled { "cancelled" } else { "failed" },
+                        reason,
+                        if cancelled {
+                            "Cancelled before Claude task input."
+                        } else {
+                            "Claude could not verify the configured role skills. No task prompt was sent."
+                        },
+                    );
+                    decision["diagnostics"] = json!({"completion_authority":"claude_role_skill_preflight","provider_prompt_sent":false,"configuration_error":!cancelled});
+                    active.decision = Some(decision);
+                    active.skills = None;
+                    self.state["role_skills"] =
+                        json!({"verified":false,"job_id":active.job["job_id"]});
+                    self.dirty = true;
+                }
+                None => {}
+            }
+            return Ok(());
+        }
         if r["type"] == "control_response"
             && (r["session_id"].is_null() || r["session_id"] == self.session_id)
         {

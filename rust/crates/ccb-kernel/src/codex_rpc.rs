@@ -23,6 +23,14 @@ struct Active {
     interrupt_error: Value,
     started: Instant,
     deadline_triggered: bool,
+    requests: Vec<Pending>,
+}
+struct Pending {
+    handle: String,
+    wire_id: Value,
+    method: String,
+    params: Value,
+    answer: Option<Value>,
 }
 pub struct Session {
     child: Child,
@@ -59,6 +67,23 @@ impl Session {
             !argv.is_empty() && argv.iter().all(Value::is_string),
             "invalid Codex argv"
         );
+        let runtime = uuid::Uuid::new_v4().to_string();
+        let init = format!("init-{runtime}");
+        let bind = format!("thread-{runtime}");
+        ensure!(
+            spec["capabilities"].is_null() || spec["capabilities"].is_object(),
+            "Codex capabilities must be an object"
+        );
+        let mut capabilities = spec["capabilities"]
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+        capabilities
+            .entry("experimentalApi".to_owned())
+            .or_insert(json!(false));
+        let params = json!({"clientInfo":{"name":"ccb-native","version":env!("CARGO_PKG_VERSION")},"capabilities":capabilities});
+        crate::codex_requests::validate_initialize(&params)?;
+        let initialize = json!({"id":init,"method":"initialize","params":params});
         let mut command = Command::new(argv[0].as_str().unwrap());
         for arg in &argv[1..] {
             command.arg(arg.as_str().unwrap());
@@ -123,10 +148,9 @@ impl Session {
                 }
             }
         });
-        let runtime = uuid::Uuid::new_v4().to_string();
-        let init = format!("init-{runtime}");
-        let bind = format!("thread-{runtime}");
-        commands.try_send(json!({"id":init,"method":"initialize","params":{"clientInfo":{"name":"ccb-native","version":env!("CARGO_PKG_VERSION")},"capabilities":{"experimentalApi":false}}})).context("Codex initialization queue unavailable")?;
+        commands
+            .try_send(initialize)
+            .context("Codex initialization queue unavailable")?;
         let expected =
             if spec["resume_session"] != false && spec["thread_options"]["ephemeral"] != true {
                 saved["state"]["thread_id"]
@@ -192,6 +216,7 @@ impl Session {
             interrupt_error: Value::Null,
             started: Instant::now(),
             deadline_triggered: false,
+            requests: Vec::new(),
         });
         self.ready = false;
         self.state["control"] = Value::Null;
@@ -205,6 +230,7 @@ impl Session {
             };
             self.ingest(record)?;
         }
+        self.refresh_pending_metadata();
         self.send_pending_interrupt()?;
         if let Some(exit) = self.child.try_wait()? {
             self.ready = false;
@@ -217,12 +243,14 @@ impl Session {
                     )
                 });
                 control_diagnostics(&active, &mut decision);
+                self.refresh_pending_metadata();
                 return Ok(Some((active.job, decision)));
             }
             anyhow::bail!("Codex app-server exited");
         }
         if self.active.as_ref().is_some_and(|a| a.decision.is_some()) {
             let active = self.active.take().unwrap();
+            self.refresh_pending_metadata();
             self.ready = true;
             let mut decision = active.decision.clone().unwrap();
             control_diagnostics(&active, &mut decision);
@@ -232,6 +260,145 @@ impl Session {
     }
     pub fn active_job_id(&self) -> Option<&str> {
         self.active.as_ref().and_then(|a| a.job["job_id"].as_str())
+    }
+    pub fn pending_requests(&self) -> Value {
+        let rows = self.active.as_ref().map(|active| active.requests.iter().map(|p|
+            json!({"request_id":p.handle,"method":p.method,"params":p.params,
+                "job_id":active.job["job_id"],"execution_instance_id":active.job["provider_options"]["native_execution_instance"],
+                "runtime_instance_id":self.runtime,"status":if p.answer.is_some(){"response_queued"}else{"awaiting_user"}}))
+            .collect::<Vec<_>>()).unwrap_or_default();
+        json!(rows)
+    }
+    fn refresh_pending_metadata(&mut self) {
+        if self.state["thread_id"].as_str().is_none_or(str::is_empty) {
+            return;
+        }
+        let summaries = self.active.as_ref().map(|active| active.requests.iter().map(|p|
+            json!({"request_id":p.handle,"method":p.method,"job_id":active.job["job_id"],
+                "turn_id":active.turn,"status":if p.answer.is_some(){"response_queued"}else{"awaiting_user"}}))
+            .collect::<Vec<_>>()).unwrap_or_default();
+        let summaries = json!(summaries);
+        if self.state["pending_requests"] != summaries {
+            self.state["pending_requests"] = summaries;
+            self.dirty = true;
+        }
+    }
+    pub fn validate_response(&self, payload: &Value) -> Result<bool> {
+        ensure!(
+            payload["runtime_instance_id"] == self.runtime,
+            "Codex response runtime identity mismatch"
+        );
+        let active = self.active.as_ref().context("Codex has no active task")?;
+        ensure!(
+            payload["job_id"] == active.job["job_id"]
+                && payload["execution_instance_id"]
+                    == active.job["provider_options"]["native_execution_instance"],
+            "Codex response execution identity mismatch"
+        );
+        ensure!(
+            active.cancel.is_none() && active.decision.is_none() && active.completed.is_null(),
+            "Codex task no longer accepts user responses"
+        );
+        let request = active
+            .requests
+            .iter()
+            .find(|r| payload["request_id"] == r.handle)
+            .context("unknown or resolved Codex request")?;
+        crate::codex_requests::validate_answer(
+            &request.method,
+            &request.params,
+            &payload["result"],
+        )?;
+        if let Some(prior) = &request.answer {
+            ensure!(
+                prior == &payload["result"],
+                "Codex request already has a different answer"
+            );
+            return Ok(false);
+        }
+        Ok(true)
+    }
+    pub fn respond(&mut self, payload: &Value) -> Result<()> {
+        if !self.validate_response(payload)? {
+            return Ok(());
+        }
+        let pending = self
+            .active
+            .as_ref()
+            .unwrap()
+            .requests
+            .iter()
+            .find(|r| payload["request_id"] == r.handle)
+            .unwrap();
+        self.send(json!({"id":pending.wire_id,"result":payload["result"]}))?;
+        let pending = self
+            .active
+            .as_mut()
+            .unwrap()
+            .requests
+            .iter_mut()
+            .find(|r| payload["request_id"] == r.handle)
+            .unwrap();
+        pending.answer = Some(payload["result"].clone());
+        self.dirty = true;
+        Ok(())
+    }
+    fn server_request(&mut self, record: Value) -> Result<()> {
+        let method = record["method"].as_str().unwrap_or("");
+        let reject =
+            |message: &str| json!({"id":record["id"],"error":{"code":-32602,"message":message}});
+        if !crate::codex_requests::supported(method) {
+            return self.send(json!({"id":record["id"],"error":{"code":-32601,"message":"Unsupported native Codex server request"}}));
+        }
+        if record["id"].as_i64().is_none() && !record["id"].is_string() {
+            return self.send(reject("Invalid Codex server request identity"));
+        }
+        if crate::codex_requests::validate_params(method, &record["params"]).is_err() {
+            return self.send(reject("Invalid Codex server request shape"));
+        }
+        let Some(active) = self.active.as_mut() else {
+            return self.send(reject("No native task owns this request"));
+        };
+        if active.turn.is_empty() {
+            ensure!(
+                active.buffer.len() < 256,
+                "Codex pre-acceptance event overflow"
+            );
+            active.buffer.push(record);
+            return Ok(());
+        }
+        let params = &record["params"];
+        if params["threadId"] != self.state["thread_id"]
+            || (!params["turnId"].is_null() && params["turnId"] != active.turn)
+            || !active.completed.is_null()
+            || active.decision.is_some()
+            || active.cancel.is_some()
+        {
+            return self.send(reject("Codex request does not belong to the active turn"));
+        }
+        if let Some(prior) = active.requests.iter().find(|r| r.wire_id == record["id"]) {
+            if prior.method == method && prior.params == *params {
+                return Ok(());
+            }
+            return self.send(reject("Codex server request identity was reused"));
+        }
+        let total_bytes = active
+            .requests
+            .iter()
+            .map(|r| r.params.to_string().len())
+            .sum::<usize>();
+        if active.requests.len() >= 32 || total_bytes + params.to_string().len() > 512 * 1024 {
+            return self.send(reject("Native Codex pending request capacity exceeded"));
+        }
+        active.requests.push(Pending {
+            handle: format!("prq-{}", uuid::Uuid::new_v4().simple()),
+            wire_id: record["id"].clone(),
+            method: method.to_owned(),
+            params: params.clone(),
+            answer: None,
+        });
+        self.dirty = true;
+        Ok(())
     }
     pub fn deadline_due(&self) -> bool {
         let timeout = self.spec["timeout_s"].as_f64().unwrap_or(0.0);
@@ -284,7 +451,9 @@ impl Session {
     }
     fn interrupt(&mut self, job_id: &str, record_reply: bool) -> Result<()> {
         self.validate_interrupt(job_id, record_reply)?;
-        self.active.as_mut().unwrap().cancel = Some(record_reply);
+        let active = self.active.as_mut().unwrap();
+        active.cancel = Some(record_reply);
+        active.requests.clear();
         Ok(())
     }
     fn send_pending_interrupt(&mut self) -> Result<()> {
@@ -305,6 +474,9 @@ impl Session {
         Ok(())
     }
     fn ingest(&mut self, record: Value) -> Result<()> {
+        if record["method"].is_string() && !record["id"].is_null() {
+            return self.server_request(record);
+        }
         if record["id"] == self.init {
             ensure!(
                 record["error"].is_null() && record["result"].is_object(),
@@ -450,6 +622,11 @@ impl Session {
         if params["threadId"] != self.state["thread_id"] {
             return Ok(());
         }
+        if record["method"] == "serverRequest/resolved" {
+            active.requests.retain(|r| r.wire_id != params["requestId"]);
+            self.dirty = true;
+            return Ok(());
+        }
         if record["method"] == "thread/status/changed"
             && params["status"]["type"] == "idle"
             && !active.check.is_empty()
@@ -464,6 +641,7 @@ impl Session {
         }
         if record["method"] == "turn/completed" && params["turn"]["id"] == active.turn {
             active.completed = params["turn"].clone();
+            active.requests.clear();
             active.check = format!("completed-{}", active.start);
             let check = active.check.clone();
             let thread = self.state["thread_id"].clone();

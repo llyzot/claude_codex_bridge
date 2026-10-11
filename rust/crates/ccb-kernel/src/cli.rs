@@ -3,7 +3,7 @@ use anyhow::{bail, ensure, Context, Result};
 use serde_json::{json, Value};
 use std::{
     ffi::OsString,
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Read, Write},
     net::TcpStream,
     path::{Path, PathBuf},
     time::Duration,
@@ -95,7 +95,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         return Ok(());
     }
     if args.is_empty() || args.first().is_some_and(|s| s == "--help") {
-        println!("ccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> ask <agent> --project <id> [--from <actor>] [--chain] [--silence] <message>\nccb-native --state-root <dir> ping|watch <target>|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native token-create <new-file>");
+        println!("ccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> ask <agent> --project <id> [--from <actor>] [--chain] [--silence] <message>\nccb-native --state-root <dir> ping|watch <target>|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native token-create <new-file>");
         return Ok(());
     }
     if args[0] == "private-copy" {
@@ -162,6 +162,45 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         "watch" => json!({"target":arg(&args,0)?}),
         "queue" => json!({"target":args.first().and_then(|s|s.to_str()).unwrap_or("all")}),
         "inbox" => json!({"agent_name":arg(&args,0)?}),
+        "pending" => {
+            ensure!(args.len() == 1, "pending requires an agent");
+            println!(
+                "{}",
+                request(
+                    &root,
+                    "provider-requests",
+                    json!({"agent_name":arg(&args,0)?})
+                )?
+            );
+            return Ok(());
+        }
+        "respond" => {
+            ensure!(
+                args.len() == 3,
+                "respond requires agent, request handle and answer JSON file"
+            );
+            let agent = arg(&args, 0)?;
+            let handle = arg(&args, 1)?;
+            let current = request(&root, "provider-requests", json!({"agent_name":agent}))?;
+            let pending = current["requests"]
+                .as_array()
+                .context("missing pending requests")?
+                .iter()
+                .find(|r| r["request_id"] == handle)
+                .context("unknown or resolved request handle")?;
+            let mut bytes = Vec::new();
+            std::fs::File::open(Path::new(&args[2]))?
+                .take(512 * 1024 + 1)
+                .read_to_end(&mut bytes)?;
+            ensure!(bytes.len() <= 512 * 1024, "answer file is too large");
+            let bytes = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(&bytes);
+            let response = json!({"agent_name":agent,"request_id":handle,
+                "runtime_instance_id":pending["runtime_instance_id"],"job_id":pending["job_id"],
+                "execution_instance_id":pending["execution_instance_id"],
+                "result":serde_json::from_slice::<Value>(bytes)?});
+            println!("{}", request(&root, "provider-respond", response)?);
+            return Ok(());
+        }
         "request" => {
             ensure!(args.len() == 2, "request requires <op> <json>");
             let response = request(&root, arg(&args, 0)?, serde_json::from_str(arg(&args, 1)?)?)?;

@@ -325,6 +325,48 @@ impl Daemon {
                 ensure!(!queues.is_empty(), "unknown queue target");
                 Ok(json!({"target":target,"queues":queues}))
             }
+            "provider-requests" => {
+                let agent = records::string(p, "agent_name")?;
+                ensure!(
+                    self.spec(agent)?["driver_kind"] == "codex_app_server",
+                    "interactive requests require an owned Codex session"
+                );
+                Ok(json!({"agent_name":agent,"requests":self.codex.get(agent)
+                    .map(|s|s.pending_requests()).unwrap_or_else(||json!([]))}))
+            }
+            "provider-respond" => {
+                let agent = records::string(p, "agent_name")?;
+                let session = self
+                    .codex
+                    .get(agent)
+                    .context("Codex session is not available")?;
+                let fresh = session.validate_response(p)?;
+                let job = self.get_job(records::string(p, "job_id")?)?;
+                ensure!(
+                    job["status"] == "running"
+                        && job["agent_name"] == agent
+                        && job["provider"] == "codex"
+                        && job["provider_options"]["native_daemon_instance"] == self.state
+                        && job["provider_options"]["native_execution_instance"]
+                            == p["execution_instance_id"]
+                        && job["provider_options"]["native_cancel_intent"].is_null(),
+                    "Codex task no longer accepts user responses"
+                );
+                if fresh {
+                    admission::event(
+                        &mut self.kernel,
+                        &job,
+                        "provider_request_answer_requested",
+                        json!({"request_id":p["request_id"],"runtime_instance_id":p["runtime_instance_id"],
+                            "execution_instance_id":p["execution_instance_id"]}),
+                        &now(),
+                    )?;
+                    // Audit the explicit action before it can reach the provider.
+                    self.kernel.store.commit()?;
+                }
+                self.codex.get_mut(agent).unwrap().respond(p)?;
+                Ok(json!({"request_id":p["request_id"],"status":"response_queued"}))
+            }
             "retry" => {
                 let target = records::string(p, "target")?;
                 let attempt = retry::source(&mut self.kernel, target)?;

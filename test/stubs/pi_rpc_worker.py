@@ -11,6 +11,18 @@ lock=threading.Lock()
 state=dict(sessionId=f'session-{os.getpid()}',sessionFile=None,isStreaming=False,isCompacting=False,pendingMessageCount=0,messageCount=0,
            model={'headers':{'Authorization':'never-persist-this'}})
 mode=sys.argv[1]
+role_plan=Path(os.environ['CCB_PI_ROLE_PLAN']) if os.environ.get('CCB_PI_ROLE_PLAN') else None
+loaded_plan=json.loads(role_plan.read_text()) if role_plan else None
+bridge_path=sys.argv[sys.argv.index('-e')+1] if '-e' in sys.argv else ''
+
+def role_behavior():
+    path=os.environ.get('CCB_PI_SKILL_BEHAVIOR')
+    return Path(path).read_text().strip() if path and Path(path).exists() else ''
+
+def role_emit(command,record,phase):
+    if role_behavior()=='delay-'+phase:
+        timer=threading.Timer(.6,lambda:emit(record));timer.daemon=True;timer.start()
+    else:emit(record)
 session_file=Path(sys.argv[2]) if mode in {'persist','persist-lead'} else None
 if mode=='persist-lead': mode='lead'
 if session_file:
@@ -65,8 +77,37 @@ for line in sys.stdin.buffer:
         with open(os.environ['CCB_FIXTURE_TRACE'], 'a', encoding='utf-8') as file:
             file.write(json.dumps(command)+'\n')
     if command['type']=='get_state':
-        emit(dict(type='response',command='get_state',id=command['id'],success=True,data=dict(state)))
+        observed=dict(state)
+        if command['id'].startswith('role-state-'):
+            if role_behavior()=='foreign-session':observed['sessionId']='wrong-session'
+            if role_behavior()=='busy':observed['isStreaming']=True
+        role_emit(command,dict(type='response',command='get_state',id=command['id'],success=True,data=observed),'state' if command['id'].startswith('role-state-') else 'init')
+    elif command['type']=='get_commands':
+        rows=[]
+        if loaded_plan:
+            rows=[dict(name=loaded_plan['command'],description=f"CCB native role bridge {loaded_plan['owner']} {loaded_plan['generation']}",
+                       source='extension',sourceInfo={'path':bridge_path})]
+            rows += [dict(name='skill:'+Path(root).name,description='Fixture skill',source='skill',
+                          sourceInfo={'path':str(Path(root)/'SKILL.md')}) for root in loaded_plan['roots']]
+        behavior=role_behavior()
+        if behavior=='missing-bridge':rows=[r for r in rows if r['source']!='extension']
+        if behavior=='missing-skill':rows=[r for r in rows if r['source']!='skill']
+        record=dict(type='response',command='get_commands',id=command['id'],success=True,data={'commands':rows})
+        if behavior=='bad-envelope':record['command']='get_state'
+        if behavior=='foreign' and command['id'].startswith('role-verify-'):
+            emit(dict(record,id='foreign-role-response'))
+            timer=threading.Timer(.6,lambda rec=record:emit(rec));timer.daemon=True;timer.start()
+        else:role_emit(command,record,'verify' if command['id'].startswith('role-verify-') else 'inspect')
     elif command['type']=='prompt':
+        if command['message'].startswith('/ccb-native-role-'):
+            behavior=role_behavior()
+            if behavior!='stale-generation':loaded_plan=json.loads(role_plan.read_text())
+            success=behavior!='reload-error'
+            record=dict(type='response',command='prompt',id=command['id'],success=success,
+                        data={'disposition':'started' if behavior=='reload-started' else 'handled'})
+            if not success:record['error']='PRIVATE_RELOAD_ERROR'
+            role_emit(command,record,'reload')
+            continue
         threading.Thread(target=prompt,args=(command,),daemon=True).start()
     elif command['type']=='abort':
         emit(dict(type='response',command='abort',id=command['id'],success=True))

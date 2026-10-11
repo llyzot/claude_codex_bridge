@@ -22,6 +22,7 @@ mod lifecycle;
 pub mod models;
 mod owned_process;
 mod pi_rpc;
+mod pi_skills;
 mod provider_fault;
 mod records;
 mod result_policy;

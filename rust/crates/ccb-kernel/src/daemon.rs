@@ -1291,6 +1291,14 @@ impl Daemon {
             .map(std::path::Path::new);
         match crate::roles::prompt(&spec, project, records::string(&job["request"], "body")?) {
             Ok(prompt) => {
+                if spec["driver_kind"] == "pi_rpc" {
+                    if let Some(roots) = &prompt.skill_roots {
+                        self.pi
+                            .get(agent)
+                            .context("Pi session missing for role preparation")?
+                            .stage_role_plan(&mut self.kernel.store, job, roots)?;
+                    }
+                }
                 if !prompt.audit.is_null() {
                     admission::event(
                         &mut self.kernel,
@@ -1550,8 +1558,16 @@ impl Daemon {
                     } else {
                         saved
                     };
+                    let bridge = if !spec["role"].is_null() {
+                        Some(crate::pi_skills::Bridge::provision(
+                            &mut self.kernel.store,
+                            &agent,
+                        )?)
+                    } else {
+                        None
+                    };
                     let session = match crate::pi_rpc::Session::spawn(
-                        &agent, &spec, endpoint, token_path, &saved,
+                        &agent, &spec, endpoint, token_path, &saved, bridge,
                     ) {
                         Ok(session) => session,
                         Err(error) => {
@@ -1629,9 +1645,11 @@ impl Daemon {
                         let Some(prompt) = self.provider_prompt(&agent, &job)? else {
                             continue;
                         };
-                        if let Err(error) =
-                            self.pi.get_mut(&agent).unwrap().start(&job, &prompt.text)
-                        {
+                        if let Err(error) = self.pi.get_mut(&agent).unwrap().start(
+                            &job,
+                            &prompt.text,
+                            prompt.skill_roots,
+                        ) {
                             self.record_provider_fault(&agent, "start", &error)?;
                             let session = self.pi.get_mut(&agent).unwrap();
                             session.quarantine(session.state.clone());

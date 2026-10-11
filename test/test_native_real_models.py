@@ -116,3 +116,43 @@ def test_real_codex_role_skill_reads_updated_body_in_same_thread(tmp_path):
                 assert metadata['state']['thread_id']==previous['state']['thread_id']
             previous=metadata
     finally:server.close()
+
+
+def test_real_pi_role_skill_reads_updated_body_in_same_session(tmp_path):
+    import uuid
+    workspace=tmp_path/'workspace';workspace.mkdir()
+    home=tmp_path/'pi-home';home.mkdir()
+    protected_copy(Path('C:/Users/user/.pi/agent/auth.json'),home/'auth.json')
+    models=Path('C:/Users/user/.pi/agent/models.json')
+    if models.exists():protected_copy(models,home/'models.json')
+    role=workspace/'roles/installed/agentroles.verify/current'
+    skill=role/'skills/ccb-role-probe';skill.mkdir(parents=True)
+    (role/'role.toml').write_text('schema="rolepack/v1"\nid="agentroles.verify"\n'
+        '[skills]\npi=["skills/ccb-role-probe"]\n',encoding='utf-8')
+    agent=dict(provider='pi',driver_kind='pi_rpc',profile_family='protocol_turn',
+        role='agentroles.verify',workspace_path=str(workspace),
+        command=[str(NODE),str(PI),'--mode','rpc','--provider','openai','--model','gpt-6-astra','--thinking','low',
+                 '--no-extensions','--no-skills','--no-prompt-templates','--no-themes','--session-dir',str(home/'sessions'),'--tools','read'],
+        env={'PI_CODING_AGENT_DIR':str(home),'PI_SKIP_VERSION_CHECK':'1','PI_TELEMETRY':'0'},timeout_s=120)
+    server=Server(tmp_path/'state',{'worker':agent})
+    try:
+        previous=None
+        for suffix in ('first','second'):
+            token='CCB_PI_ROLE_'+uuid.uuid4().hex
+            (skill/f'{suffix}.txt').write_text(token,encoding='utf-8')
+            (skill/'SKILL.md').write_text('---\nname: ccb-role-probe\n'
+                'description: Read the verification token when asked to check the CCB role token.\n---\n'
+                f'Read ./{suffix}.txt relative to this skill directory. Reply only with the file contents.\n',encoding='utf-8')
+            receipt=submit(server,body='Use the ccb-role-probe skill to read the current CCB role verification token. '
+                'Read the current SKILL.md and referenced file each time. Reply only with the token. '
+                'Use only the read tool. Do not edit files or make network requests.')
+            result=wait_result(server,receipt['job_id'])
+            assert result['status']=='completed',result['reply']
+            assert result['reply'].strip()==token,result['reply']
+            metadata=json.loads((server.root/'providers/pi/worker/session.json').read_text())
+            assert metadata['state']['role_skills']['verified'] is True
+            if previous:
+                assert metadata['runtime_instance_id']==previous['runtime_instance_id']
+                assert metadata['state']['sessionId']==previous['state']['sessionId']
+            previous=metadata
+    finally:server.close()

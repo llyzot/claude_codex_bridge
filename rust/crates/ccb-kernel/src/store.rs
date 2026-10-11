@@ -113,7 +113,9 @@ impl Store {
         let provider_state = parts.len() == 4
             && parts[0] == "providers"
             && ["pi", "codex", "claude"].contains(&parts[1])
-            && ["session.json", "fault.json"].contains(&parts[3]);
+            && (["session.json", "fault.json"].contains(&parts[3])
+                || parts[1] == "pi"
+                    && ["role-plan.json", "native-role-bridge.mjs"].contains(&parts[3]));
         if provider_state {
             crate::models::validate_agent(parts[2])?;
         }
@@ -485,6 +487,39 @@ mod tests {
         assert!(Store::open(root.path()).is_err());
         assert!(store.save("mailboxes/../escape", &json!({})).is_err());
         assert!(store.save("unowned/file", &json!({})).is_err());
+    }
+    #[test]
+    fn pi_role_assets_have_exact_owned_paths() {
+        let root = tempfile::tempdir().unwrap();
+        let mut store = Store::open(root.path()).unwrap();
+        store
+            .save_bytes(
+                "providers/pi/worker/native-role-bridge.mjs",
+                b"export default () => {};",
+            )
+            .unwrap();
+        store
+            .save("providers/pi/worker/role-plan.json", &json!({"roots":[]}))
+            .unwrap();
+        for path in [
+            "providers/codex/worker/role-plan.json",
+            "providers/claude/worker/native-role-bridge.mjs",
+            "providers/pi/worker/other.mjs",
+            "providers/pi/../role-plan.json",
+        ] {
+            assert!(store.save_bytes(path, b"x").is_err());
+        }
+        store.commit().unwrap();
+        drop(store);
+        let restored = Store::open(root.path()).unwrap();
+        assert_eq!(
+            restored.json("providers/pi/worker/role-plan.json").unwrap(),
+            Some(json!({"roots":[]}))
+        );
+        assert!(restored
+            .bytes("providers/pi/worker/native-role-bridge.mjs")
+            .unwrap()
+            .is_some());
     }
     #[test]
     fn journal_replays_partial_append_once() {

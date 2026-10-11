@@ -8,6 +8,7 @@ use std::{
     time::Instant,
 };
 struct Turn {
+    skills: Option<crate::pi_skills::Load>,
     job: Value,
     id: String,
     accepted: bool,
@@ -28,6 +29,8 @@ enum StreamEvent {
     End,
 }
 pub struct Session {
+    role_bridge: Option<crate::pi_skills::Bridge>,
+    role_skills_bound: bool,
     child: crate::owned_process::OwnedChild,
     commands: mpsc::SyncSender<Value>,
     events: mpsc::Receiver<StreamEvent>,
@@ -53,6 +56,7 @@ impl Session {
         endpoint: &Value,
         token: &std::path::Path,
         saved: &Value,
+        bridge: Option<crate::pi_skills::Bridge>,
     ) -> Result<Self> {
         let argv = spec["command"]
             .as_array()
@@ -99,6 +103,13 @@ impl Session {
             .env("CCB_AGENT_NAME", agent)
             .env("CCB_NATIVE_ENDPOINT", endpoint.to_string())
             .env("CCB_NATIVE_TOKEN_FILE", token);
+        if let Some(bridge) = &bridge {
+            command
+                .arg("-e")
+                .arg(&bridge.script)
+                .env("CCB_PI_ROLE_PLAN", &bridge.plan)
+                .env("CCB_PI_ROLE_OWNER", &bridge.owner);
+        }
         command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -162,6 +173,8 @@ impl Session {
             .try_send(json!({"id":init,"type":"get_state"}))
             .context("Pi initialization queue unavailable")?;
         Ok(Self {
+            role_bridge: bridge,
+            role_skills_bound: false,
             child,
             commands,
             events,
@@ -181,7 +194,23 @@ impl Session {
             timeout_s: spec["timeout_s"].as_f64().unwrap_or(3600.0),
         })
     }
-    pub fn start(&mut self, job: &Value, prompt: &str) -> Result<()> {
+    pub fn stage_role_plan(
+        &self,
+        store: &mut crate::store::Store,
+        job: &Value,
+        roots: &[std::path::PathBuf],
+    ) -> Result<()> {
+        self.role_bridge
+            .as_ref()
+            .context("Pi role bridge is missing")?
+            .stage(store, crate::pi_skills::generation(job)?, roots)
+    }
+    pub fn start(
+        &mut self,
+        job: &Value,
+        prompt: &str,
+        skill_roots: Option<Vec<std::path::PathBuf>>,
+    ) -> Result<()> {
         ensure!(
             self.ready && self.active.is_none(),
             "Pi session is not idle"
@@ -197,11 +226,32 @@ impl Session {
             job["job_id"].as_str().context("missing Pi job id")?,
             prompt
         );
-        self.input_closed |= !enqueue(
-            &self.commands,
-            json!({"id":id,"type":"prompt","message":message}),
-        )?;
+        let prompt = json!({"id":id,"type":"prompt","message":message});
+        let session_id = self.state["sessionId"]
+            .as_str()
+            .context("Pi session identity unavailable")?
+            .to_owned();
+        let skills =
+            if let Some(roots) = skill_roots.filter(|r| !r.is_empty() || self.role_skills_bound) {
+                let bridge = self
+                    .role_bridge
+                    .clone()
+                    .context("Pi role bridge is missing")?;
+                let load = crate::pi_skills::Load::new(
+                    bridge,
+                    crate::pi_skills::generation(job)?.into(),
+                    session_id.clone(),
+                    roots,
+                    prompt,
+                );
+                self.input_closed |= !enqueue(&self.commands, load.request())?;
+                Some(load)
+            } else {
+                self.input_closed |= !enqueue(&self.commands, prompt)?;
+                None
+            };
         self.active = Some(Turn {
+            skills,
             job: job.clone(),
             id,
             accepted: false,
@@ -210,10 +260,7 @@ impl Session {
             settled: false,
             check: String::new(),
             decision: None,
-            session_id: self.state["sessionId"]
-                .as_str()
-                .context("Pi session identity unavailable")?
-                .to_owned(),
+            session_id,
             cancel: None,
             abort_sent: false,
             started: Instant::now(),
@@ -313,7 +360,7 @@ impl Session {
             && !self.input_closed
         {
             if let Some(turn) = self.active.as_mut() {
-                if turn.cancel.is_some() && !turn.abort_sent {
+                if turn.cancel.is_some() && !turn.abort_sent && turn.skills.is_none() {
                     turn.abort_sent = enqueue(
                         &self.commands,
                         json!({"id":format!("abort-{}",turn.id),"type":"abort"}),
@@ -385,7 +432,7 @@ impl Session {
                 record["command"] == "get_state" && record["success"] == true,
                 "Pi get_state initialization failed"
             );
-            self.state = state_view(&record["data"]);
+            observe_state(&mut self.state, &record["data"]);
             ensure!(
                 !self.state["sessionId"].as_str().unwrap_or("").is_empty(),
                 "Pi initialization session identity missing"
@@ -406,6 +453,44 @@ impl Session {
             }
             return Ok(());
         };
+        if let Some(load) = turn.skills.as_mut() {
+            match load.ingest(record, turn.cancel.is_some())? {
+                Some(crate::pi_skills::Step::Send(request)) => {
+                    self.input_closed |= !enqueue(&self.commands, request)?;
+                }
+                Some(crate::pi_skills::Step::Ready(prompt, roots, state)) => {
+                    self.role_skills_bound = !roots.is_empty();
+                    observe_state(&mut self.state, &state);
+                    self.state["role_skills"] = json!({"verified":true,"roots":roots,
+                        "job_id":turn.job["job_id"],"execution_instance_id":turn.job["provider_options"]["native_execution_instance"]});
+                    self.dirty = true;
+                    turn.skills = None;
+                    self.input_closed |= !enqueue(&self.commands, prompt)?;
+                }
+                Some(crate::pi_skills::Step::Stop(reason)) => {
+                    let cancelled = turn.cancel.is_some();
+                    let mut decision = failure(
+                        if cancelled { "cancelled" } else { "failed" },
+                        reason,
+                        if cancelled {
+                            "Cancelled before Pi task input."
+                        } else {
+                            "Pi could not verify the configured role skills. No task prompt was sent."
+                        },
+                    );
+                    decision["diagnostics"] = json!({"completion_authority":"pi_role_skill_preflight",
+                        "provider_prompt_sent":false,"configuration_error":!cancelled});
+                    turn.decision = Some(decision);
+                    turn.skills = None;
+                    self.role_skills_bound = true;
+                    self.state["role_skills"] =
+                        json!({"verified":false,"job_id":turn.job["job_id"]});
+                    self.dirty = true;
+                }
+                None => {}
+            }
+            return Ok(());
+        }
         if record["type"] == "response" && record["id"] == turn.id {
             ensure!(
                 record["command"] == "prompt",
@@ -467,7 +552,7 @@ impl Session {
                 record["command"] == "get_state" && record["success"] == true,
                 "Pi settled-state query failed"
             );
-            self.state = state_view(&record["data"]);
+            observe_state(&mut self.state, &record["data"]);
             self.dirty = true;
             ensure!(
                 self.state["sessionId"] == turn.session_id,
@@ -545,13 +630,20 @@ fn control_diagnostics(turn: &Turn, decision: &mut Value) {
         decision["diagnostics"]["deadline_triggered"] = json!(true);
     }
 }
-fn idle(state: &Value) -> bool {
+pub(crate) fn idle(state: &Value) -> bool {
     state["isStreaming"] == false
         && state["isCompacting"] == false
         && state["pendingMessageCount"].as_u64() == Some(0)
 }
 fn state_view(state: &Value) -> Value {
     json!({"sessionId":state["sessionId"],"sessionFile":state["sessionFile"],"isStreaming":state["isStreaming"],"isCompacting":state["isCompacting"],"pendingMessageCount":state["pendingMessageCount"],"messageCount":state["messageCount"]})
+}
+fn observe_state(current: &mut Value, observed: &Value) {
+    let roles = current["role_skills"].clone();
+    *current = state_view(observed);
+    if !roles.is_null() {
+        current["role_skills"] = roles;
+    }
 }
 fn content(message: &Value) -> String {
     if let Some(text) = message["content"].as_str() {

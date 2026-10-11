@@ -260,8 +260,13 @@ pub fn prompt(spec: &Value, project: Option<&Path>, body: &str) -> Result<Prepar
         paths(&manifest["memory"]["files"], &mut declarations)?;
         manifest["memory"]["merge_strategy"].clone()
     };
-    let skill_roots = if spec["provider"] == "codex" {
-        Some(skill_roots(&root, &manifest, &adapter, "codex")?)
+    let skill_roots = if ["codex", "pi"].contains(&spec["provider"].as_str().unwrap_or("")) {
+        Some(skill_roots(
+            &root,
+            &manifest,
+            &adapter,
+            spec["provider"].as_str().unwrap(),
+        )?)
     } else {
         None
     };

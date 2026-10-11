@@ -8,12 +8,14 @@ use std::{
     sync::mpsc,
     time::Instant,
 };
+pub(crate) const IDLE_SHUTDOWN_GRACE: std::time::Duration = std::time::Duration::from_millis(1000);
 enum StreamEvent {
     Record(Value),
     Fault,
     End,
 }
 struct Active {
+    context: Option<crate::claude_context::Control>,
     requests: crate::claude_requests::Broker,
     skills: Option<crate::claude_skills::Load>,
     job: Value,
@@ -242,6 +244,40 @@ impl Session {
         ));
         Ok(())
     }
+    pub fn begin_idle_shutdown(&mut self) -> bool {
+        if !self.can_idle_shutdown() {
+            return false;
+        }
+        self.ready = false;
+        // Closing the real writer channel delivers stdin EOF after already
+        // queued writes. Drop/kill alone can race Claude's transcript flush.
+        let (closed, receiver) = mpsc::sync_channel(1);
+        self.commands = closed;
+        drop(receiver);
+        true
+    }
+    pub fn can_idle_shutdown(&self) -> bool {
+        self.ready && self.active.is_none() && !self.quarantined && !self.closed && !self.forced
+    }
+    pub fn poll_idle_shutdown(&mut self) -> Result<Option<Value>> {
+        // No managed turn is active. Drain the bounded reader so the provider
+        // can finish shutdown; do not interpret hooks as new work or approvals.
+        for _ in 0..128 {
+            match self.events.try_recv() {
+                Ok(StreamEvent::End) => self.stdout_closed = true,
+                Ok(_) => {}
+                Err(_) => break,
+            }
+        }
+        let Some(exit) = self.child.try_wait()? else {
+            return Ok(None);
+        };
+        if !self.stdout_closed || !self.child.tree_empty()? {
+            return Ok(None);
+        }
+        self.closed = true;
+        Ok(Some(json!({"status":"exited","exit_code":exit.code()})))
+    }
     pub fn start(&mut self, job: &Value, prompt: &str) -> Result<()> {
         ensure!(
             self.ready && self.active.is_none(),
@@ -250,7 +286,29 @@ impl Session {
         let uuid = uuid::Uuid::new_v4().to_string();
         let input = json!({"type":"user","uuid":uuid,"session_id":self.session_id,"parent_tool_use_id":null,
             "message":{"role":"user","content":format!("CCB_REQ_ID: {}\n{}",job["job_id"].as_str().context("missing Claude job")?,prompt)}});
-        let skills = if self.surface.is_some() {
+        let context = if job["provider_options"]["native_context_control"].is_object() {
+            let control = &job["provider_options"]["native_context_control"];
+            ensure!(
+                control["runtime_instance_id"] == self.runtime,
+                "Claude context runtime changed before dispatch"
+            );
+            Some(crate::claude_context::Control::new(
+                control["action"]
+                    .as_str()
+                    .context("missing Claude context action")?,
+                &uuid,
+                &self.state,
+            )?)
+        } else {
+            None
+        };
+        let skills = if let Some(control) = &context {
+            self.staged_roles = None;
+            self.commands
+                .try_send(control.request())
+                .context("Claude context preflight unavailable")?;
+            None
+        } else if self.surface.is_some() {
             let (generation, routes) = self
                 .staged_roles
                 .take()
@@ -276,6 +334,7 @@ impl Session {
             None
         };
         self.active = Some(Active {
+            context,
             requests: crate::claude_requests::Broker::default(),
             skills,
             job: job.clone(),
@@ -382,6 +441,7 @@ impl Session {
                 if active.cancel.is_some()
                     && active.interrupt_id.is_empty()
                     && active.skills.is_none()
+                    && active.context.as_ref().is_none_or(|control| control.sent())
                 {
                     let id = format!("interrupt-{}-{}", self.runtime, active.uuid);
                     self.commands
@@ -512,6 +572,13 @@ impl Session {
         Ok(())
     }
     fn ingest(&mut self, r: &Value) -> Result<()> {
+        ensure!(
+            r["type"] != "conversation_reset"
+                || r["session_id"] != self.session_id
+                || !r["parent_tool_use_id"].is_null()
+                || self.active.as_ref().is_some_and(|a| a.context.is_some()),
+            "Claude changed context outside an owned context operation"
+        );
         if r["type"] == "control_request" {
             // No custom dialog kinds were advertised. Such dialogs must never
             // be answered, including with a synthetic cancellation response.
@@ -580,6 +647,43 @@ impl Session {
             }
             self.refresh_requests();
             return Ok(());
+        }
+        if let Some(active) = self.active.as_mut().filter(|a| a.context.is_some()) {
+            let response_id = &r["response"]["request_id"];
+            let cancel_response = r["type"] == "control_response"
+                && (!active.interrupt_id.is_empty()
+                    && response_id.as_str() == Some(active.interrupt_id.as_str())
+                    || !active.queue_cancel_id.is_empty()
+                        && response_id.as_str() == Some(active.queue_cancel_id.as_str()));
+            if !cancel_response {
+                match active
+                    .context
+                    .as_mut()
+                    .unwrap()
+                    .ingest(r, active.cancel.is_some())?
+                {
+                    Some(crate::claude_context::Step::Send(request)) => {
+                        self.commands
+                            .try_send(request)
+                            .context("Claude context command queue unavailable")?;
+                    }
+                    Some(crate::claude_context::Step::Finished(state, decision)) => {
+                        self.session_id = state["session_id"]
+                            .as_str()
+                            .context("Claude verified session missing")?
+                            .into();
+                        self.require_result_identity = state["require_result_identity"] == true;
+                        if let Some(id) = state["last_result_id"].as_str() {
+                            self.consumed.insert(id.into());
+                        }
+                        self.state = state;
+                        self.dirty = true;
+                        active.decision = Some(decision);
+                    }
+                    None => {}
+                }
+                return Ok(());
+            }
         }
         if r["type"] == "control_response"
             && self
@@ -680,6 +784,13 @@ impl Session {
                             .as_array()
                             .is_some_and(|ids| ids.iter().any(|id| id == &active.uuid)));
             if cancelled && active.decision.is_none() {
+                ensure!(
+                    active
+                        .context
+                        .as_ref()
+                        .is_none_or(|c| !c.has_effect_evidence()),
+                    "Claude queue cancellation contradicts context effect evidence"
+                );
                 self.require_result_identity = true;
                 self.state["require_result_identity"] = json!(true);
                 let mut decision = failure("cancelled", "claude_queued_cancelled", "");

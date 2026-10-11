@@ -16,6 +16,75 @@ PI=Path('C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@earendil-
 pytestmark=pytest.mark.skipif(os.environ.get('CCB_RUN_REAL_MODELS')!='1',reason='Explicit real-model opt-in required')
 
 
+def private_claude_context_config(tmp_path,base_url=None):
+    workspace=tmp_path/'workspace';workspace.mkdir()
+    home=tmp_path/'claude-home';home.mkdir()
+    return dict(provider='claude',driver_kind='claude_stream',profile_family='protocol_turn',workspace_path=str(workspace),
+        command=['C:/Users/user/.local/bin/claude.exe','-p','--input-format','stream-json','--output-format','stream-json',
+                 '--verbose','--replay-user-messages','--bare','--setting-sources','','--strict-mcp-config','--mcp-config','{"mcpServers":{}}','--tools',''],
+        env={'CLAUDE_CONFIG_DIR':str(home),'ANTHROPIC_API_KEY':'local-test-key' if base_url else '',
+             'ANTHROPIC_AUTH_TOKEN':'','CLAUDE_CODE_OAUTH_TOKEN':'',
+             'ANTHROPIC_BASE_URL':base_url or 'https://api.anthropic.com',
+             'DISABLE_AUTOUPDATER':'1','CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC':'1'},timeout_s=60)
+
+
+def test_real_claude_clear_and_empty_compact_without_model(tmp_path):
+    from test_native_restart import ready
+    from test_native_restart import settled as restart_settled
+    from test_native_context import control,settled
+    config=private_claude_context_config(tmp_path)
+    server=Server(tmp_path/'runtime/ccbd',{'worker':config})
+    try:
+        before=ready(server)
+        result=settled(server,control(server))
+        assert result['status']=='completed',result
+        assert ready(server)['runtime_instance_id']==before['runtime_instance_id']
+        restarted=restart_settled(server,server.rpc('restart',{'agent_names':['worker']})['reload'])
+        assert restarted['status']=='applied'
+        assert restarted['idle_provider_shutdown']['worker']['status']=='exited'
+        no_op=settled(server,control(server,'compact'))
+        assert no_op['results'][0]['completion_reason']=='claude_context_compaction_not_performed',no_op
+        assert settled(server,control(server))['status']=='completed'
+    finally:server.close()
+    restored=Server(server.root,{'worker':config})
+    try:
+        ready(restored)
+        no_op=settled(restored,control(restored,'compact'))
+        assert no_op['results'][0]['completion_reason']=='claude_context_compaction_not_performed',no_op
+        assert settled(restored,control(restored))['status']=='completed'
+    finally:restored.close()
+
+
+def test_real_claude_compact_against_local_protocol_backend(tmp_path):
+    """Exercises the actual CLI compactor; generated text comes from a local fixture."""
+    from stubs.anthropic_context_backend import Backend
+    from test_native_restart import ready
+    from test_native_context import control,settled
+    backend=Backend()
+    server=None
+    try:
+        config=private_claude_context_config(tmp_path,backend.url)
+        server=Server(tmp_path/'runtime/ccbd',{'worker':config})
+        for n in range(2):
+            receipt=submit(server,body='Disposable public context test. '*70+f' Reply to turn {n}.')
+            row=wait_result(server,receipt['job_id'])
+            assert row['status']=='completed',{'status':row['status'],'reason':row.get('completion_reason'),'paths':backend.paths}
+        before=ready(server);first=len(backend.responses)
+        result=settled(server,control(server,'compact'),timeout=60)
+        assert result['status']=='completed',result
+        assert len(backend.responses)>first,'Compaction must call the local fixture backend'
+        summaries=backend.responses[first:].copy()
+        assert ready(server)['runtime_instance_id']==before['runtime_instance_id']
+        next_request=len(backend.requests)
+        row=wait_result(server,submit(server,body='Continue after compaction.')['job_id'])
+        assert row['status']=='completed'
+        payloads=json.dumps(backend.requests[next_request:])
+        assert any(summary in payloads for summary in summaries),'CLI must use its generated compaction summary in later history'
+    finally:
+        if server:server.close()
+        backend.close()
+
+
 @pytest.mark.parametrize('kind',['pi','codex'])
 def test_real_context_clear_without_model_or_credentials(tmp_path,kind):
     """Only state/new-session RPCs; private empty homes, no model turn or auth copy."""

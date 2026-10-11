@@ -1,7 +1,7 @@
 # Native context controls — 2026-10-11
 
 Rust now owns asynchronous `clear` and `compact` commands for its persistent
-Pi RPC and Codex app-server runtimes. They use provider protocols directly and
+Pi RPC, Codex app-server and Claude stream-json runtimes. They use provider protocols directly and
 keep the provider process alive. They do not type slash commands into a terminal,
 submit a natural-language request to a model, erase provider histories, or copy
 resource trees. The installed account default remains Python.
@@ -10,7 +10,8 @@ resource trees. The installed account default remains Python.
 | --- | --- | --- | --- |
 | Pi 1.1.0 | `new_session`, then correlated `get_state` with a different session ID | Completed `compact` result, then same-session idle `get_state` | Real executable clear/restart and real-model compaction with subsequent memory check; fixtures cover cancellation, veto and failures |
 | Codex CLI 0.162.1 | `thread/start`, then correlated idle `thread/read` with a new thread ID | Fresh turn plus matching context-compaction item lifecycle, terminal turn and idle history read | Real executable clear/restart and real-model compaction with subsequent memory check; fixtures cover cancellation and failures |
-| Claude / other drivers | Not connected | Not connected | Explicitly blocked; no text-prompt or terminal fallback |
+| Claude Code 2.1.296+ | Verified built-in `/clear`, UUID-bound reset/lifecycle/result, actual new session and idle control response | Verified built-in `/compact`, manual boundary, UUID lifecycle/result and idle control response | Actual CLI clear/immediate resume and no-op compaction; successful CLI compaction against a local simulated model backend; authenticated Claude model validation remains open |
+| Other drivers | Not connected | Not connected | Explicitly blocked; no text-prompt or terminal fallback |
 
 ## Durable operations and usage
 
@@ -33,7 +34,7 @@ restart; a different action or target list cannot reuse the ID.
 The API accepts `clear` / `project_clear_context`, `compact` /
 `project_compact_context`, and `context-status`. Names, uniquely bound role IDs
 and `all` work; omitted names mean `all`. Preflight covers every target before
-admitting any Job. Unsupported, disabled, unavailable or busy targets block the
+admitting any Job. Unsupported driver types, disabled, unavailable or busy targets block the
 whole admission. Existing unfinished work, mailbox events, callback edges,
 outstanding replies and provider faults are checked using the same authority
 as reload/restart. Thus an idle Lead expecting a Worker reply cannot be cleared.
@@ -73,6 +74,14 @@ deprecated compaction-only notifications, or `{}` alone cannot finish the Job.
 Cancellation requests `turn/interrupt` only for the observed current turn.
 Pi cancellation uses `abort`; its installed source also aborts compaction.
 Cancellation cannot undo a clear that already completed successfully.
+
+Claude first verifies its built-in command catalogue, version and idle state.
+It then uses exact `/clear` or `/compact` stream-json input with a client UUID,
+requiring correlated lifecycle, replay, native result and post-command idle
+evidence. Clear binds the actual new `session_id`, not the display conversation
+ID; compaction also requires a manual boundary. See
+[the Claude context checkpoint](native-claude-context-20261011.md) for the
+protocol probes, no-op distinction, recovery fences and real-CLI test scope.
 
 Invalid or contradictory protocol evidence quarantines the provider and keeps
 the active Job unresolved. Provider exit without confirmation yields incomplete;
@@ -118,7 +127,7 @@ turn. Pi used a private test setting of 64 recent tokens so the small transcript
 could actually compact. These two cases passed in 41.10 seconds; the no-model
 clear/restart cases passed in 6.99 seconds.
 
-The affected context/Pi/Codex/recovery/restart/reload/view regression passed all
+At the Pi/Codex checkpoint, the context/recovery/restart/reload/view regression passed all
 117 selected cases in 257.18 seconds. Two added tests then verified that the
 empty-context marker is durably consumed while a new prompt is still running
 (both passed in 3.72 seconds). There are 25 dedicated context fixture cases.
@@ -126,7 +135,7 @@ Rust unit tests: 11 passed; formatting, clippy with warnings denied and diff
 checks passed. The full curated 697-case native inventory was collected, not
 executed; the last complete run remains the recorded 613-case baseline.
 
-Claude management, Herdr/original terminal UI integration, large-history limits,
+Authenticated Claude model/error-path validation, Herdr/original terminal UI integration, large-history limits,
 broader empty-startup recovery, old loaded-thread cleanup and a retention policy
 for context-operation receipts remain incomplete. The account installation and
 production default were not changed.

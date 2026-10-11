@@ -268,6 +268,7 @@ impl Daemon {
         Ok(())
     }
     pub fn unmount(&mut self) -> Result<()> {
+        let idle_shutdown = self.drain_idle_claude();
         self.pi.clear();
         self.codex.clear();
         self.claude.clear();
@@ -286,6 +287,9 @@ impl Daemon {
             .json("lifecycle.json")?
             .unwrap_or(Value::Null);
         if !lifecycle.is_null() {
+            if !idle_shutdown.is_empty() {
+                lifecycle["idle_provider_shutdown"] = json!(idle_shutdown);
+            }
             lifecycle["desired_state"] = json!("stopped");
             lifecycle["phase"] = json!("unmounted");
             lifecycle["phase_started_at"] = json!(now());
@@ -297,6 +301,48 @@ impl Daemon {
         }
         self.kernel.store.commit()?;
         Ok(())
+    }
+    fn drain_idle_claude(&mut self) -> Vec<Value> {
+        let mut pending = std::collections::BTreeMap::new();
+        for (name, session) in &mut self.claude {
+            if session.begin_idle_shutdown() {
+                pending.insert(
+                    name.clone(),
+                    json!({"agent_name":name,"provider":"claude","pid":session.pid(),
+                    "runtime_instance_id":session.runtime,"method":"stdin_eof"}),
+                );
+            }
+        }
+        let deadline = Instant::now() + crate::claude_stream::IDLE_SHUTDOWN_GRACE;
+        let mut results = Vec::new();
+        while !pending.is_empty() {
+            let names: Vec<_> = pending.keys().cloned().collect();
+            for name in names {
+                let outcome = match self.claude.get_mut(&name).unwrap().poll_idle_shutdown() {
+                    Ok(Some(value)) => Some(value),
+                    Ok(None) => None,
+                    Err(_) => Some(json!({"status":"observation_failed"})),
+                };
+                if let Some(outcome) = outcome {
+                    let mut row = pending.remove(&name).unwrap();
+                    row.as_object_mut()
+                        .unwrap()
+                        .extend(outcome.as_object().unwrap().clone());
+                    results.push(row);
+                }
+            }
+            if Instant::now() >= deadline {
+                for (_, mut row) in pending {
+                    row["status"] = json!("grace_expired");
+                    results.push(row);
+                }
+                break;
+            }
+            if !pending.is_empty() {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        }
+        results
     }
     fn names(&self) -> Vec<String> {
         self.config["agents"]

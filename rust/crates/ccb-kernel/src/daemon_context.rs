@@ -102,7 +102,8 @@ impl Daemon {
         for name in &names {
             let spec = &self.config["agents"][name];
             let owned = self.owned_view(name);
-            if !["pi_rpc", "codex_app_server"].contains(&spec["driver_kind"].as_str().unwrap_or(""))
+            if !["pi_rpc", "codex_app_server", "claude_stream"]
+                .contains(&spec["driver_kind"].as_str().unwrap_or(""))
             {
                 blockers.push(
                     json!({"agent_name":name,"reason":"native_context_protocol_unsupported"}),

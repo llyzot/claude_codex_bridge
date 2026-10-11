@@ -220,10 +220,9 @@ def test_daemon_death_keeps_unknown_control_fenced_until_reconciled(tmp_path,kin
 
 
 def test_context_inputs_and_unverified_provider_are_rejected_before_admission(tmp_path):
-    from test_native_claude_stream import claude_spec
-    server=Server(tmp_path/'state',{'worker':provider(tmp_path),'claude':claude_spec()})
+    server=Server(tmp_path/'state',{'worker':provider(tmp_path),'external':spec()})
     try:
-        ready(server);ready(server,'claude')
+        ready(server)
         for request in [{'dry_run':'false'},{'operation_id':123},{'operation_id':'x'},
                         {'agent_names':['all','worker']},{'agent_names':[None]},{'agent_names':['']}]:
             with pytest.raises(AssertionError):server.rpc('clear',request)

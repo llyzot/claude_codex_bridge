@@ -65,7 +65,11 @@ configuration retirement workflow; the record distinguishes `action: restart`.
 Validation uses real disposable Windows processes speaking provider fixture
 protocols. This is not evidence of real model inference, credentials, original
 provider terminal UI or live Herdr integration. Full native migration remains
-incomplete, including clear/compact and production default promotion.
+incomplete, including production default promotion. Subsequent context-control
+checkpoints implement Pi/Codex/Claude clear and compact. Idle Claude retirement
+now first closes stdin and waits within a bounded grace period so buffered
+transcripts can finish; restart/reload remain responsive during that wait. See
+[the Claude context checkpoint](native-claude-context-20261011.md).
 
 The 16 dedicated restart cases are included in the 79-case affected regression
 run (all passed, 160.34 seconds). After final CLI error-identity and view-label

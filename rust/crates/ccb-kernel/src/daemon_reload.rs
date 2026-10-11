@@ -4,13 +4,18 @@ use super::{now, Daemon};
 use crate::{records, Kernel};
 use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
-use std::{collections::BTreeSet, sync::mpsc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::mpsc,
+    time::Instant,
+};
 
 pub(super) struct Pending {
     config: Value,
     affected: Vec<String>,
     record: Value,
     prepared: mpsc::Receiver<bool>,
+    idle_claude: BTreeMap<String, Instant>,
 }
 
 fn hash(value: &Value) -> Result<String> {
@@ -552,6 +557,7 @@ impl Daemon {
             affected,
             record: record.clone(),
             prepared,
+            idle_claude: BTreeMap::new(),
         });
         if spawned.is_some_and(|value| value.is_err()) {
             self.fail_reload("workspace_preparation_unavailable")?;
@@ -583,12 +589,38 @@ impl Daemon {
             if !blockers(&mut self.kernel, &affected)?.is_empty() {
                 return self.fail_reload("work_appeared_during_preparation");
             }
+            let graceful: Vec<_> = affected
+                .iter()
+                .filter(|name| {
+                    self.claude
+                        .get(*name)
+                        .is_some_and(|s| s.can_idle_shutdown())
+                })
+                .cloned()
+                .collect();
             let pending = self.reload.as_mut().unwrap();
             pending.record["status"] = json!("retiring");
+            for name in &graceful {
+                pending.record["idle_provider_shutdown"][name] = json!({"method":"stdin_eof","status":"waiting",
+                    "grace_ms":crate::claude_stream::IDLE_SHUTDOWN_GRACE.as_millis()});
+            }
             let record = pending.record.clone();
             self.save_reload_record(&record)?;
             self.kernel.store.commit()?;
+            let deadline = Instant::now() + crate::claude_stream::IDLE_SHUTDOWN_GRACE;
             for agent in affected {
+                if graceful.contains(&agent) {
+                    ensure!(
+                        self.claude.get_mut(&agent).unwrap().begin_idle_shutdown(),
+                        "Claude idle retirement state changed"
+                    );
+                    self.reload
+                        .as_mut()
+                        .unwrap()
+                        .idle_claude
+                        .insert(agent, deadline);
+                    continue;
+                }
                 let owned = self.owned_view(&agent);
                 if !owned.is_null()
                     && owned["closed"] != true
@@ -599,6 +631,7 @@ impl Daemon {
             }
         }
         let affected = self.reload.as_ref().unwrap().affected.clone();
+        let mut all_closed = true;
         for agent in &affected {
             let result = if let Some(session) = self.pi.get_mut(agent) {
                 let prior = session.state.clone();
@@ -638,8 +671,43 @@ impl Daemon {
             }
             let owned = self.owned_view(agent);
             if !owned.is_null() && owned["closed"] != true {
-                return Ok(());
+                all_closed = false;
+                if self
+                    .reload
+                    .as_ref()
+                    .unwrap()
+                    .idle_claude
+                    .get(agent)
+                    .is_some_and(|deadline| Instant::now() >= *deadline)
+                {
+                    let pending = self.reload.as_mut().unwrap();
+                    pending.idle_claude.remove(agent);
+                    pending.record["idle_provider_shutdown"][agent]["status"] =
+                        json!("grace_expired");
+                    let record = pending.record.clone();
+                    self.save_reload_record(&record)?;
+                    self.kernel.store.commit()?;
+                    if self.send_tree_termination(agent).is_err() {
+                        return self.fail_reload("provider_retirement_failed");
+                    }
+                }
+            } else if self
+                .reload
+                .as_mut()
+                .unwrap()
+                .idle_claude
+                .remove(agent)
+                .is_some()
+            {
+                let pending = self.reload.as_mut().unwrap();
+                pending.record["idle_provider_shutdown"][agent]["status"] = json!("exited");
+                let record = pending.record.clone();
+                self.save_reload_record(&record)?;
+                self.kernel.store.commit()?;
             }
+        }
+        if !all_closed {
+            return Ok(());
         }
         if !blockers(&mut self.kernel, &affected)?.is_empty() {
             return self.fail_reload("work_appeared_before_publish");

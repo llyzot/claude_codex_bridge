@@ -47,6 +47,50 @@ pub fn project_id(root: &Path) -> Result<String> {
     let path = path.to_lowercase();
     Ok(format!("{:x}", Sha256::digest(path.as_bytes())))
 }
+pub fn state_root(root: &Path) -> Result<PathBuf> {
+    let id = project_id(root)?;
+    if let Some(home) = std::env::var_os("CCB_RUNTIME_STATE_HOME").filter(|s| !s.is_empty()) {
+        let home = expand_home(Path::new(&home))?;
+        ensure!(
+            home.is_absolute(),
+            "CCB_RUNTIME_STATE_HOME must be absolute"
+        );
+        return Ok(home.join(id).join("ccbd"));
+    }
+    let reference = root.join(".ccb/runtime-root-ref.json");
+    if reference.is_file() {
+        let value: Value = serde_json::from_slice(&std::fs::read(reference)?)?;
+        ensure!(
+            value["record_type"] == "ccb_runtime_root_ref" && value["project_id"] == id,
+            "runtime root reference does not belong to this project"
+        );
+        let path = expand_home(Path::new(
+            value["runtime_state_root"]
+                .as_str()
+                .context("runtime root reference missing path")?,
+        ))?;
+        ensure!(
+            path.is_absolute(),
+            "runtime root reference must be absolute"
+        );
+        return Ok(path.join("ccbd"));
+    }
+    Ok(root.join(".ccb/ccbd"))
+}
+fn expand_home(path: &Path) -> Result<PathBuf> {
+    if path.starts_with("~") {
+        let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+            .context("cannot expand account home")?;
+        return Ok(PathBuf::from(home).join(path.strip_prefix("~")?));
+    }
+    Ok(path.to_path_buf())
+}
+pub fn fingerprint(config: &Value) -> Result<String> {
+    let mut value = config.clone();
+    let fields = value.as_object_mut().context("config must be an object")?;
+    fields.remove("startup_id");
+    Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(&value)?)))
+}
 pub fn parse(text: &str) -> Result<Value> {
     if text.trim_start().starts_with('{') {
         return Ok(serde_json::from_str(text)?);

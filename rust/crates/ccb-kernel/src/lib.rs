@@ -13,6 +13,7 @@ mod completion_gate;
 pub mod config;
 pub mod control_plane;
 pub mod daemon;
+mod executables;
 mod finalization;
 mod lifecycle;
 pub mod models;
@@ -23,6 +24,7 @@ mod retry;
 pub mod rpc;
 mod scheduler;
 pub mod security;
+mod startup;
 pub mod store;
 
 use anyhow::{bail, ensure, Result};

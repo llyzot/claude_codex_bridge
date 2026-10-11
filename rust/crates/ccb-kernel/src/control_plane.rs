@@ -37,7 +37,15 @@ pub fn serve(root: &Path, token_path: &Path) -> Result<()> {
     serve_runtime(root, token_path, None, false)
 }
 pub fn serve_daemon(root: &Path, token_path: &Path, config: &Path, standalone: bool) -> Result<()> {
-    serve_runtime(root, token_path, Some(config), standalone)
+    serve_runtime(
+        root,
+        token_path,
+        Some(serde_json::from_slice(&fs::read(config)?)?),
+        standalone,
+    )
+}
+pub fn serve_config(root: &Path, token_path: &Path, config: Value) -> Result<()> {
+    serve_runtime(root, token_path, Some(config), true)
 }
 enum Runtime {
     Kernel(Box<Kernel>),
@@ -77,7 +85,7 @@ impl Runtime {
 fn serve_runtime(
     root: &Path,
     token_path: &Path,
-    config: Option<&Path>,
+    config: Option<Value>,
     standalone: bool,
 ) -> Result<()> {
     ensure!(
@@ -100,15 +108,17 @@ fn serve_runtime(
         .filter(|s| !s.is_empty())
         .context("missing token generation")?
         .to_owned();
-    if config.is_some() {
+    if let Some(value) = &config {
+        crate::daemon::Daemon::validate_config(value)?;
         crate::daemon::verify_owner(root)?;
         crate::security::own_process_tree()?;
     }
     let kernel = Kernel::open(root)?;
+    let public = config.is_some();
     let mut runtime = if let Some(config) = config {
         Runtime::Daemon(Box::new(crate::daemon::Daemon::new(
             kernel,
-            serde_json::from_slice(&fs::read(config)?)?,
+            config,
             &generation,
         )?))
     } else {
@@ -133,7 +143,7 @@ fn serve_runtime(
     let ready = json!({"service":"ccb-kernel","transport":"tcp_loopback","host":"127.0.0.1","port":listener.local_addr()?.port(),"generation":generation,"pid":std::process::id()});
     let mut descriptor = ready.clone();
     descriptor["token_ref"] = json!(token_path);
-    if config.is_some() {
+    if public {
         descriptor["public_api_version"] = json!(2);
     }
     runtime.mount(&descriptor)?;
@@ -177,7 +187,7 @@ fn serve_runtime(
         }
     });
     while !stop.load(Ordering::Acquire) {
-        if let Ok(event) = requests.recv_timeout(if config.is_some() {
+        if let Ok(event) = requests.recv_timeout(if public {
             Duration::from_millis(50)
         } else {
             Duration::from_secs(1)

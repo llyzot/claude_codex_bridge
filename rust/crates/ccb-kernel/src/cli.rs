@@ -94,9 +94,12 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
-    if args.is_empty() || args.first().is_some_and(|s| s == "--help") {
-        println!("ccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> ask <agent> --project <id> [--from <actor>] [--chain] [--silence] <message>\nccb-native --state-root <dir> ping|watch <target>|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native token-create <new-file>");
+    if args.first().is_some_and(|s| s == "--help") {
+        println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask <agent> [--from <actor>] [--chain] [--silence] <message>\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> ping|watch <target>|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
         return Ok(());
+    }
+    if args.is_empty() {
+        args.push("start".into());
     }
     if args[0] == "private-copy" {
         ensure!(
@@ -120,13 +123,17 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             return Ok(());
         }
         ensure!(
-            operation == "compile" && args.len() == 4,
-            "config compile requires project root and executable manifest"
+            operation == "compile" && (args.len() == 3 || args.len() == 4),
+            "config compile requires project root and optional executable manifest"
         );
         let root = Path::new(&args[2]).canonicalize()?;
         let document =
             crate::config::parse(&std::fs::read_to_string(root.join(".ccb/ccb.config"))?)?;
-        let executables: Value = serde_json::from_slice(&std::fs::read(Path::new(&args[3]))?)?;
+        let executables: Value = if args.len() == 4 {
+            serde_json::from_slice(&std::fs::read(Path::new(&args[3]))?)?
+        } else {
+            crate::executables::discover(&document)?
+        };
         println!("{}", crate::config::compile(&root, document, &executables)?);
         return Ok(());
     }
@@ -135,27 +142,130 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("{}", crate::security::create_token(Path::new(&args[1]))?);
         return Ok(());
     }
-    ensure!(
-        args.len() >= 3 && args[0] == "--state-root",
-        "native command requires --state-root <dir>"
-    );
-    let root = PathBuf::from(&args[1]);
-    args.drain(..2);
+    let mut explicit_root = None;
+    let mut project = None;
+    while args
+        .first()
+        .is_some_and(|a| a == "--state-root" || a == "--project")
+    {
+        ensure!(args.len() >= 2, "global option requires a directory");
+        if args[0] == "--state-root" {
+            explicit_root = Some(PathBuf::from(&args[1]));
+        } else {
+            project = Some(crate::config::project_root(Path::new(&args[1]))?);
+        }
+        args.drain(..2);
+    }
+    let inherited_root = if explicit_root.is_none() && project.is_none() {
+        std::env::var_os("CCB_NATIVE_TOKEN_FILE").and_then(|token| {
+            let token = PathBuf::from(token);
+            let kernel = token.parent()?;
+            (token.is_absolute() && kernel.file_name()? == "kernel")
+                .then(|| kernel.parent().map(Path::to_path_buf))
+                .flatten()
+        })
+    } else {
+        None
+    };
+    if project.is_none() && explicit_root.is_none() && inherited_root.is_none() {
+        project = Some(crate::config::project_root(&std::env::current_dir()?)?);
+    }
+    let root = explicit_root
+        .or(inherited_root)
+        .map(Ok)
+        .unwrap_or_else(|| {
+            crate::config::state_root(
+                project
+                    .as_deref()
+                    .context("native command requires a project or --state-root")?,
+            )
+        })?;
+    if args.is_empty() {
+        args.push("start".into());
+    }
     let op = args
         .remove(0)
         .into_string()
         .map_err(|_| anyhow::anyhow!("invalid command encoding"))?;
     if op == "daemon" {
-        ensure!(
-            args.len() == 2 && args[0] == "--config",
-            "daemon requires --config <json>"
-        );
+        let config = if args.len() == 1 && args[0] == "--config-stdin" {
+            let mut bytes = Vec::new();
+            std::io::stdin()
+                .lock()
+                .take(1024 * 1024 + 2)
+                .read_until(b'\n', &mut bytes)?;
+            ensure!(
+                bytes.len() <= 1024 * 1024 + 1 && bytes.last() == Some(&b'\n'),
+                "invalid native bootstrap frame"
+            );
+            serde_json::from_slice::<Value>(&bytes)?
+        } else {
+            ensure!(
+                args.len() == 2 && args[0] == "--config",
+                "daemon requires --config <json>"
+            );
+            serde_json::from_slice::<Value>(&std::fs::read(Path::new(&args[1]))?)?
+        };
+        crate::daemon::Daemon::validate_config(&config)?;
         crate::daemon::verify_owner(&root)?;
         let token = root
             .join("kernel")
             .join(format!("token-{}.json", uuid::Uuid::new_v4().simple()));
         crate::security::create_token(&token)?;
-        return crate::control_plane::serve_daemon(&root, &token, Path::new(&args[1]), true);
+        return crate::control_plane::serve_config(&root, &token, config);
+    }
+    if op == "start" {
+        let mut manifest = None;
+        let mut config_file = None;
+        let mut timeout = 15_000u64;
+        let mut i = 0;
+        while i < args.len() {
+            match arg(&args, i)? {
+                "--executables" => {
+                    i += 1;
+                    manifest = Some(PathBuf::from(
+                        args.get(i).context("--executables requires a file")?,
+                    ));
+                }
+                "--config" => {
+                    i += 1;
+                    config_file = Some(PathBuf::from(
+                        args.get(i).context("--config requires a file")?,
+                    ));
+                }
+                "--timeout-ms" => {
+                    i += 1;
+                    timeout = arg(&args, i)?.parse()?;
+                }
+                other => bail!("unknown start option: {other}"),
+            }
+            i += 1;
+        }
+        let config = if let Some(path) = config_file {
+            ensure!(
+                manifest.is_none(),
+                "--config cannot be combined with --executables"
+            );
+            serde_json::from_slice(&std::fs::read(path)?)?
+        } else {
+            let project = project
+                .clone()
+                .map(Ok)
+                .unwrap_or_else(|| crate::config::project_root(&std::env::current_dir()?))?;
+            let document =
+                crate::config::parse(&std::fs::read_to_string(project.join(".ccb/ccb.config"))?)?;
+            let executables = if let Some(path) = manifest {
+                serde_json::from_slice(&std::fs::read(path)?)?
+            } else {
+                crate::executables::discover(&document)?
+            };
+            crate::config::compile(&project, document, &executables)?
+        };
+        println!(
+            "{}",
+            crate::startup::start(&root, config, Duration::from_millis(timeout))?
+        );
+        return Ok(());
     }
     let payload = match op.as_str() {
         "ping" | "stop" => json!({}),
@@ -209,8 +319,11 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         }
         "ask" => {
             let target = arg(&args, 0)?.to_owned();
-            let mut project = None;
-            let mut actor = "user".to_owned();
+            let mut project_id = project
+                .as_deref()
+                .map(crate::config::project_id)
+                .transpose()?;
+            let mut actor = std::env::var("CCB_AGENT_NAME").unwrap_or_else(|_| "user".to_owned());
             let mut chain = false;
             let mut silence = false;
             let mut body = Vec::new();
@@ -220,7 +333,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
                 match value {
                     "--project" => {
                         i += 1;
-                        project = Some(arg(&args, i)?.to_owned());
+                        project_id = Some(arg(&args, i)?.to_owned());
                     }
                     "--from" => {
                         i += 1;
@@ -240,7 +353,15 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
                 }
                 i += 1;
             }
-            json!({"project_id":project.context("ask requires --project <id>")?,"to_agent":target,"from_actor":actor,"body":body.join(" "),"delivery_scope":if target=="all" {"broadcast"} else {"single"},"silence_on_success":silence,"route_options":if chain {json!({"mode":"chain"})} else {json!({})}})
+            let project_id = if let Some(id) = project_id {
+                id
+            } else {
+                request(&root, "ping", json!({}))?["project_id"]
+                    .as_str()
+                    .context("daemon project identity missing")?
+                    .to_owned()
+            };
+            json!({"project_id":project_id,"to_agent":target,"from_actor":actor,"body":body.join(" "),"delivery_scope":if target=="all" {"broadcast"} else {"single"},"silence_on_success":silence,"route_options":if chain {json!({"mode":"chain"})} else {json!({})}})
         }
         _ => bail!("unsupported native command: {op}"),
     };

@@ -101,7 +101,14 @@ fn native_arguments(executable: &Path, mut args: Vec<OsString>) -> Result<Vec<Os
         .to_ascii_lowercase();
     match stem.as_str() {
         "ccb"|"ccb-windows-launcher"=>Ok(args),
-        "ask"=>{if args.len()<2 || args[0]!="--state-root" {return Err("Native ask requires --state-root <directory> before target arguments".into());}args.insert(2,OsString::from("ask"));Ok(args)},
+        "ask"=>{
+            let mut prefix = 0;
+            while args.get(prefix).is_some_and(|s|s=="--state-root" || s=="--project") {
+                if args.get(prefix+1).is_none() {return Err("Native ask directory option requires a value".into());}
+                prefix += 2;
+            }
+            args.insert(prefix,OsString::from("ask"));Ok(args)
+        },
         _=>Err(format!("Native CLI does not yet support launcher {stem}; do not select CCB_NATIVE_CLI for this command")),
     }
 }

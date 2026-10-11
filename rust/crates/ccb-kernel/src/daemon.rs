@@ -73,22 +73,14 @@ impl Drop for Daemon {
     }
 }
 impl Daemon {
-    pub fn new(mut kernel: Kernel, config: Value, generation: &str) -> Result<Self> {
+    pub fn validate_config(config: &Value) -> Result<()> {
         ensure!(
-            config["schema_version"] == 2 && !records::string(&config, "project_id")?.is_empty(),
+            config["schema_version"] == 2 && !records::string(config, "project_id")?.is_empty(),
             "invalid native daemon config"
         );
         let agents = config["agents"]
             .as_object()
             .context("daemon agents must be an object")?;
-        let prior = kernel.store.json("lease.json")?.unwrap_or(Value::Null);
-        if !prior.is_null() && prior["mount_state"] != "unmounted" {
-            let pid = prior["ccbd_pid"].as_u64().unwrap_or(0);
-            ensure!(
-                pid > 0 && pid <= u32::MAX as u64 && owner_stopped(pid as u32),
-                "existing daemon ownership is live or cannot be proven stopped"
-            );
-        }
         ensure!(
             !agents.is_empty() && agents.len() <= 32,
             "daemon requires 1 to 32 agents"
@@ -98,6 +90,13 @@ impl Daemon {
             ensure!(
                 !records::string(spec, "provider")?.is_empty(),
                 "empty agent provider"
+            );
+            ensure!(
+                spec["env"].is_null()
+                    || spec["env"]
+                        .as_object()
+                        .is_some_and(|env| env.values().all(Value::is_string)),
+                "native provider environment must contain string values"
             );
             ensure!(
                 spec["command"].is_null() || spec["command"].is_array(),
@@ -147,6 +146,19 @@ impl Daemon {
                     "invalid command driver argv"
                 );
             }
+        }
+        Ok(())
+    }
+    pub fn new(mut kernel: Kernel, config: Value, generation: &str) -> Result<Self> {
+        Self::validate_config(&config)?;
+        let agents = config["agents"].as_object().unwrap();
+        let prior = kernel.store.json("lease.json")?.unwrap_or(Value::Null);
+        if !prior.is_null() && prior["mount_state"] != "unmounted" {
+            let pid = prior["ccbd_pid"].as_u64().unwrap_or(0);
+            ensure!(
+                pid > 0 && pid <= u32::MAX as u64 && owner_stopped(pid as u32),
+                "existing daemon ownership is live or cannot be proven stopped"
+            );
         }
         let state = format!("daemon-{generation}");
         let names = agents.keys().cloned().collect::<Vec<_>>();
@@ -306,7 +318,8 @@ impl Daemon {
     fn dispatch(&mut self, op: &str, p: &Value) -> Result<Value> {
         match op {
             "ping" => Ok(
-                json!({"service":"ccbd","runtime":"rust","project_id":self.config["project_id"],"pid":std::process::id(),"status":"running"}),
+                json!({"service":"ccbd","runtime":"rust","project_id":self.config["project_id"],"pid":std::process::id(),"status":"running",
+                    "startup_id":self.config["startup_id"],"config_fingerprint":crate::config::fingerprint(&self.config)?}),
             ),
             "submit" => self.submit(p),
             "watch" => self.watch(p),
@@ -1227,7 +1240,7 @@ impl Daemon {
     }
 }
 #[cfg(windows)]
-fn owner_stopped(pid: u32) -> bool {
+pub(crate) fn owner_stopped(pid: u32) -> bool {
     use std::ffi::c_void;
     #[link(name = "kernel32")]
     extern "system" {
@@ -1249,7 +1262,7 @@ fn owner_stopped(pid: u32) -> bool {
     }
 }
 #[cfg(not(windows))]
-fn owner_stopped(pid: u32) -> bool {
+pub(crate) fn owner_stopped(pid: u32) -> bool {
     std::path::Path::new("/proc").is_dir()
         && std::fs::metadata(format!("/proc/{pid}"))
             .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)

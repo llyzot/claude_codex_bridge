@@ -94,12 +94,15 @@
     "Owned Claude cancellation/deadlines journal intent before interrupt controls, bind response IDs and user UUIDs, and distinguish acknowledgement from exact queued-message removal or terminal result evidence",
     "Claude results enforce available user UUID attribution and require it after queued cancellation across restarts; terminal abort reasons, error arrays, silent policy and no-retry intent retain their semantics",
     "Claude exit fallback waits for stdout EOF after process exit, preserves a buffered valid result, and keeps the daemon available without admitting work into a dead process",
-    "Installed Claude Code 2.1.296 accepted private no-model initialize/idle-interrupt and direct idle-interrupt controls without user prompts or login changes"
+    "Installed Claude Code 2.1.296 accepted private no-model initialize/idle-interrupt and direct idle-interrupt controls without user prompts or login changes",
+    "Native CLI discovers project configuration and existing Pi/Codex/Claude executables, infers normal ask project/sender context and follows project/runtime-home/reference state placement",
+    "Background native startup uses a private configuration pipe, cross-process launch lock, durable startup UUID/PID/config fingerprint and authenticated readiness; matching live daemons are reused and observation expiry does not restart them",
+    "Windows startup fences caller standard handle inheritance, preserves background lifetime, rejects invalid configuration before runtime writes and protects live foreign or changed-config owners"
   ],
   "remaining": [
     "Finish ordinary terminal-result recovery and explicit cancellation/termination orchestration; reconcile uncertain running executions after daemon restart",
     "Migrate Git tree observation, provider completion/control adapters and remaining failure-notice orchestration",
-    "Complete public API-2/CLI/config-schema parity and keeper/startup integration; verify non-Windows process lifetime and default native routing",
+    "Complete public API-2/CLI/config-schema/worktree/role parity and full Keeper/reload integration; verify non-Windows process lifetime and default native routing",
     "Finish native CLI/provider command composition and installer integration after interface parity",
     "Finish interrupted-running-task reconciliation and Herdr attachment; add Claude hooks/interactive requests; validate real Codex/Claude interruption and interactive requests plus graphical approval UI integration",
     "Verify actual Claude Lead callback with credentials and actual Herdr-integrated Pi/Codex execution in isolated Windows projects",
@@ -108,6 +111,10 @@
     "Remove transitional Python core dependencies after native runtime parity is proven"
   ],
   "verification": {
+    "native_project_startup": "12 final-release startup cases passed: parent/captured-pipe return and background lifetime, inferred project ask, idempotent start, config/foreign-owner rejection, zero-observation reuse of same startup PID/UUID, compact nested project config, both state relocations, discovery without execution, invalid preflight without writes, concurrent start and Agent environment context",
+    "startup_current_suite": "Release suite 206 cases: 205 passed and one Windows metadata-open sharing transient in the test observer. Observer now retries the same confirmed-live process; all 26 startup/Claude-control cases passed after repair. Rust tests 7 and clippy warnings denied; Windows launcher Rust 3 and entry/packaging tests 14 passed",
+    "native_installed_discovery": "Read-only config compilation in a new temp project resolved existing Node + earendil Pi entry, native Codex vendor exe and local Claude exe without a manifest; no provider or model launched",
+    "startup_handle_regression": "Reproduced detached child retaining caller captured stdout after parent exit; stopped only that verified test runtime and repaired standard handle inheritance. Startup tests then returned and cleaned owned daemons normally",
     "claude_controls": "14 final-release cases passed: durable/idempotent silent cancel, ack/error/foreign-result fencing, UUID-specific queued cancellation and targeted fallback, deadlines, natural/failure outcome preservation without retry, process-exit/EOF behavior, daemon-death intent retention, repeated restart attribution, buffered valid result after exit",
     "native_claude_controls_release": "Complete final release kernel/CLI suite 194 passed; Rust tests 7 passed and clippy warnings denied. No new real-model inference was invoked",
     "claude_installed_idle_control": "Installed Claude Code 2.1.296 accepted private initialize plus interrupt(cancel_queued=true), and a separate private interrupt without initialize; success receipts had still_queued=[] and cancelled=[]. No user prompt/model task or user credential/environment change",
@@ -131,7 +138,7 @@
     "result_policy_differential": "14 retry/notice cases match the existing Python oracle, including boolean policy opt-out and structured permission code precedence over auth message text",
     "result_policy_integration": "56 existing retry/empty-result/callback/finalization cases passed in native mode",
     "daemon_scope": "Real model-backed Pi Lead/Codex Worker automatic callback verified; native Claude protocol and actual unauthenticated failure verified, but successful Claude inference and Herdr execution remain unverified. Unknown prior running executions remain fenced, not automatically replayed",
-    "native_contract_tests": 194,
+    "native_contract_tests": 206,
     "native_claude_release": "All 6 Claude stream contracts passed on final release; complete debug contract suite 130 passed; Rust tests 5 passed and clippy warnings denied",
     "native_provider_suite": "Complete debug suite 123 passed before adding delayed-idle case; all 15 final Pi/Codex provider contracts passed on final release; Rust 5 passed and clippy warnings denied",
     "native_cli_pi_release": "8 CLI/security/Pi RPC cases passed on final release executables, including installed Pi get_state handshake; final debug contract suite 114 passed",

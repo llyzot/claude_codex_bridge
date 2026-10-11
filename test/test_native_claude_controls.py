@@ -185,7 +185,13 @@ def test_result_attribution_requirement_survives_repeated_clean_restarts(tmp_pat
         try:
             deadline = time.monotonic() + 3
             while time.monotonic() < deadline:
-                metadata = json.loads(path.read_text())
+                assert restored.proc.poll() is None, restored.proc.stderr.read()
+                try:
+                    metadata = json.loads(path.read_text())
+                except OSError:
+                    # Atomic Windows replacement can transiently reject an open.
+                    time.sleep(.025)
+                    continue
                 if metadata['runtime_instance_id'] != prior_runtime:
                     break
                 time.sleep(.025)

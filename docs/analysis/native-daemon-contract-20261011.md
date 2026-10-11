@@ -10,6 +10,15 @@ The supplied token follows the existing `ccbd-control-plane-token-v1` contract. 
 
 The config has `schema_version: 2`, a `project_id`, and an `agents` object. Each entry declares `provider`, an optional `profile_family`, optional `workspace_path`, and either a `command` argv array or no command for externally claimed work. The current format is an internal checkpoint format; conversion from the full existing CCB config is not complete.
 
+Project-native `ccb-native start` now finds existing configuration above the
+working directory, discovers installed provider executables, compiles the
+supported configuration and bootstraps a standalone child through stdin.
+Ordinary `ask` infers project identity and the scoped Agent sender. Matching live
+starts are reused; readiness uses a startup UUID, PID, config fingerprint and
+authenticated ping. Observation expiry preserves a live starting process.
+See [project startup checkpoint](native-project-startup-20261011.md) for paths,
+commands, handle inheritance and remaining Keeper/config/Herdr scope.
+
 ## Verified behavior
 
 - Public API-2 requests keep the existing `{api_version, op, request}` and flattened success/error envelope. The current operations are ping, submit, watch, queue, retry, inbox, mailbox-head, work, complete, cancel, provider-requests, provider-respond and shutdown. Complete operation/output-shape parity is not yet claimed. Cancellation controls are implemented for owned Pi, Codex and Claude sessions; explicit Codex interaction is available through native pending/respond commands.

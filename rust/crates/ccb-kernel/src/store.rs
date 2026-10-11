@@ -50,6 +50,8 @@ enum WriteOp {
 }
 pub struct Store {
     root: PathBuf,
+    agent_journal_lock: RefCell<Option<File>>,
+    known_controller: bool,
     _lock: File,
     staged: HashMap<String, Option<Vec<u8>>>,
     writes: Vec<WriteOp>,
@@ -65,6 +67,14 @@ impl Store {
         reject_link(&root.join("kernel"))?;
         reject_link(&root.join("kernel/writer.lock"))?;
         reject_link(&root.join("kernel/pending.json"))?;
+        let known_controller = [
+            "kernel/pending.json",
+            "lease.json",
+            "configuration.json",
+            "messages/messages.jsonl",
+        ]
+        .iter()
+        .any(|path| root.join(path).exists());
         let lock = OpenOptions::new()
             .read(true)
             .write(true)
@@ -76,6 +86,8 @@ impl Store {
         let mut store = Self {
             root,
             _lock: lock,
+            agent_journal_lock: RefCell::new(None),
+            known_controller,
             staged: HashMap::new(),
             writes: Vec::new(),
             latest_indices: RefCell::new(HashMap::new()),
@@ -159,6 +171,10 @@ impl Store {
                     );
                 }
             }
+        }
+        if agent_log && self.agent_journal_lock.borrow().is_none() {
+            let held = crate::agent_journal::claim(&self.root, self.known_controller)?;
+            *self.agent_journal_lock.borrow_mut() = Some(held);
         }
         Ok(full)
     }
@@ -425,6 +441,16 @@ impl Store {
         let path = self.root.join("kernel/pending.json");
         if path.exists() {
             let ops: Vec<WriteOp> = serde_json::from_slice(&fs::read(&path)?)?;
+            // Validate every ownership boundary before replaying any member of
+            // the transaction, including a prior message write ahead of a Job.
+            for op in &ops {
+                let target = match op {
+                    WriteOp::Save { path, .. }
+                    | WriteOp::Append { path, .. }
+                    | WriteOp::Remove { path } => path,
+                };
+                self.path(target)?;
+            }
             for op in &ops {
                 self.apply(op)?;
             }

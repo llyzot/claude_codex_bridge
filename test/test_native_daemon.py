@@ -52,7 +52,7 @@ def spec(mode=None):
 def servers(tmp_path):
     active=[]
     def create(agents,**options):
-        root=tmp_path/f'state-{len(active)}'
+        root=tmp_path/f'runtime-{len(active)}'/'ccbd'
         server=Server(root,agents,**options)
         active.append(server)
         return server

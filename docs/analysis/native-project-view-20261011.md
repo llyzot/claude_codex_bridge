@@ -64,9 +64,10 @@ state at `runtime-parent/ccbd`. Independent services must use distinct runtime
 parents. A test initially used a controller directory directly below the shared
 OS temp root and saw old test journals; the fixture now isolates the entire
 runtime parent. Startup and view projection reject foreign-project Job records.
-This consistency check does not supply a cross-root writer lock for unsupported
-alternate controller directories that share the same parent; that isolation
-case still needs a dedicated ownership fence before broad promotion.
+The subsequent [Agent journal authority](native-agent-journal-authority-20261011.md)
+checkpoint adds a shared-parent lock and persistent controller binding. Current
+writers reject alternate controllers against the same Agent journals rather
+than treating separate controller-local locks as sufficient isolation.
 
 Validation uses disposable native services and fixture providers. It covers
 stable/read-only projections, queue/running/callback/delivery/fault/approval

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import atexit
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 from functools import wraps
 import json
 import os
@@ -218,11 +218,18 @@ def legacy_writer(layout):
     """Use the same OS lock as Rust for transitional Python mailbox writes."""
     path = layout.ccbd_dir / 'kernel' / 'writer.lock'
     key = str(path.resolve())
+    controller=layout.ccbd_dir.resolve()
+    expected_agents=controller.parent/'agents'
+    actual_agents=getattr(layout,'agents_dir',expected_agents)
+    if Path(actual_agents).resolve()!=expected_agents.resolve():
+        raise KernelUnavailable('Agent journal layout does not match the controller parent')
     with _legacy_lock:
         held = getattr(_legacy_local, 'held', set())
         if key in held:
             yield
             return
+        known_controller=any((layout.ccbd_dir/name).exists() for name in [
+            'kernel/pending.json','lease.json','configuration.json','messages/messages.jsonl'])
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open('a+b') as handle:
             handle.seek(0)
@@ -238,12 +245,18 @@ def legacy_writer(layout):
                 acquire()
             except OSError as error:
                 raise KernelUnavailable('Mailbox state has an active writer; Python write rejected') from error
-            held.add(key)
-            _legacy_local.held = held
             try:
-                yield
+                from storage.agent_journal_authority import agent_journal_authority
+                with ExitStack() as claims:
+                    try:
+                        claims.enter_context(agent_journal_authority(layout.ccbd_dir,known_controller=known_controller))
+                    except (OSError,ValueError) as error:
+                        raise KernelUnavailable('Agent journal ownership rejected the Python write') from error
+                    held.add(key)
+                    _legacy_local.held = held
+                    try:yield
+                    finally:held.remove(key)
             finally:
-                held.remove(key)
                 release()
 
 

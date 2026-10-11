@@ -1,4 +1,5 @@
 mod admission;
+mod agent_journal;
 mod artifacts;
 mod bureau;
 mod callback;

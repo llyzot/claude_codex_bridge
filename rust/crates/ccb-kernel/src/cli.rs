@@ -136,6 +136,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
         println!("ccb-native installation upgrade|recover|rollback --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]\nccb-native installation status --prefix <directory>");
         println!("ccb-native --state-root <dir> view [--limit <1..64>]");
+        println!("ccb-native [--project <directory>] trace <submission|message|attempt|reply|job ID> [--limit <1..1000>] [--offset <n>]");
         println!("ccb-native codex-tui-attach <host-directory> (experimental native Codex TUI)");
         println!("ccb-native [--project <directory>] herdr open [--herdr-exe <path>] [--session <name>] [--options <json>] [--no-attach] [--timeout-ms <0..60000>] [--dry-run] [--recover-stopped]");
         println!("ccb-native --state-root <dir> clear|compact [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> context-status <operation-id>");
@@ -688,6 +689,23 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     }
     if op == "clear" || op == "compact" {
         return crate::cli_context::run(&root, &op, &args);
+    }
+    if op == "trace" {
+        ensure!(!args.is_empty(), "trace requires an ID");
+        let mut payload = json!({"target":arg(&args,0)?});
+        let mut i = 1;
+        while i < args.len() {
+            let key = match arg(&args, i)? {
+                "--limit" => "limit",
+                "--offset" => "offset",
+                _ => bail!("unsupported trace option"),
+            };
+            ensure!(payload[key].is_null(), "duplicate trace option");
+            payload[key] = json!(arg(&args, i + 1)?.parse::<u64>()?);
+            i += 2;
+        }
+        println!("{}", request_preview(&request(&root, "trace", payload)?));
+        return Ok(());
     }
     let payload = match op.as_str() {
         "context-status" => {

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "base_commit": "15961f4d",
+  "recorded_at": "2026-10-11T19:04:56.851685+00:00",
+  "scope": "Native diagnostic API/CLI trace; no model inference or production install changes",
+  "python_oracles": [
+    "lib/message_bureau/control_trace_runtime/summaries.py",
+    "lib/message_bureau/control_trace_runtime/service.py"
+  ],
+  "final_release_sha256": {
+    "ccb-kernel.exe": "77b6cb995a8328bc3266e493f368d3abd9c872515bab9d5b63d6d63e1a182d28",
+    "ccb-native.exe": "da0ed2edf7d9c2a6948fdc7ff5f00ddc0f54510190aa7af31c342be51106d590"
+  },
+  "production_install_changed": false,
+  "repository_bin_matches_release": true,
+  "verification": {
+    "selected_suite": "66 passed in 93.41s",
+    "rust_unit_tests": "25 passed; one helper invoked by its parent",
+    "format_clippy_diff": "passed",
+    "initial_red": "unsupported native daemon operation: trace"
+  }
+}

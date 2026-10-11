@@ -23,6 +23,8 @@ mod herdr;
 mod project_view;
 #[path = "daemon_reload.rs"]
 mod reload;
+#[path = "trace.rs"]
+mod trace;
 
 pub fn validate_startup(kernel: &mut Kernel, config: &Value) -> Result<()> {
     reload::startup_guard(kernel, config)
@@ -475,6 +477,7 @@ impl Daemon {
             }).collect::<Vec<_>>()})),
             "submit" => self.submit(p),
             "watch" => self.watch(p),
+            "trace" => self.trace(p),
             "queue" => {
                 let target = p["target"].as_str().unwrap_or("all");
                 let mut queues = Vec::new();

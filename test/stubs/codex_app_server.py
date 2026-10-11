@@ -4,12 +4,19 @@ import sys
 import os
 import time
 import threading
+from pathlib import Path
 
 mode=sys.argv[1]
 thread_id='thread-fixture'
 turns=[]
 read_count=0
 lock=threading.Lock()
+skill_roots=[]
+loaded_skills=[]
+
+def skill_behavior():
+    path=os.environ.get('CCB_SKILL_BEHAVIOR')
+    return Path(path).read_text().strip() if path and Path(path).exists() else ''
 def emit(value):
     with lock:print(json.dumps(value),flush=True)
 def trace(command):
@@ -32,7 +39,34 @@ for line in sys.stdin.buffer:
     elif method in {'thread/start','thread/resume'}:
         if method=='thread/resume':thread_id=command['params']['threadId']
         response(command,{'thread':thread()})
+    elif method=='skills/extraRoots/set':
+        behavior=skill_behavior()
+        if behavior=='bad-envelope':
+            emit({'id':command['id'],'result':None})
+            continue
+        if behavior=='reject-set':
+            emit({'id':command['id'],'error':{'code':-1,'message':'SECRET_SKILL_ERROR'}})
+            continue
+        skill_roots=command['params']['extraRoots']
+        loaded_skills=[]
+        if behavior=='delay-set':later(.6,lambda cmd=command:response(cmd,{}))
+        else:response(command,{})
+    elif method=='skills/list':
+        assert command['params']['forceReload'] is True
+        behavior=skill_behavior()
+        loaded_skills=[dict(name=Path(root).name,path=str(Path(root)/'SKILL.md'),enabled=behavior!='disabled') for root in skill_roots]
+        if behavior=='missing':loaded_skills=[]
+        data={'data':[dict(cwd='C:/not-the-workspace' if behavior=='wrong-cwd' else command['params']['cwds'][0],skills=loaded_skills,errors=[])]}
+        if behavior=='reject-list':emit({'id':command['id'],'error':{'code':-1,'message':'SECRET_SKILL_ERROR'}})
+        elif behavior=='malformed':response(command,{'data':None})
+        elif behavior in {'delay-list','foreign'}:
+            if behavior=='foreign':
+                emit({'id':'foreign-skill-list','result':data})
+                emit(dict(method='turn/completed',params=dict(threadId=thread_id,turn=dict(id='foreign',status='completed',items=[]))))
+            later(.6,lambda cmd=command,data=data:response(cmd,data))
+        else:response(command,data)
     elif method=='turn/start':
+        assert len(loaded_skills)==len(skill_roots)
         turn_id=f'turn-{len(turns)+1}'
         completed=dict(id=turn_id,status='completed',items=[{'type':'agentMessage','id':'final','phase':'final_answer','text':'Codex final result'}],error=None)
         if mode.startswith('cancel-') and not turns:

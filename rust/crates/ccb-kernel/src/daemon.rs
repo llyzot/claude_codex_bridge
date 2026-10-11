@@ -1279,20 +1279,24 @@ impl Daemon {
         self.kernel.dispatch("scheduler.mark_active_for",&json!({"state_id":self.state,"target_kind":"agent","target_name":agent,"job_id":job["job_id"]}))?;
         Ok(job)
     }
-    fn provider_prompt(&mut self, agent: &str, job: &Value) -> Result<Option<String>> {
+    fn provider_prompt(
+        &mut self,
+        agent: &str,
+        job: &Value,
+    ) -> Result<Option<crate::roles::Prepared>> {
         let spec = self.spec(agent)?;
         let project = self.config["project_root"]
             .as_str()
             .or(spec["workspace_path"].as_str())
             .map(std::path::Path::new);
         match crate::roles::prompt(&spec, project, records::string(&job["request"], "body")?) {
-            Ok((prompt, metadata)) => {
-                if !metadata.is_null() {
+            Ok(prompt) => {
+                if !prompt.audit.is_null() {
                     admission::event(
                         &mut self.kernel,
                         job,
                         "role_context_loaded",
-                        metadata,
+                        prompt.audit.clone(),
                         &now(),
                     )?;
                     self.kernel.store.commit()?;
@@ -1303,7 +1307,7 @@ impl Daemon {
                 // A bad role file is a task configuration failure, not a broken
                 // provider session. Never log parser excerpts or memory content.
                 let mut decision = failure("failed", "role_context_invalid",
-                    "Role memory could not be loaded. Check the installed role manifest, declared files, UTF-8 encoding and size limits, then submit again.");
+                    "Role context could not be loaded. Check the installed role manifest, declared files, UTF-8 encoding and size limits, then submit again.");
                 decision["diagnostics"] = json!({"completion_authority":"native_role_context",
                     "provider_prompt_sent":false,"configuration_error":true});
                 self.complete(job, &decision)?;
@@ -1625,7 +1629,9 @@ impl Daemon {
                         let Some(prompt) = self.provider_prompt(&agent, &job)? else {
                             continue;
                         };
-                        if let Err(error) = self.pi.get_mut(&agent).unwrap().start(&job, &prompt) {
+                        if let Err(error) =
+                            self.pi.get_mut(&agent).unwrap().start(&job, &prompt.text)
+                        {
                             self.record_provider_fault(&agent, "start", &error)?;
                             let session = self.pi.get_mut(&agent).unwrap();
                             session.quarantine(session.state.clone());
@@ -1738,8 +1744,11 @@ impl Daemon {
                         let Some(prompt) = self.provider_prompt(&agent, &job)? else {
                             continue;
                         };
-                        if let Err(error) = self.codex.get_mut(&agent).unwrap().start(&job, &prompt)
-                        {
+                        if let Err(error) = self.codex.get_mut(&agent).unwrap().start(
+                            &job,
+                            &prompt.text,
+                            prompt.skill_roots,
+                        ) {
                             self.record_provider_fault(&agent, "start", &error)?;
                             let session = self.codex.get_mut(&agent).unwrap();
                             session.quarantine(session.state.clone());
@@ -1854,8 +1863,11 @@ impl Daemon {
                         let Some(prompt) = self.provider_prompt(&agent, &job)? else {
                             continue;
                         };
-                        if let Err(error) =
-                            self.claude.get_mut(&agent).unwrap().start(&job, &prompt)
+                        if let Err(error) = self
+                            .claude
+                            .get_mut(&agent)
+                            .unwrap()
+                            .start(&job, &prompt.text)
                         {
                             self.record_provider_fault(&agent, "start", &error)?;
                             let session = self.claude.get_mut(&agent).unwrap();

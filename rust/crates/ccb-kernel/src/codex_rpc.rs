@@ -8,6 +8,7 @@ use std::{
     time::Instant,
 };
 struct Active {
+    skills: Option<crate::codex_skills::Load>,
     job: Value,
     start: String,
     turn: String,
@@ -38,6 +39,7 @@ enum StreamEvent {
     End,
 }
 pub struct Session {
+    role_skills_bound: bool,
     child: crate::owned_process::OwnedChild,
     commands: mpsc::SyncSender<Value>,
     events: mpsc::Receiver<StreamEvent>,
@@ -178,6 +180,7 @@ impl Session {
                 String::new()
             };
         Ok(Self {
+            role_skills_bound: false,
             child,
             commands,
             events,
@@ -208,7 +211,12 @@ impl Session {
             Err(error) => Err(error).context("Codex command queue unavailable"),
         }
     }
-    pub fn start(&mut self, job: &Value, prompt: &str) -> Result<()> {
+    pub fn start(
+        &mut self,
+        job: &Value,
+        prompt: &str,
+        skill_roots: Option<Vec<std::path::PathBuf>>,
+    ) -> Result<()> {
         ensure!(
             self.ready && self.active.is_none(),
             "Codex session is not idle"
@@ -226,8 +234,23 @@ impl Session {
         params.insert("threadId".into(), self.state["thread_id"].clone());
         params.insert("clientUserMessageId".into(), job["job_id"].clone());
         params.insert("input".into(),json!([{"type":"text","text":format!("CCB_REQ_ID: {}\n{}",job["job_id"].as_str().unwrap_or(""),prompt)}]));
-        self.send(json!({"id":start,"method":"turn/start","params":params}))?;
+        let turn = json!({"id":start,"method":"turn/start","params":params});
+        let skills = if let Some(roots) =
+            skill_roots.filter(|roots| !roots.is_empty() || self.role_skills_bound)
+        {
+            let cwd = self.spec["workspace_path"]
+                .as_str()
+                .map(std::path::PathBuf::from)
+                .unwrap_or(std::env::current_dir()?);
+            let load = crate::codex_skills::Load::new(&start, roots, cwd, turn);
+            self.send(load.request())?;
+            Some(load)
+        } else {
+            self.send(turn)?;
+            None
+        };
         self.active = Some(Active {
+            skills,
             job: job.clone(),
             start,
             turn: String::new(),
@@ -444,6 +467,9 @@ impl Session {
         let Some(active) = self.active.as_mut() else {
             return self.send(reject("No native task owns this request"));
         };
+        if active.skills.is_some() {
+            return self.send(reject("No Codex turn exists during role skill preparation"));
+        }
         if active.turn.is_empty() {
             ensure!(
                 active.buffer.len() < 256,
@@ -604,6 +630,43 @@ impl Session {
         let Some(active) = self.active.as_mut() else {
             return Ok(());
         };
+        if let Some(load) = active.skills.as_mut() {
+            match load.ingest(&record, active.cancel.is_some())? {
+                Some(crate::codex_skills::Step::Send(request)) => self.send(request)?,
+                Some(crate::codex_skills::Step::Ready(turn, roots)) => {
+                    self.role_skills_bound = !roots.is_empty();
+                    self.state["role_skills"] = json!({"roots":roots,"verified":true,
+                        "job_id":active.job["job_id"],"execution_instance_id":active.job["provider_options"]["native_execution_instance"]});
+                    self.dirty = true;
+                    active.skills = None;
+                    self.send(turn)?;
+                }
+                Some(crate::codex_skills::Step::Stop(reason)) => {
+                    let cancelled = active.cancel.is_some();
+                    let mut decision = failure(
+                        if cancelled { "cancelled" } else { "failed" },
+                        reason,
+                        if cancelled {
+                            "Cancelled before Codex turn input."
+                        } else {
+                            "Codex could not verify the configured role skills. No task prompt was sent."
+                        },
+                    );
+                    decision["diagnostics"] = json!({"completion_authority":"codex_role_skill_preflight",
+                        "provider_prompt_sent":false,"configuration_error":!cancelled});
+                    active.decision = Some(decision);
+                    active.skills = None;
+                    // Even a rejected verification may have changed roots. A
+                    // later empty declaration must explicitly clear that state.
+                    self.role_skills_bound = true;
+                    self.state["role_skills"] =
+                        json!({"verified":false,"job_id":active.job["job_id"]});
+                    self.dirty = true;
+                }
+                None => {}
+            }
+            return Ok(());
+        }
         if !active.interrupt.is_empty() && record["id"] == active.interrupt {
             active.interrupt_acknowledged =
                 record["error"].is_null() && record["result"].is_object();

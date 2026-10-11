@@ -9,7 +9,7 @@ import pytest
 from test_native_daemon import Server,submit
 
 ROOT=Path(__file__).resolve().parents[1]
-NATIVE=ROOT/'rust'/'target'/'debug'/'ccb-native.exe'
+NATIVE=Path(os.environ.get('CCB_TEST_NATIVE_BIN') or ROOT/'rust'/'target'/'debug'/'ccb-native.exe')
 CODEX=Path('C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe')
 NODE=Path('C:/Users/user/scoop/apps/nodejs-lts/current/node.exe')
 PI=Path('C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')
@@ -78,4 +78,41 @@ def test_real_pi_lead_codex_worker_automatic_callback(tmp_path):
         assert len(edges)==1 and edges[0]['state']=='done'
         metadata=json.loads((server.root/'providers/pi/lead/session.json').read_text())
         assert metadata['state']['messageCount']>=4
+    finally:server.close()
+
+
+def test_real_codex_role_skill_reads_updated_body_in_same_thread(tmp_path):
+    import uuid
+    workspace=tmp_path/'workspace';workspace.mkdir()
+    home=tmp_path/'codex-home';home.mkdir()
+    protected_copy(Path('C:/Users/user/.codex/auth.json'),home/'auth.json')
+    role=workspace/'roles/installed/agentroles.verify/current'
+    skill=role/'skills/ccb-role-probe';skill.mkdir(parents=True)
+    (role/'role.toml').write_text('schema="rolepack/v1"\nid="agentroles.verify"\n'
+        '[skills]\ncodex=["skills/ccb-role-probe"]\n',encoding='utf-8')
+    agent=dict(provider='codex',driver_kind='codex_app_server',profile_family='protocol_turn',
+        role='agentroles.verify',workspace_path=str(workspace),command=[str(CODEX),'app-server','--stdio'],
+        env={'CODEX_HOME':str(home)},thread_options={'model':'gpt-6.1-sol','approvalPolicy':'never','sandbox':'read-only'},
+        turn_options={'effort':'low'},timeout_s=120)
+    server=Server(tmp_path/'state',{'worker':agent})
+    try:
+        previous=None
+        for suffix in ('first','second'):
+            token='CCB_ROLE_'+uuid.uuid4().hex
+            (skill/f'{suffix}.txt').write_text(token,encoding='utf-8')
+            (skill/'SKILL.md').write_text('---\nname: ccb-role-probe\n'
+                'description: Read the verification token when asked to check the CCB role token.\n---\n'
+                f'Read ./{suffix}.txt relative to this skill directory. Reply only with the file contents.\n',encoding='utf-8')
+            receipt=submit(server,body='Use $ccb-role-probe to read the current CCB role verification token. '
+                'Read the current skill instructions and referenced file each time. Reply only with the token. '
+                'Do not edit files or make network requests.')
+            result=wait_result(server,receipt['job_id'])
+            assert result['status']=='completed', result['reply']
+            assert result['reply'].strip()==token, result['reply']
+            metadata=json.loads((server.root/'providers/codex/worker/session.json').read_text())
+            assert metadata['state']['role_skills']['verified'] is True
+            if previous:
+                assert metadata['runtime_instance_id']==previous['runtime_instance_id']
+                assert metadata['state']['thread_id']==previous['state']['thread_id']
+            previous=metadata
     finally:server.close()

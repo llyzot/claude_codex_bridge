@@ -9,6 +9,7 @@ pub mod cli;
 mod cli_tasks;
 mod codex_requests;
 mod codex_rpc;
+mod codex_skills;
 mod completion;
 mod completion_gate;
 pub mod config;

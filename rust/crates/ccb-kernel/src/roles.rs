@@ -207,11 +207,20 @@ pub fn default_agent(identity: &str, project: Option<&Path>) -> Result<String> {
 
 /// Read only the declared live files. The caller owns the per-turn audit commit;
 /// content is returned for transport, never written into the job store here.
-pub fn prompt(spec: &Value, project: Option<&Path>, body: &str) -> Result<(String, Value)> {
+pub struct Prepared {
+    pub text: String,
+    pub audit: Value,
+    pub skill_roots: Option<Vec<PathBuf>>,
+}
+pub fn prompt(spec: &Value, project: Option<&Path>, body: &str) -> Result<Prepared> {
     use serde_json::json;
     use sha2::{Digest, Sha256};
     let Some(identity) = normalized(&spec["role"])? else {
-        return Ok((body.into(), Value::Null));
+        return Ok(Prepared {
+            text: body.into(),
+            audit: Value::Null,
+            skill_roots: None,
+        });
     };
     let (root, manifest) = installed(&identity, project)?;
     let schema = manifest["schema"].as_str().unwrap_or("");
@@ -220,13 +229,14 @@ pub fn prompt(spec: &Value, project: Option<&Path>, body: &str) -> Result<(Strin
         "role schema must be a string"
     );
     let mut declarations = Vec::new();
+    let mut adapter = Value::Null;
     let strategy = if schema.starts_with("agent-role/preview-") {
         ensure!(
             manifest["contents"].is_null() || manifest["contents"].is_object(),
             "role contents must be a table"
         );
         let path = root.join("adapters/ccb/adapter.toml");
-        let adapter = if path.exists() {
+        adapter = if path.exists() {
             ensure!(
                 path.canonicalize()?.starts_with(&root),
                 "role adapter escapes role root"
@@ -249,6 +259,11 @@ pub fn prompt(spec: &Value, project: Option<&Path>, body: &str) -> Result<(Strin
         );
         paths(&manifest["memory"]["files"], &mut declarations)?;
         manifest["memory"]["merge_strategy"].clone()
+    };
+    let skill_roots = if spec["provider"] == "codex" {
+        Some(skill_roots(&root, &manifest, &adapter, "codex")?)
+    } else {
+        None
     };
     ensure!(
         strategy.is_null() || strategy.as_str() == Some("append_after_project_memory"),
@@ -281,10 +296,88 @@ pub fn prompt(spec: &Value, project: Option<&Path>, body: &str) -> Result<(Strin
         text.push_str(&format!("\n### {relative}\n{content}\n"));
     }
     let prompt = format!("{body}\n\n<ccb_role_context>\nCurrent role: {identity}\nRole root: {}\nThis is the current CCB role memory for this turn, replacing earlier CCB role memory. An empty list means no current role memory. Project and user instructions still apply.\n{text}</ccb_role_context>", root.display());
-    Ok((
-        prompt,
-        json!({"role":identity,"root":root,"sources":sources,"delivery":"per_turn_live_read"}),
-    ))
+    Ok(Prepared {
+        text: prompt,
+        audit: json!({"role":identity,"root":root,"sources":sources,"skill_roots":skill_roots,"delivery":"per_turn_live_read"}),
+        skill_roots,
+    })
+}
+
+fn skill_roots(
+    root: &Path,
+    manifest: &Value,
+    adapter: &Value,
+    provider: &str,
+) -> Result<Vec<PathBuf>> {
+    let mut declarations = Vec::new();
+    if manifest["schema"]
+        .as_str()
+        .unwrap_or("")
+        .starts_with("agent-role/preview-")
+    {
+        let supported = if let Some(providers) = adapter["supported_providers"].as_array() {
+            ensure!(
+                providers.iter().all(Value::is_string),
+                "invalid role skill providers"
+            );
+            if providers.is_empty() {
+                None
+            } else {
+                Some(
+                    providers
+                        .iter()
+                        .any(|v| v.as_str().unwrap().trim().eq_ignore_ascii_case(provider)),
+                )
+            }
+        } else {
+            ensure!(
+                adapter["supported_providers"].is_null(),
+                "role skill providers must be an array"
+            );
+            None
+        };
+        let supported = supported.unwrap_or_else(|| {
+            adapter["recommended_provider"]
+                .as_str()
+                .filter(|s| !s.trim().is_empty())
+                .map(|s| s.trim().eq_ignore_ascii_case(provider))
+                .unwrap_or(["codex", "claude"].contains(&provider))
+        });
+        if supported {
+            paths(&manifest["contents"]["skills"], &mut declarations)?;
+            paths(&adapter["skills"], &mut declarations)?;
+        }
+    } else {
+        ensure!(
+            manifest["skills"].is_null() || manifest["skills"].is_object(),
+            "role skills must be a table"
+        );
+        paths(&manifest["skills"][provider], &mut declarations)?;
+    }
+    ensure!(declarations.len() <= 64, "too many role skills");
+    let mut roots = Vec::new();
+    for declaration in declarations {
+        let path = root
+            .join(declaration)
+            .canonicalize()
+            .context("role skill directory is missing")?;
+        ensure!(
+            path.starts_with(root) && path.is_dir(),
+            "role skill directory escapes role root"
+        );
+        let file = path
+            .join("SKILL.md")
+            .canonicalize()
+            .context("role skill has no SKILL.md")?;
+        ensure!(
+            file.starts_with(&path) && file.is_file(),
+            "role SKILL.md escapes skill directory"
+        );
+        if !roots.contains(&path) {
+            roots.push(path);
+        }
+    }
+    Ok(roots)
 }
 
 fn paths(value: &Value, result: &mut Vec<String>) -> Result<()> {

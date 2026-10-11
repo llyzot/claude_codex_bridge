@@ -16,6 +16,21 @@ BIN=Path(os.environ.get('CCB_TEST_NATIVE_BIN') or ROOT/'rust'/'target'/'debug'/(
 def cli(*args,**kwargs):
     return subprocess.run([str(BIN),*map(str,args)],text=True,capture_output=True,encoding='utf-8',timeout=8,**kwargs)
 
+
+@pytest.mark.parametrize('flag',['--help','--version','--print-version','--capabilities'])
+def test_launcher_forwarded_ask_metadata_needs_no_project_or_daemon(tmp_path,flag):
+    result=cli('ask',flag,cwd=tmp_path)
+    assert result.returncode==0,result.stderr
+    assert not (tmp_path/'.ccb').exists()
+    if flag=='--capabilities':assert json.loads(result.stdout)['service']=='ccb-native'
+    else:assert 'ccb-native' in result.stdout
+
+
+def test_forwarded_ask_capabilities_preserves_argument_validation(tmp_path):
+    result=cli('ask','--capabilities','unexpected',cwd=tmp_path)
+    assert result.returncode!=0 and 'takes no arguments' in result.stderr
+    assert 'project' not in result.stderr
+
 def test_native_token_is_private_and_create_new_does_not_delete_existing(tmp_path):
     path=tmp_path/'private'/'token.json'
     result=cli('token-create',path)

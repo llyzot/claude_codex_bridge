@@ -94,6 +94,17 @@ fn read(reader: &mut BufReader<TcpStream>) -> Result<Value> {
     Ok(serde_json::from_slice(&bytes)?)
 }
 pub fn run(mut args: Vec<OsString>) -> Result<()> {
+    // The Windows launcher forwards ask.exe metadata queries as `ask <flag>`.
+    // They must work before project discovery, just like the native ask alias.
+    if args.first().is_some_and(|s| s == "ask")
+        && args.get(1).is_some_and(|s| {
+            ["--help", "--version", "--print-version", "--capabilities"]
+                .iter()
+                .any(|flag| s == flag)
+        })
+    {
+        args.remove(0);
+    }
     if args.first().is_some_and(|s| s == "--capabilities") {
         ensure!(args.len() == 1, "--capabilities takes no arguments");
         println!(

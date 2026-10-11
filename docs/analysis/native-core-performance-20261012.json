@@ -1,0 +1,2540 @@
+{
+  "schema_version": 1,
+  "fixture_root": "C:\\Users\\user\\AppData\\Local\\Temp\\ccb-core-perf-6phcoofm",
+  "runs": 10,
+  "samples_per_run": 30,
+  "kernel_sha256": "447c66a2ab5e694c164aad785f3306be2e3e440d6feb3f4b0de59d8f624c0409",
+  "python": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+  "measurements": [
+    {
+      "mode": "python",
+      "admission_ms": [
+        35.19849997246638,
+        22.125300019979477,
+        19.258800020907074,
+        24.86579999094829,
+        26.05709998169914,
+        24.021600023843348,
+        23.607200011610985,
+        22.317100025247782,
+        20.98260005004704,
+        24.991200014483184,
+        29.25889997277409,
+        26.250199996866286,
+        28.029899985995144,
+        28.23060000082478,
+        19.467200036160648,
+        20.617500005755574,
+        20.679400011431426,
+        22.50109997112304,
+        24.440300010610372,
+        21.750499960035086,
+        30.294700001832098,
+        24.810399976558983,
+        27.51670003635809,
+        23.965700005646795,
+        21.365299995522946,
+        22.788000002037734,
+        22.140000015497208,
+        21.637899975758046,
+        20.350700011476874,
+        19.891400006599724
+      ],
+      "callback_ms": 35.94680002424866,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 1.1686999932862818,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.0005249999812804,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 55189504,
+        "private_bytes": 45043712,
+        "processes": [
+          {
+            "pid": 47292,
+            "created_ticks": 134362227883791929,
+            "cpu_seconds": 0.5625,
+            "working_set_bytes": 55189504,
+            "private_bytes": 45043712
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.0010747999767773,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 55336960,
+        "private_bytes": 45043712,
+        "processes": [
+          {
+            "pid": 47292,
+            "created_ticks": 134362227883791929,
+            "cpu_seconds": 1.0,
+            "working_set_bytes": 55336960,
+            "private_bytes": 45043712
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 0,
+      "harness_ready_ms": 731.1967000132427
+    },
+    {
+      "mode": "rust",
+      "admission_ms": [
+        37.879300012718886,
+        30.462299997452646,
+        26.8377999891527,
+        31.98339999653399,
+        13.567600050009787,
+        12.270500010345131,
+        10.241899988614023,
+        23.61360000213608,
+        12.195199960842729,
+        38.547700038179755,
+        28.267099987715483,
+        12.250500032678246,
+        35.75849998742342,
+        12.250299972947687,
+        12.994799995794892,
+        12.3786999611184,
+        24.929000006522983,
+        30.81119997659698,
+        31.086800037883222,
+        30.156900000292808,
+        33.27880002325401,
+        11.058799980673939,
+        34.84559996286407,
+        11.033100017812103,
+        35.465899971313775,
+        32.46909996960312,
+        32.71130000939593,
+        29.26589996786788,
+        11.951400025282055,
+        34.99839996220544
+      ],
+      "callback_ms": 42.30440000537783,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 878.2887000124902,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.0009414000087418,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 61698048,
+        "private_bytes": 45895680,
+        "processes": [
+          {
+            "pid": 58400,
+            "created_ticks": 134362227940319159,
+            "cpu_seconds": 0.609375,
+            "working_set_bytes": 55390208,
+            "private_bytes": 44793856
+          },
+          {
+            "pid": 7884,
+            "created_ticks": 134362227954359625,
+            "cpu_seconds": 0.015625,
+            "working_set_bytes": 6307840,
+            "private_bytes": 1101824
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.000765400007367,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 62709760,
+        "private_bytes": 46583808,
+        "processes": [
+          {
+            "pid": 58400,
+            "created_ticks": 134362227940319159,
+            "cpu_seconds": 0.640625,
+            "working_set_bytes": 55435264,
+            "private_bytes": 44793856
+          },
+          {
+            "pid": 7884,
+            "created_ticks": 134362227954359625,
+            "cpu_seconds": 0.40625,
+            "working_set_bytes": 7274496,
+            "private_bytes": 1789952
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 0,
+      "harness_ready_ms": 1489.4655999960378
+    },
+    {
+      "mode": "native",
+      "admission_ms": [
+        36.33309999713674,
+        13.35520000429824,
+        10.956899961456656,
+        34.91540002869442,
+        30.060800025239587,
+        12.081699969712645,
+        35.20869999192655,
+        31.38360002776608,
+        29.378400009591132,
+        31.30779997445643,
+        32.51970000565052,
+        31.04089997941628,
+        30.349600012414157,
+        30.399999988730997,
+        31.222099962178618,
+        12.75970001006499,
+        13.263900007586926,
+        35.09610000764951,
+        31.31210000719875,
+        31.417699996381998,
+        14.02619999134913,
+        12.805800011847168,
+        35.05179996136576,
+        28.531800024211407,
+        31.432499992661178,
+        31.685900001320988,
+        31.837099988479167,
+        28.915400034748018,
+        32.15850004926324,
+        31.19240002706647
+      ],
+      "callback_ms": 79.73989995662123,
+      "callback_contract": "child complete RPC through continuation claim RPC (includes loopback transport)",
+      "setup_ms_after_imports": 865.9802000038326,
+      "native_process_creation_to_endpoint_ms": 46.29945755004883,
+      "fresh_idle": {
+        "window_seconds": 2.0006752000190318,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 6918144,
+        "private_bytes": 1175552,
+        "processes": [
+          {
+            "pid": 29200,
+            "created_ticks": 134362228028836317,
+            "cpu_seconds": 0.015625,
+            "working_set_bytes": 6918144,
+            "private_bytes": 1175552
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.0005930999759585,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 7872512,
+        "private_bytes": 1974272,
+        "processes": [
+          {
+            "pid": 29200,
+            "created_ticks": 134362228028836317,
+            "cpu_seconds": 0.3125,
+            "working_set_bytes": 7872512,
+            "private_bytes": 1974272
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 0,
+      "harness_ready_ms": 1474.603200040292
+    },
+    {
+      "mode": "rust",
+      "admission_ms": [
+        35.9716999810189,
+        25.794000015594065,
+        31.69600002001971,
+        11.87940000090748,
+        11.096299975179136,
+        21.48609998403117,
+        32.93699998175725,
+        12.400400009937584,
+        34.010699950158596,
+        12.78470002580434,
+        33.78369996789843,
+        30.86609998717904,
+        30.770600016694516,
+        32.35670004505664,
+        30.400500050745904,
+        30.9658000478521,
+        32.11379999993369,
+        29.141200007870793,
+        11.654799978714436,
+        37.341499992180616,
+        30.176499974913895,
+        31.11059998627752,
+        31.92110004602,
+        32.0445999968797,
+        30.105700017884374,
+        12.945299968123436,
+        34.55849998863414,
+        31.719000020530075,
+        29.963199980556965,
+        13.135499961208552
+      ],
+      "callback_ms": 89.93640000699088,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 875.7202999549918,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.000625300046522,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 61935616,
+        "private_bytes": 46166016,
+        "processes": [
+          {
+            "pid": 63336,
+            "created_ticks": 134362228090625835,
+            "cpu_seconds": 0.625,
+            "working_set_bytes": 55627776,
+            "private_bytes": 45068288
+          },
+          {
+            "pid": 63952,
+            "created_ticks": 134362228105555584,
+            "cpu_seconds": 0.0,
+            "working_set_bytes": 6307840,
+            "private_bytes": 1097728
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.0004872999852523,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 63086592,
+        "private_bytes": 46891008,
+        "processes": [
+          {
+            "pid": 63336,
+            "created_ticks": 134362228090625835,
+            "cpu_seconds": 0.640625,
+            "working_set_bytes": 55705600,
+            "private_bytes": 45068288
+          },
+          {
+            "pid": 63952,
+            "created_ticks": 134362228105555584,
+            "cpu_seconds": 0.359375,
+            "working_set_bytes": 7380992,
+            "private_bytes": 1822720
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 1,
+      "harness_ready_ms": 1586.4115000003949
+    },
+    {
+      "mode": "native",
+      "admission_ms": [
+        16.91540004685521,
+        26.444800023455173,
+        13.014000025577843,
+        12.420099985320121,
+        13.593100011348724,
+        13.287900015711784,
+        25.294999999459833,
+        31.095599988475442,
+        29.65119999134913,
+        10.934899968560785,
+        11.393299966584891,
+        10.637200030032545,
+        28.226800030097365,
+        31.670299998950213,
+        31.766300031449646,
+        12.686699978075922,
+        31.54619998531416,
+        32.28909999597818,
+        11.071499960962683,
+        10.879300010856241,
+        24.61849997052923,
+        30.957499984651804,
+        29.06590001657605,
+        10.230599960777909,
+        37.03840001253411,
+        12.831499974709004,
+        35.70189996389672,
+        30.074700014665723,
+        11.512400000356138,
+        36.10840003238991
+      ],
+      "callback_ms": 63.51680000079796,
+      "callback_contract": "child complete RPC through continuation claim RPC (includes loopback transport)",
+      "setup_ms_after_imports": 900.8248000172898,
+      "native_process_creation_to_endpoint_ms": 44.74925994873047,
+      "fresh_idle": {
+        "window_seconds": 2.0006796999950893,
+        "cpu_seconds": 0.03125,
+        "working_set_bytes": 6897664,
+        "private_bytes": 1183744,
+        "processes": [
+          {
+            "pid": 63076,
+            "created_ticks": 134362228182073683,
+            "cpu_seconds": 0.078125,
+            "working_set_bytes": 6897664,
+            "private_bytes": 1183744
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.000414899957832,
+        "cpu_seconds": 0.0625,
+        "working_set_bytes": 7901184,
+        "private_bytes": 2035712,
+        "processes": [
+          {
+            "pid": 63076,
+            "created_ticks": 134362228182073683,
+            "cpu_seconds": 0.3125,
+            "working_set_bytes": 7901184,
+            "private_bytes": 2035712
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 1,
+      "harness_ready_ms": 1518.883500015363
+    },
+    {
+      "mode": "python",
+      "admission_ms": [
+        31.785700004547834,
+        22.522800019942224,
+        20.177299971692264,
+        20.020099997054785,
+        22.27770001627505,
+        20.14089998556301,
+        18.87590001570061,
+        18.96470005158335,
+        18.284099991433322,
+        19.19109997106716,
+        20.365300006233156,
+        20.03590000094846,
+        21.59899997059256,
+        27.263399970252067,
+        21.90719998907298,
+        22.162200009915978,
+        28.402599971741438,
+        23.272800026461482,
+        21.72650001011789,
+        20.983499998692423,
+        24.779400031547993,
+        24.546100001316518,
+        21.12180000403896,
+        22.149500029627234,
+        27.069099945947528,
+        30.138400034047663,
+        29.4183999649249,
+        23.06420000968501,
+        28.143599978648126,
+        22.648899990599602
+      ],
+      "callback_ms": 34.48889998253435,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 0.6386999739333987,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.000582900014706,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 54595584,
+        "private_bytes": 44789760,
+        "processes": [
+          {
+            "pid": 37104,
+            "created_ticks": 134362228241428389,
+            "cpu_seconds": 0.5,
+            "working_set_bytes": 54595584,
+            "private_bytes": 44789760
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.0005658000009134,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 54804480,
+        "private_bytes": 44924928,
+        "processes": [
+          {
+            "pid": 37104,
+            "created_ticks": 134362228241428389,
+            "cpu_seconds": 0.9375,
+            "working_set_bytes": 54804480,
+            "private_bytes": 44924928
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 1,
+      "harness_ready_ms": 650.1853000372648
+    },
+    {
+      "mode": "native",
+      "admission_ms": [
+        16.818400006741285,
+        31.829599989578128,
+        31.622499984223396,
+        31.02769999532029,
+        31.430299975909293,
+        31.512800022028387,
+        11.652899964246899,
+        11.920700024347752,
+        22.47730002272874,
+        11.161500005982816,
+        10.997600038535893,
+        25.561800051946193,
+        13.07360001374036,
+        32.6342000043951,
+        34.18860002420843,
+        11.004399973899126,
+        11.10760000301525,
+        14.007999969180673,
+        22.86859997548163,
+        31.04840003652498,
+        31.05310001410544,
+        31.182700011413544,
+        10.83939999807626,
+        35.18990002339706,
+        12.968099967110902,
+        12.3862000182271,
+        37.78220003005117,
+        29.39219999825582,
+        32.29639999335632,
+        29.845899960491806
+      ],
+      "callback_ms": 76.38240000233054,
+      "callback_contract": "child complete RPC through continuation claim RPC (includes loopback transport)",
+      "setup_ms_after_imports": 912.4805000028573,
+      "native_process_creation_to_endpoint_ms": 46.39744758605957,
+      "fresh_idle": {
+        "window_seconds": 2.00039729999844,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 6914048,
+        "private_bytes": 1167360,
+        "processes": [
+          {
+            "pid": 57776,
+            "created_ticks": 134362228311167204,
+            "cpu_seconds": 0.015625,
+            "working_set_bytes": 6914048,
+            "private_bytes": 1167360
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.0004435000009835,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 7950336,
+        "private_bytes": 2080768,
+        "processes": [
+          {
+            "pid": 57776,
+            "created_ticks": 134362228311167204,
+            "cpu_seconds": 0.3125,
+            "working_set_bytes": 7950336,
+            "private_bytes": 2080768
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 2,
+      "harness_ready_ms": 1513.2520000333898
+    },
+    {
+      "mode": "python",
+      "admission_ms": [
+        26.622299978043884,
+        18.268899992108345,
+        17.166500038001686,
+        21.993600006680936,
+        25.102499988861382,
+        21.57500002067536,
+        20.654699997976422,
+        20.30539995757863,
+        19.563700014259666,
+        21.41809999011457,
+        19.313699973281473,
+        22.146000002976507,
+        19.230899983085692,
+        19.628000038210303,
+        18.34089995827526,
+        19.111500005237758,
+        22.382199997082353,
+        19.977399962954223,
+        20.078400033526123,
+        19.889499992132187,
+        19.827499985694885,
+        20.583599980454892,
+        21.978400007355958,
+        18.849399988539517,
+        21.63749997271225,
+        20.019099989440292,
+        20.733300014398992,
+        19.260099972598255,
+        20.86980000603944,
+        20.44160000514239
+      ],
+      "callback_ms": 32.75939996819943,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 0.6374999647960067,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.0006595999584533,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 54812672,
+        "private_bytes": 44908544,
+        "processes": [
+          {
+            "pid": 63580,
+            "created_ticks": 134362228371408416,
+            "cpu_seconds": 0.53125,
+            "working_set_bytes": 54812672,
+            "private_bytes": 44908544
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.0007827999652363,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 54964224,
+        "private_bytes": 45043712,
+        "processes": [
+          {
+            "pid": 63580,
+            "created_ticks": 134362228371408416,
+            "cpu_seconds": 0.9375,
+            "working_set_bytes": 54964224,
+            "private_bytes": 45043712
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 2,
+      "harness_ready_ms": 615.143800037913
+    },
+    {
+      "mode": "rust",
+      "admission_ms": [
+        42.08749998360872,
+        25.261699978727847,
+        32.432899984996766,
+        30.41559999110177,
+        12.005099968519062,
+        35.58269998757169,
+        30.497799976728857,
+        29.03950004838407,
+        12.01140001649037,
+        36.511799960862845,
+        30.03660001559183,
+        30.334700015373528,
+        32.652600028086454,
+        31.566699966788292,
+        16.234799986705184,
+        29.44860002025962,
+        31.74459998263046,
+        12.773700000252575,
+        34.77329999441281,
+        30.197099957149476,
+        29.81610002461821,
+        30.4129000287503,
+        31.688799965195358,
+        29.71360000083223,
+        11.27939997240901,
+        10.613500024192035,
+        12.550499988719821,
+        12.449000030755997,
+        13.241300010122359,
+        32.291000010445714
+      ],
+      "callback_ms": 119.56700001610443,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 884.9281000439078,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.0004918999620713,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 62062592,
+        "private_bytes": 46272512,
+        "processes": [
+          {
+            "pid": 39136,
+            "created_ticks": 134362228425612191,
+            "cpu_seconds": 0.640625,
+            "working_set_bytes": 55750656,
+            "private_bytes": 45162496
+          },
+          {
+            "pid": 64372,
+            "created_ticks": 134362228439827462,
+            "cpu_seconds": 0.015625,
+            "working_set_bytes": 6311936,
+            "private_bytes": 1110016
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.000656299991533,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 63152128,
+        "private_bytes": 47005696,
+        "processes": [
+          {
+            "pid": 39136,
+            "created_ticks": 134362228425612191,
+            "cpu_seconds": 0.65625,
+            "working_set_bytes": 55840768,
+            "private_bytes": 45162496
+          },
+          {
+            "pid": 64372,
+            "created_ticks": 134362228439827462,
+            "cpu_seconds": 0.296875,
+            "working_set_bytes": 7311360,
+            "private_bytes": 1843200
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 2,
+      "harness_ready_ms": 1507.5356000452302
+    },
+    {
+      "mode": "python",
+      "admission_ms": [
+        84.78769997600466,
+        21.88790001673624,
+        24.049700004979968,
+        30.2633999963291,
+        30.3311999887228,
+        33.132200012914836,
+        31.00840002298355,
+        31.23690001666546,
+        32.25769998971373,
+        28.444900002796203,
+        19.78069997858256,
+        20.631699997466058,
+        22.933200001716614,
+        21.26100001623854,
+        20.53039998281747,
+        18.24000000488013,
+        20.53360000718385,
+        22.02569996006787,
+        22.115500003565103,
+        21.67859999462962,
+        28.325999970547855,
+        23.765699996147305,
+        19.792500010225922,
+        18.32279999507591,
+        19.895599980372936,
+        20.669399993494153,
+        19.99260002048686,
+        22.944799973629415,
+        20.82659996813163,
+        23.944800021126866
+      ],
+      "callback_ms": 36.37919999891892,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 0.9487000061199069,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.0005615999689326,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 54665216,
+        "private_bytes": 44445696,
+        "processes": [
+          {
+            "pid": 62508,
+            "created_ticks": 134362228502098783,
+            "cpu_seconds": 0.484375,
+            "working_set_bytes": 54665216,
+            "private_bytes": 44445696
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.0004498999915086,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 54816768,
+        "private_bytes": 44580864,
+        "processes": [
+          {
+            "pid": 62508,
+            "created_ticks": 134362228502098783,
+            "cpu_seconds": 0.890625,
+            "working_set_bytes": 54816768,
+            "private_bytes": 44580864
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 3,
+      "harness_ready_ms": 608.6702999891713
+    },
+    {
+      "mode": "rust",
+      "admission_ms": [
+        40.21079995436594,
+        26.21240000007674,
+        17.418199975509197,
+        13.754300016444176,
+        29.000300040934235,
+        31.563299999106675,
+        31.74190002027899,
+        12.542699987534434,
+        36.018499988131225,
+        9.948099963366985,
+        36.09460004372522,
+        31.456299999263138,
+        28.558899997733533,
+        32.71190001396462,
+        30.302900006063282,
+        11.938200041186064,
+        12.74200004991144,
+        37.42040001088753,
+        32.4603000190109,
+        27.4642999866046,
+        32.08349994383752,
+        31.389800016768277,
+        10.29710000148043,
+        36.5241999970749,
+        30.050700006540865,
+        13.222199981100857,
+        11.679199989885092,
+        37.1879999875091,
+        12.670000025536865,
+        32.51560003263876
+      ],
+      "callback_ms": 74.04820004012436,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 829.3095999979414,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.000740699993912,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 61665280,
+        "private_bytes": 45719552,
+        "processes": [
+          {
+            "pid": 65124,
+            "created_ticks": 134362228557948045,
+            "cpu_seconds": 0.59375,
+            "working_set_bytes": 55353344,
+            "private_bytes": 44613632
+          },
+          {
+            "pid": 63960,
+            "created_ticks": 134362228571934703,
+            "cpu_seconds": 0.015625,
+            "working_set_bytes": 6311936,
+            "private_bytes": 1105920
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.0007629999890924,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 62689280,
+        "private_bytes": 46473216,
+        "processes": [
+          {
+            "pid": 65124,
+            "created_ticks": 134362228557948045,
+            "cpu_seconds": 0.640625,
+            "working_set_bytes": 55410688,
+            "private_bytes": 44613632
+          },
+          {
+            "pid": 63960,
+            "created_ticks": 134362228571934703,
+            "cpu_seconds": 0.328125,
+            "working_set_bytes": 7278592,
+            "private_bytes": 1859584
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 3,
+      "harness_ready_ms": 1452.3645999724977
+    },
+    {
+      "mode": "native",
+      "admission_ms": [
+        17.78789999661967,
+        28.796099999453872,
+        31.601900001987815,
+        12.255899957381189,
+        33.573900000192225,
+        31.032699975185096,
+        32.14160003699362,
+        28.04370003286749,
+        12.114099983591586,
+        36.095499992370605,
+        12.041199952363968,
+        13.045900035649538,
+        34.48730002855882,
+        31.57910000300035,
+        12.554500019177794,
+        13.516900013200939,
+        20.766800036653876,
+        12.691099953372031,
+        12.620800000149757,
+        24.4302999926731,
+        29.782500001601875,
+        12.168899993412197,
+        11.913699971046299,
+        16.132199962157756,
+        37.03549999045208,
+        30.53139999974519,
+        30.413099972065538,
+        13.521699991542846,
+        35.997800005134195,
+        29.744200001005083
+      ],
+      "callback_ms": 77.74530001915991,
+      "callback_contract": "child complete RPC through continuation claim RPC (includes loopback transport)",
+      "setup_ms_after_imports": 908.3330000285059,
+      "native_process_creation_to_endpoint_ms": 46.51379585266113,
+      "fresh_idle": {
+        "window_seconds": 2.0005634999834,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 6885376,
+        "private_bytes": 1171456,
+        "processes": [
+          {
+            "pid": 40792,
+            "created_ticks": 134362228648270083,
+            "cpu_seconds": 0.03125,
+            "working_set_bytes": 6885376,
+            "private_bytes": 1171456
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.0008762999786995,
+        "cpu_seconds": 0.015625,
+        "working_set_bytes": 7987200,
+        "private_bytes": 2035712,
+        "processes": [
+          {
+            "pid": 40792,
+            "created_ticks": 134362228648270083,
+            "cpu_seconds": 0.296875,
+            "working_set_bytes": 7987200,
+            "private_bytes": 2035712
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 3,
+      "harness_ready_ms": 1534.1595000354573
+    },
+    {
+      "mode": "rust",
+      "admission_ms": [
+        39.30370003217831,
+        24.31459998479113,
+        13.13879998633638,
+        33.2549000158906,
+        31.672899960540235,
+        15.137200010940433,
+        17.018599959556013,
+        12.980600004084408,
+        33.10389997204766,
+        28.01850001560524,
+        17.19519996549934,
+        31.54619998531416,
+        30.528200033586472,
+        30.736699991393834,
+        13.680300035048276,
+        35.41200002655387,
+        12.7949999878183,
+        32.41260000504553,
+        13.296900026034564,
+        34.193400002550334,
+        31.247499980963767,
+        12.280699971597642,
+        11.241399974096566,
+        24.275600037071854,
+        30.87400004733354,
+        11.979500006418675,
+        37.75120002683252,
+        30.099600029643625,
+        12.408899958245456,
+        33.0934000085108
+      ],
+      "callback_ms": 120.9482999984175,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 886.55049999943,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.000830600038171,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 61673472,
+        "private_bytes": 45789184,
+        "processes": [
+          {
+            "pid": 25936,
+            "created_ticks": 134362228708674265,
+            "cpu_seconds": 0.625,
+            "working_set_bytes": 55361536,
+            "private_bytes": 44683264
+          },
+          {
+            "pid": 31360,
+            "created_ticks": 134362228723061107,
+            "cpu_seconds": 0.015625,
+            "working_set_bytes": 6311936,
+            "private_bytes": 1105920
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.0004144000122324,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 62705664,
+        "private_bytes": 46522368,
+        "processes": [
+          {
+            "pid": 25936,
+            "created_ticks": 134362228708674265,
+            "cpu_seconds": 0.65625,
+            "working_set_bytes": 55406592,
+            "private_bytes": 44683264
+          },
+          {
+            "pid": 31360,
+            "created_ticks": 134362228723061107,
+            "cpu_seconds": 0.375,
+            "working_set_bytes": 7299072,
+            "private_bytes": 1839104
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 4,
+      "harness_ready_ms": 1534.477400011383
+    },
+    {
+      "mode": "native",
+      "admission_ms": [
+        18.35870003560558,
+        18.489799986127764,
+        13.038599980063736,
+        31.132100033573806,
+        14.552700042258948,
+        31.414800032507628,
+        29.777699965052307,
+        13.344599981792271,
+        11.755799991078675,
+        36.63119999691844,
+        31.693600001744926,
+        31.14609996555373,
+        29.034600011073053,
+        32.45429997332394,
+        14.022899966221303,
+        13.394700014032423,
+        12.004499963950366,
+        22.000700002536178,
+        12.756899988744408,
+        34.160599985625595,
+        30.57860000990331,
+        12.720500002615154,
+        36.24300000956282,
+        28.788199997507036,
+        12.494899972807616,
+        12.171599955763668,
+        11.609100038185716,
+        11.565699998755008,
+        12.711599993053824,
+        34.66659999685362
+      ],
+      "callback_ms": 72.1991999889724,
+      "callback_contract": "child complete RPC through continuation claim RPC (includes loopback transport)",
+      "setup_ms_after_imports": 879.3895000126213,
+      "native_process_creation_to_endpoint_ms": 43.51043701171875,
+      "fresh_idle": {
+        "window_seconds": 2.0005478999810293,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 6868992,
+        "private_bytes": 1155072,
+        "processes": [
+          {
+            "pid": 51440,
+            "created_ticks": 134362228799768991,
+            "cpu_seconds": 0.0,
+            "working_set_bytes": 6868992,
+            "private_bytes": 1155072
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.0007382000330836,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 8011776,
+        "private_bytes": 2031616,
+        "processes": [
+          {
+            "pid": 51440,
+            "created_ticks": 134362228799768991,
+            "cpu_seconds": 0.375,
+            "working_set_bytes": 8011776,
+            "private_bytes": 2031616
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 4,
+      "harness_ready_ms": 1526.7281000269577
+    },
+    {
+      "mode": "python",
+      "admission_ms": [
+        41.58399999141693,
+        22.230900009162724,
+        24.175799975637347,
+        25.9811999858357,
+        27.38620003219694,
+        31.999300001189113,
+        34.97680003056303,
+        34.86019995762035,
+        34.861400024965405,
+        37.62519999872893,
+        40.255899948533624,
+        30.35529999760911,
+        19.7510999860242,
+        19.989099993836135,
+        21.48470003157854,
+        21.245400013867766,
+        20.33520000986755,
+        27.384899964090437,
+        23.404000035952777,
+        23.451300046872348,
+        23.70850002625957,
+        21.739199990406632,
+        21.939300000667572,
+        19.158799957949668,
+        20.897500042337924,
+        21.242299990262836,
+        21.648199995979667,
+        21.101199963595718,
+        21.43109997268766,
+        19.77070001885295
+      ],
+      "callback_ms": 32.66520000761375,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 0.9064000332728028,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.0007730000070296,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 54763520,
+        "private_bytes": 45023232,
+        "processes": [
+          {
+            "pid": 14860,
+            "created_ticks": 134362228859376657,
+            "cpu_seconds": 0.421875,
+            "working_set_bytes": 54763520,
+            "private_bytes": 45023232
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.0007916999747977,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 55037952,
+        "private_bytes": 45023232,
+        "processes": [
+          {
+            "pid": 14860,
+            "created_ticks": 134362228859376657,
+            "cpu_seconds": 0.953125,
+            "working_set_bytes": 55037952,
+            "private_bytes": 45023232
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 4,
+      "harness_ready_ms": 613.7233999907039
+    },
+    {
+      "mode": "native",
+      "admission_ms": [
+        17.431999964173883,
+        12.553200009278953,
+        22.222799947485328,
+        32.717399997636676,
+        31.538099981844425,
+        13.489000033587217,
+        33.54840003885329,
+        13.67370004300028,
+        34.059699974022806,
+        14.536899980157614,
+        30.763300019316375,
+        12.8573999973014,
+        34.15890003088862,
+        30.173200007993728,
+        13.696299982257187,
+        32.624199986457825,
+        30.822800006717443,
+        30.579299957025796,
+        12.23059999756515,
+        33.75280002364889,
+        32.94830000959337,
+        28.032500005792826,
+        13.889900001231581,
+        34.67680001631379,
+        29.988299997057766,
+        30.457699962425977,
+        12.859600014053285,
+        13.343399972654879,
+        36.25299996929243,
+        11.785000038798898
+      ],
+      "callback_ms": 66.5949999820441,
+      "callback_contract": "child complete RPC through continuation claim RPC (includes loopback transport)",
+      "setup_ms_after_imports": 882.5708999647759,
+      "native_process_creation_to_endpoint_ms": 41.49484634399414,
+      "fresh_idle": {
+        "window_seconds": 2.0007638999959454,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 6918144,
+        "private_bytes": 1175552,
+        "processes": [
+          {
+            "pid": 46536,
+            "created_ticks": 134362228929820799,
+            "cpu_seconds": 0.015625,
+            "working_set_bytes": 6918144,
+            "private_bytes": 1175552
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.001250999979675,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 7892992,
+        "private_bytes": 2023424,
+        "processes": [
+          {
+            "pid": 46536,
+            "created_ticks": 134362228929820799,
+            "cpu_seconds": 0.328125,
+            "working_set_bytes": 7892992,
+            "private_bytes": 2023424
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 5,
+      "harness_ready_ms": 1530.1470000413246
+    },
+    {
+      "mode": "python",
+      "admission_ms": [
+        34.72930000862107,
+        22.126900032162666,
+        16.254100017249584,
+        18.507100001443177,
+        20.231799979228526,
+        19.11420002579689,
+        18.978199979756027,
+        18.69639998767525,
+        21.08029997907579,
+        21.383400016929954,
+        21.06980001553893,
+        23.998800024855882,
+        19.49759997660294,
+        22.340200026519597,
+        20.691599987912923,
+        22.63319998746738,
+        24.969099962618202,
+        20.159000006970018,
+        21.563899994362146,
+        19.96609999332577,
+        20.659799978602678,
+        24.740200024098158,
+        23.869699973147362,
+        21.92009997088462,
+        22.280900040641427,
+        19.237699976656586,
+        23.835100000724196,
+        21.77829999709502,
+        22.728200012352318,
+        19.696200033649802
+      ],
+      "callback_ms": 35.513399983756244,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 0.6636999896727502,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.0007462999783456,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 54497280,
+        "private_bytes": 44376064,
+        "processes": [
+          {
+            "pid": 64712,
+            "created_ticks": 134362228989916133,
+            "cpu_seconds": 0.5,
+            "working_set_bytes": 54497280,
+            "private_bytes": 44376064
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.000778200046625,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 54788096,
+        "private_bytes": 44511232,
+        "processes": [
+          {
+            "pid": 64712,
+            "created_ticks": 134362228989916133,
+            "cpu_seconds": 0.921875,
+            "working_set_bytes": 54788096,
+            "private_bytes": 44511232
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 5,
+      "harness_ready_ms": 668.8191000139341
+    },
+    {
+      "mode": "rust",
+      "admission_ms": [
+        35.98980000242591,
+        27.025500021409243,
+        13.36119999177754,
+        12.485099956393242,
+        12.403600034303963,
+        11.644600017461926,
+        28.446100011933595,
+        28.628600004594773,
+        31.576299981679767,
+        31.72389999963343,
+        29.97279999544844,
+        13.899900019168854,
+        32.355899980757385,
+        32.64889999991283,
+        31.38500003842637,
+        29.217499948572367,
+        30.288200010545552,
+        13.323199993465096,
+        34.17749999789521,
+        31.420799961779267,
+        13.827399990987033,
+        32.62339998036623,
+        30.42630001436919,
+        13.442099967505783,
+        32.432999985758215,
+        31.618000008165836,
+        32.01199998147786,
+        30.901200021617115,
+        10.703899955842644,
+        12.476300005801022
+      ],
+      "callback_ms": 48.73330000555143,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 859.2255999683402,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.0006348000024445,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 61571072,
+        "private_bytes": 45903872,
+        "processes": [
+          {
+            "pid": 23100,
+            "created_ticks": 134362229045152466,
+            "cpu_seconds": 0.5625,
+            "working_set_bytes": 55246848,
+            "private_bytes": 44785664
+          },
+          {
+            "pid": 52400,
+            "created_ticks": 134362229059597562,
+            "cpu_seconds": 0.0625,
+            "working_set_bytes": 6324224,
+            "private_bytes": 1118208
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.0009797000093386,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 62709760,
+        "private_bytes": 46698496,
+        "processes": [
+          {
+            "pid": 23100,
+            "created_ticks": 134362229045152466,
+            "cpu_seconds": 0.640625,
+            "working_set_bytes": 55406592,
+            "private_bytes": 44785664
+          },
+          {
+            "pid": 52400,
+            "created_ticks": 134362229059597562,
+            "cpu_seconds": 0.296875,
+            "working_set_bytes": 7303168,
+            "private_bytes": 1912832
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 5,
+      "harness_ready_ms": 1516.1381000070833
+    },
+    {
+      "mode": "python",
+      "admission_ms": [
+        30.812299984972924,
+        22.118499968200922,
+        23.841299989726394,
+        29.301000002305955,
+        27.44049998000264,
+        19.400899996981025,
+        27.151599992066622,
+        32.53890003543347,
+        30.73869994841516,
+        29.780600045342,
+        38.855899998452514,
+        31.274500011932105,
+        31.68539999751374,
+        25.13999998336658,
+        21.32639999035746,
+        23.675000004004687,
+        20.74850001372397,
+        23.155400005634874,
+        23.988100001588464,
+        27.041200024541467,
+        24.791000003460795,
+        29.200499993748963,
+        24.308199994266033,
+        20.526800013612956,
+        21.80599997518584,
+        17.599300015717745,
+        18.506399996113032,
+        22.877999988850206,
+        24.80939996894449,
+        20.771200011949986
+      ],
+      "callback_ms": 32.27500000502914,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 0.6405000458471477,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.0006486999918707,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 54538240,
+        "private_bytes": 44412928,
+        "processes": [
+          {
+            "pid": 45800,
+            "created_ticks": 134362229120647015,
+            "cpu_seconds": 0.484375,
+            "working_set_bytes": 54538240,
+            "private_bytes": 44412928
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.000736899964977,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 54820864,
+        "private_bytes": 44683264,
+        "processes": [
+          {
+            "pid": 45800,
+            "created_ticks": 134362229120647015,
+            "cpu_seconds": 0.90625,
+            "working_set_bytes": 54820864,
+            "private_bytes": 44683264
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 6,
+      "harness_ready_ms": 607.1072000195272
+    },
+    {
+      "mode": "rust",
+      "admission_ms": [
+        40.70850001880899,
+        24.527600035071373,
+        30.74739995645359,
+        31.45030001178384,
+        29.797600000165403,
+        12.064899958204478,
+        35.224499995820224,
+        31.820800038985908,
+        29.17730004992336,
+        12.7345000510104,
+        35.698499996215105,
+        12.501400022301823,
+        12.603299983311445,
+        37.37149998778477,
+        30.996299989055842,
+        32.035799988079816,
+        31.515999988187104,
+        12.723799969535321,
+        12.451699993107468,
+        36.62219998659566,
+        29.45889998227358,
+        32.57899999152869,
+        31.02789999684319,
+        11.453900020569563,
+        35.302800009958446,
+        29.68069998314604,
+        12.469800014514476,
+        12.16109999222681,
+        24.700099951587617,
+        12.185800005681813
+      ],
+      "callback_ms": 111.94530001375824,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 843.2154000038281,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.0007952000014484,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 62279680,
+        "private_bytes": 46366720,
+        "processes": [
+          {
+            "pid": 39012,
+            "created_ticks": 134362229176335837,
+            "cpu_seconds": 0.578125,
+            "working_set_bytes": 55984128,
+            "private_bytes": 45293568
+          },
+          {
+            "pid": 62412,
+            "created_ticks": 134362229190316867,
+            "cpu_seconds": 0.015625,
+            "working_set_bytes": 6295552,
+            "private_bytes": 1073152
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.001124499947764,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 63324160,
+        "private_bytes": 47153152,
+        "processes": [
+          {
+            "pid": 39012,
+            "created_ticks": 134362229176335837,
+            "cpu_seconds": 0.65625,
+            "working_set_bytes": 56029184,
+            "private_bytes": 45293568
+          },
+          {
+            "pid": 62412,
+            "created_ticks": 134362229190316867,
+            "cpu_seconds": 0.21875,
+            "working_set_bytes": 7294976,
+            "private_bytes": 1859584
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 6,
+      "harness_ready_ms": 1451.8586000194773
+    },
+    {
+      "mode": "native",
+      "admission_ms": [
+        21.807099983561784,
+        31.561699986923486,
+        32.11939998436719,
+        28.694499982520938,
+        34.27239996381104,
+        29.91189999738708,
+        29.73740000743419,
+        13.34179996047169,
+        12.637800013180822,
+        34.83369998866692,
+        33.766499953344464,
+        11.606600019149482,
+        33.13769999658689,
+        13.026799948420376,
+        12.620099994819611,
+        38.495899992994964,
+        12.45719997677952,
+        32.920700032263994,
+        13.067100022453815,
+        32.18290000222623,
+        11.050800036173314,
+        33.73299998929724,
+        33.23989995988086,
+        31.206600018776953,
+        30.148400051984936,
+        32.72120002657175,
+        13.961299962829798,
+        30.62640002463013,
+        11.327700049150735,
+        11.265900044236332
+      ],
+      "callback_ms": 71.77759998012334,
+      "callback_contract": "child complete RPC through continuation claim RPC (includes loopback transport)",
+      "setup_ms_after_imports": 849.1518000373617,
+      "native_process_creation_to_endpoint_ms": 44.5866584777832,
+      "fresh_idle": {
+        "window_seconds": 2.0006086999783292,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 6889472,
+        "private_bytes": 1175552,
+        "processes": [
+          {
+            "pid": 10084,
+            "created_ticks": 134362229266248693,
+            "cpu_seconds": 0.015625,
+            "working_set_bytes": 6889472,
+            "private_bytes": 1175552
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.000998600036837,
+        "cpu_seconds": 0.015625,
+        "working_set_bytes": 7917568,
+        "private_bytes": 1970176,
+        "processes": [
+          {
+            "pid": 10084,
+            "created_ticks": 134362229266248693,
+            "cpu_seconds": 0.328125,
+            "working_set_bytes": 7917568,
+            "private_bytes": 1970176
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 6,
+      "harness_ready_ms": 1512.1179000125267
+    },
+    {
+      "mode": "rust",
+      "admission_ms": [
+        38.84339996147901,
+        15.005299996118993,
+        26.206000009551644,
+        29.9656999995932,
+        31.542900018393993,
+        31.464500003494322,
+        29.853600019123405,
+        28.452400001697242,
+        33.92329998314381,
+        28.58899999409914,
+        32.88730001077056,
+        31.550300016533583,
+        30.35229997476563,
+        28.80670002195984,
+        11.738299974240363,
+        35.49290000228211,
+        32.571799994912,
+        31.20079997461289,
+        33.024200005456805,
+        31.00840002298355,
+        31.1993999639526,
+        30.94319999217987,
+        32.15570002794266,
+        12.075699982233346,
+        13.042200007475913,
+        37.706100032664835,
+        11.769199976697564,
+        12.610699981451035,
+        11.833099997602403,
+        25.266500015277416
+      ],
+      "callback_ms": 88.47079996485263,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 879.7429999685846,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.0005730999982916,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 61931520,
+        "private_bytes": 46153728,
+        "processes": [
+          {
+            "pid": 63072,
+            "created_ticks": 134362229326431318,
+            "cpu_seconds": 0.609375,
+            "working_set_bytes": 55611392,
+            "private_bytes": 45039616
+          },
+          {
+            "pid": 40680,
+            "created_ticks": 134362229340570948,
+            "cpu_seconds": 0.0,
+            "working_set_bytes": 6320128,
+            "private_bytes": 1114112
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.000905499968212,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 63123456,
+        "private_bytes": 46952448,
+        "processes": [
+          {
+            "pid": 63072,
+            "created_ticks": 134362229326431318,
+            "cpu_seconds": 0.640625,
+            "working_set_bytes": 55754752,
+            "private_bytes": 45039616
+          },
+          {
+            "pid": 40680,
+            "created_ticks": 134362229340570948,
+            "cpu_seconds": 0.359375,
+            "working_set_bytes": 7368704,
+            "private_bytes": 1912832
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 7,
+      "harness_ready_ms": 1501.3857999583706
+    },
+    {
+      "mode": "native",
+      "admission_ms": [
+        29.88240000559017,
+        27.70149998832494,
+        11.97269995464012,
+        11.638200026936829,
+        12.165099964477122,
+        11.29860000219196,
+        31.50769998319447,
+        28.534799988847226,
+        32.09180000703782,
+        32.308800029568374,
+        29.627999989315867,
+        11.884899984579533,
+        14.445899985730648,
+        34.9286999553442,
+        10.521700023673475,
+        38.393599970731884,
+        28.681299998424947,
+        13.063499995041639,
+        34.34090001974255,
+        29.42919998895377,
+        29.624400020111352,
+        32.16550004435703,
+        13.032999995630234,
+        36.46370000205934,
+        29.691700008697808,
+        11.640400043688715,
+        35.2261999505572,
+        31.52540000155568,
+        32.009200018364936,
+        31.566400022711605
+      ],
+      "callback_ms": 68.21379996836185,
+      "callback_contract": "child complete RPC through continuation claim RPC (includes loopback transport)",
+      "setup_ms_after_imports": 875.2580999862403,
+      "native_process_creation_to_endpoint_ms": 39.98923301696777,
+      "fresh_idle": {
+        "window_seconds": 2.0010516999755055,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 6885376,
+        "private_bytes": 1175552,
+        "processes": [
+          {
+            "pid": 53900,
+            "created_ticks": 134362229417845291,
+            "cpu_seconds": 0.03125,
+            "working_set_bytes": 6885376,
+            "private_bytes": 1175552
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.0007704000454396,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 7901184,
+        "private_bytes": 1945600,
+        "processes": [
+          {
+            "pid": 53900,
+            "created_ticks": 134362229417845291,
+            "cpu_seconds": 0.40625,
+            "working_set_bytes": 7901184,
+            "private_bytes": 1945600
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 7,
+      "harness_ready_ms": 1543.3322000317276
+    },
+    {
+      "mode": "python",
+      "admission_ms": [
+        37.908900005277246,
+        21.743299963418394,
+        16.52860001195222,
+        24.353699991479516,
+        19.42069997312501,
+        18.254199996590614,
+        21.935800032224506,
+        22.76629995321855,
+        22.98850001534447,
+        21.168700011912733,
+        19.831699959468096,
+        21.07710001291707,
+        19.569399999454618,
+        21.189599996432662,
+        19.98240000102669,
+        20.260199962649494,
+        22.12490001693368,
+        20.344899967312813,
+        20.224400039296597,
+        19.9748000013642,
+        20.13640000950545,
+        20.014500012621284,
+        20.30219999141991,
+        22.503699990920722,
+        21.89059997908771,
+        19.375999982003123,
+        18.73479998903349,
+        19.100600038655102,
+        23.06550001958385,
+        20.9245000150986
+      ],
+      "callback_ms": 36.35270002996549,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 0.6707000429742038,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.0004907000111416,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 55062528,
+        "private_bytes": 44978176,
+        "processes": [
+          {
+            "pid": 57500,
+            "created_ticks": 134362229477653515,
+            "cpu_seconds": 0.46875,
+            "working_set_bytes": 55062528,
+            "private_bytes": 44978176
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.000640199985355,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 55205888,
+        "private_bytes": 44978176,
+        "processes": [
+          {
+            "pid": 57500,
+            "created_ticks": 134362229477653515,
+            "cpu_seconds": 0.796875,
+            "working_set_bytes": 55205888,
+            "private_bytes": 44978176
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 7,
+      "harness_ready_ms": 613.0344999837689
+    },
+    {
+      "mode": "native",
+      "admission_ms": [
+        41.37370001990348,
+        27.963999949861318,
+        32.3359000030905,
+        30.221100023481995,
+        29.684900015126914,
+        13.465399970300496,
+        11.932399997022003,
+        10.576100030448288,
+        25.46299999812618,
+        33.29890000168234,
+        30.892000009771436,
+        11.405000055674464,
+        36.7168000084348,
+        33.11670001130551,
+        12.475799943786114,
+        11.77590002771467,
+        12.13129999814555,
+        11.897600023075938,
+        11.99809997342527,
+        10.422000021208078,
+        11.90770004177466,
+        36.87229997012764,
+        12.112699972931296,
+        10.197099996730685,
+        9.915200003888458,
+        32.11399994324893,
+        11.862299987114966,
+        33.793200040236115,
+        12.723400024697185,
+        12.441499973647296
+      ],
+      "callback_ms": 78.23899999493733,
+      "callback_contract": "child complete RPC through continuation claim RPC (includes loopback transport)",
+      "setup_ms_after_imports": 840.4209000291303,
+      "native_process_creation_to_endpoint_ms": 43.206214904785156,
+      "fresh_idle": {
+        "window_seconds": 2.001017500006128,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 6881280,
+        "private_bytes": 1171456,
+        "processes": [
+          {
+            "pid": 50960,
+            "created_ticks": 134362229546831359,
+            "cpu_seconds": 0.015625,
+            "working_set_bytes": 6881280,
+            "private_bytes": 1171456
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.000499999965541,
+        "cpu_seconds": 0.015625,
+        "working_set_bytes": 8036352,
+        "private_bytes": 2076672,
+        "processes": [
+          {
+            "pid": 50960,
+            "created_ticks": 134362229546831359,
+            "cpu_seconds": 0.328125,
+            "working_set_bytes": 8036352,
+            "private_bytes": 2076672
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 8,
+      "harness_ready_ms": 1547.9842000058852
+    },
+    {
+      "mode": "python",
+      "admission_ms": [
+        35.02220002701506,
+        20.4401999944821,
+        21.623399981763214,
+        32.5093999854289,
+        28.62160000950098,
+        31.972499971743673,
+        27.753000031225383,
+        30.922300007659942,
+        30.495300015900284,
+        32.85439999308437,
+        21.071699971798807,
+        22.679799993056804,
+        21.923599997535348,
+        20.131699973717332,
+        21.1117000435479,
+        18.73200002592057,
+        19.10540001699701,
+        19.69790004659444,
+        19.350299960933626,
+        21.107400010805577,
+        20.301199983805418,
+        22.502099978737533,
+        20.352400024421513,
+        24.555499956477433,
+        25.408399989828467,
+        21.583500027190894,
+        25.698899989947677,
+        20.70990001084283,
+        20.858700037933886,
+        19.456699956208467
+      ],
+      "callback_ms": 41.86379996826872,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 0.6641999934799969,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.000530900026206,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 54710272,
+        "private_bytes": 44810240,
+        "processes": [
+          {
+            "pid": 59664,
+            "created_ticks": 134362229606348986,
+            "cpu_seconds": 0.5625,
+            "working_set_bytes": 54710272,
+            "private_bytes": 44810240
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.000548299984075,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 54894592,
+        "private_bytes": 44810240,
+        "processes": [
+          {
+            "pid": 59664,
+            "created_ticks": 134362229606348986,
+            "cpu_seconds": 0.921875,
+            "working_set_bytes": 54894592,
+            "private_bytes": 44810240
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 8,
+      "harness_ready_ms": 645.5552999977954
+    },
+    {
+      "mode": "rust",
+      "admission_ms": [
+        40.734299982432276,
+        25.19289997871965,
+        32.003499974962324,
+        31.061100016813725,
+        31.145199958700687,
+        32.06940001109615,
+        29.50639999471605,
+        31.20719996513799,
+        33.04680000292137,
+        29.08949996344745,
+        33.71809999225661,
+        29.165100015234202,
+        30.69770004367456,
+        29.047499992884696,
+        30.985299963504076,
+        33.722100022714585,
+        30.843500047922134,
+        32.12859999621287,
+        13.7389000155963,
+        12.797800009138882,
+        33.705900015775114,
+        10.966099973302335,
+        12.052100035361946,
+        22.90879999054596,
+        30.254000041168183,
+        12.642899993807077,
+        34.19720003148541,
+        12.825299985706806,
+        38.937299977988005,
+        12.354000005871058
+      ],
+      "callback_ms": 41.201199986971915,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 862.9985000006855,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.000866699963808,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 62287872,
+        "private_bytes": 46592000,
+        "processes": [
+          {
+            "pid": 44900,
+            "created_ticks": 134362229662120895,
+            "cpu_seconds": 0.484375,
+            "working_set_bytes": 55971840,
+            "private_bytes": 45477888
+          },
+          {
+            "pid": 59928,
+            "created_ticks": 134362229676116273,
+            "cpu_seconds": 0.015625,
+            "working_set_bytes": 6316032,
+            "private_bytes": 1114112
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.001088599965442,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 63508480,
+        "private_bytes": 47353856,
+        "processes": [
+          {
+            "pid": 44900,
+            "created_ticks": 134362229662120895,
+            "cpu_seconds": 0.53125,
+            "working_set_bytes": 56102912,
+            "private_bytes": 45477888
+          },
+          {
+            "pid": 59928,
+            "created_ticks": 134362229676116273,
+            "cpu_seconds": 0.25,
+            "working_set_bytes": 7405568,
+            "private_bytes": 1875968
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 8,
+      "harness_ready_ms": 1465.6557000125758
+    },
+    {
+      "mode": "python",
+      "admission_ms": [
+        27.653399971313775,
+        19.556700019165874,
+        17.755100037902594,
+        20.073699997738004,
+        21.504299947991967,
+        20.69950004806742,
+        20.922700001392514,
+        19.928499998059124,
+        21.923699998296797,
+        19.085499981883913,
+        18.832100031431764,
+        20.05469996947795,
+        19.08009999897331,
+        21.44919999409467,
+        22.87139999680221,
+        20.526900014374405,
+        19.12609999999404,
+        21.192200016230345,
+        20.656200009398162,
+        19.24289995804429,
+        19.946000014897436,
+        20.332299987785518,
+        22.775000019464642,
+        19.385000050533563,
+        20.986300020013005,
+        21.915599994827062,
+        19.584499998018146,
+        27.34299999428913,
+        21.389400004409254,
+        18.786299973726273
+      ],
+      "callback_ms": 39.74080004263669,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 0.6476999842561781,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.0006930000381544,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 54972416,
+        "private_bytes": 45297664,
+        "processes": [
+          {
+            "pid": 63544,
+            "created_ticks": 134362229738512989,
+            "cpu_seconds": 0.515625,
+            "working_set_bytes": 54972416,
+            "private_bytes": 45297664
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.00086819997523,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 55242752,
+        "private_bytes": 45297664,
+        "processes": [
+          {
+            "pid": 63544,
+            "created_ticks": 134362229738512989,
+            "cpu_seconds": 0.9375,
+            "working_set_bytes": 55242752,
+            "private_bytes": 45297664
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 9,
+      "harness_ready_ms": 642.0384999946691
+    },
+    {
+      "mode": "rust",
+      "admission_ms": [
+        30.835399986244738,
+        24.09209997858852,
+        31.147100031375885,
+        30.146800039801747,
+        30.700499948579818,
+        32.22769999410957,
+        29.74149998044595,
+        12.935400009155273,
+        34.59569998085499,
+        29.321699985302985,
+        11.449199984781444,
+        36.85510001378134,
+        29.18759995372966,
+        33.027100027538836,
+        31.549000006634742,
+        30.668300052639097,
+        31.114200013689697,
+        12.958500010427088,
+        34.49430002365261,
+        29.94749997742474,
+        30.019099998753518,
+        11.79509999928996,
+        36.577099992427975,
+        30.934800044633448,
+        11.561500024981797,
+        34.84109998680651,
+        29.94759997818619,
+        32.11520001059398,
+        9.709499950986356,
+        22.694499988574535
+      ],
+      "callback_ms": 75.60339994961396,
+      "callback_contract": "persisted terminal child and reply through queued continuation; identical Python caller",
+      "setup_ms_after_imports": 908.9941999991424,
+      "native_process_creation_to_endpoint_ms": null,
+      "fresh_idle": {
+        "window_seconds": 2.000855299993418,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 61771776,
+        "private_bytes": 45805568,
+        "processes": [
+          {
+            "pid": 2592,
+            "created_ticks": 134362229793262278,
+            "cpu_seconds": 0.609375,
+            "working_set_bytes": 55455744,
+            "private_bytes": 44695552
+          },
+          {
+            "pid": 51784,
+            "created_ticks": 134362229807539671,
+            "cpu_seconds": 0.015625,
+            "working_set_bytes": 6316032,
+            "private_bytes": 1110016
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.000646099972073,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 62976000,
+        "private_bytes": 46604288,
+        "processes": [
+          {
+            "pid": 2592,
+            "created_ticks": 134362229793262278,
+            "cpu_seconds": 0.625,
+            "working_set_bytes": 55615488,
+            "private_bytes": 44695552
+          },
+          {
+            "pid": 51784,
+            "created_ticks": 134362229807539671,
+            "cpu_seconds": 0.140625,
+            "working_set_bytes": 7360512,
+            "private_bytes": 1908736
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 9,
+      "harness_ready_ms": 1522.3942000302486
+    },
+    {
+      "mode": "native",
+      "admission_ms": [
+        29.33420002227649,
+        26.084500015713274,
+        33.75359997153282,
+        11.507000017445534,
+        11.844600026961416,
+        38.3053999976255,
+        28.86620000936091,
+        12.652600009460002,
+        36.3323999918066,
+        30.52829997614026,
+        13.953499961644411,
+        30.07340000476688,
+        33.12559996265918,
+        30.109599989373237,
+        29.10760004306212,
+        10.607100033666939,
+        22.339300019666553,
+        31.13899996969849,
+        29.112500022165477,
+        32.690599968191236,
+        32.45709999464452,
+        12.625499977730215,
+        13.808800023980439,
+        13.762000016868114,
+        36.51609999360517,
+        30.574999982491136,
+        13.26320000225678,
+        13.021500024478883,
+        37.392099970020354,
+        28.166400035843253
+      ],
+      "callback_ms": 67.36739998450503,
+      "callback_contract": "child complete RPC through continuation claim RPC (includes loopback transport)",
+      "setup_ms_after_imports": 829.8413000302389,
+      "native_process_creation_to_endpoint_ms": 45.03154754638672,
+      "fresh_idle": {
+        "window_seconds": 2.0007413999992423,
+        "cpu_seconds": 0.0,
+        "working_set_bytes": 6885376,
+        "private_bytes": 1175552,
+        "processes": [
+          {
+            "pid": 2412,
+            "created_ticks": 134362229883596789,
+            "cpu_seconds": 0.046875,
+            "working_set_bytes": 6885376,
+            "private_bytes": 1175552
+          }
+        ]
+      },
+      "populated_idle": {
+        "window_seconds": 2.000552900019102,
+        "cpu_seconds": 0.015625,
+        "working_set_bytes": 7888896,
+        "private_bytes": 2002944,
+        "processes": [
+          {
+            "pid": 2412,
+            "created_ticks": 134362229883596789,
+            "cpu_seconds": 0.421875,
+            "working_set_bytes": 7888896,
+            "private_bytes": 2002944
+          }
+        ]
+      },
+      "verified_queued_jobs": 30,
+      "run": 9,
+      "harness_ready_ms": 1461.9764999952167
+    }
+  ],
+  "limitations": [
+    "Core-contract harness, not complete Python CcbdApp versus native startup",
+    "python=Python core; rust=Python coordinator plus native kernel; native=standalone native daemon",
+    "Python/rust admission timings use identical callers; native API-2 adds authenticated loopback RPC",
+    "Only Python/rust callback repair metrics share the same boundary; native callback latency has a different boundary",
+    "Harness-ready time includes Python test-fixture imports in all lanes; not pure native process startup",
+    "Python/rust idle is a quiescent harness, not their production daemon polling loop",
+    "Working set sums can double-count shared pages; private bytes are also reported",
+    "No cache flush, model, terminal, Herdr, skill materialization or real repository workload"
+  ],
+  "summaries": {
+    "python": {
+      "harness_ready_ms": {
+        "count": 10,
+        "min": 607.1072000195272,
+        "p50": 628.5911500162911,
+        "p95_nearest_rank": 731.1967000132427,
+        "max": 731.1967000132427
+      },
+      "setup_ms_after_imports": {
+        "count": 10,
+        "min": 0.6374999647960067,
+        "p50": 0.6639499915763736,
+        "p95_nearest_rank": 1.1686999932862818,
+        "max": 1.1686999932862818
+      },
+      "admission_ms": {
+        "count": 300,
+        "min": 16.254100017249584,
+        "p50": 21.63044997723773,
+        "p95_nearest_rank": 32.5093999854289,
+        "max": 84.78769997600466
+      },
+      "callback_ms": {
+        "count": 10,
+        "min": 32.27500000502914,
+        "p50": 35.73010000400245,
+        "p95_nearest_rank": 41.86379996826872,
+        "max": 41.86379996826872
+      },
+      "fresh_working_set_bytes": {
+        "count": 10,
+        "min": 54497280,
+        "p50": 54736896.0,
+        "p95_nearest_rank": 55189504,
+        "max": 55189504
+      },
+      "fresh_private_bytes": {
+        "count": 10,
+        "min": 44376064,
+        "p50": 44859392.0,
+        "p95_nearest_rank": 45297664,
+        "max": 45297664
+      },
+      "populated_idle_one_core_cpu_percent": {
+        "count": 10,
+        "min": 0.0,
+        "p50": 0.0,
+        "p95_nearest_rank": 0.0,
+        "max": 0.0
+      }
+    },
+    "rust": {
+      "harness_ready_ms": {
+        "count": 10,
+        "min": 1451.8586000194773,
+        "p50": 1504.4607000018004,
+        "p95_nearest_rank": 1586.4115000003949,
+        "max": 1586.4115000003949
+      },
+      "setup_ms_after_imports": {
+        "count": 10,
+        "min": 829.3095999979414,
+        "p50": 877.004499983741,
+        "p95_nearest_rank": 908.9941999991424,
+        "max": 908.9941999991424
+      },
+      "admission_ms": {
+        "count": 300,
+        "min": 9.709499950986356,
+        "p50": 30.22554999915883,
+        "p95_nearest_rank": 36.85510001378134,
+        "max": 42.08749998360872
+      },
+      "callback_ms": {
+        "count": 10,
+        "min": 41.201199986971915,
+        "p50": 82.0370999572333,
+        "p95_nearest_rank": 120.9482999984175,
+        "max": 120.9482999984175
+      },
+      "fresh_working_set_bytes": {
+        "count": 10,
+        "min": 61571072,
+        "p50": 61851648.0,
+        "p95_nearest_rank": 62287872,
+        "max": 62287872
+      },
+      "fresh_private_bytes": {
+        "count": 10,
+        "min": 45719552,
+        "p50": 46028800.0,
+        "p95_nearest_rank": 46592000,
+        "max": 46592000
+      },
+      "populated_idle_one_core_cpu_percent": {
+        "count": 10,
+        "min": 0.0,
+        "p50": 0.0,
+        "p95_nearest_rank": 0.0,
+        "max": 0.0
+      }
+    },
+    "native": {
+      "harness_ready_ms": {
+        "count": 10,
+        "min": 1461.9764999952167,
+        "p50": 1522.8058000211604,
+        "p95_nearest_rank": 1547.9842000058852,
+        "max": 1547.9842000058852
+      },
+      "setup_ms_after_imports": {
+        "count": 10,
+        "min": 829.8413000302389,
+        "p50": 877.3237999994308,
+        "p95_nearest_rank": 912.4805000028573,
+        "max": 912.4805000028573
+      },
+      "admission_ms": {
+        "count": 300,
+        "min": 9.915200003888458,
+        "p50": 28.975000022910535,
+        "p95_nearest_rank": 36.25299996929243,
+        "max": 41.37370001990348
+      },
+      "callback_ms": {
+        "count": 10,
+        "min": 63.51680000079796,
+        "p50": 71.98839998454787,
+        "p95_nearest_rank": 79.73989995662123,
+        "max": 79.73989995662123
+      },
+      "fresh_working_set_bytes": {
+        "count": 10,
+        "min": 6868992,
+        "p50": 6887424.0,
+        "p95_nearest_rank": 6918144,
+        "max": 6918144
+      },
+      "fresh_private_bytes": {
+        "count": 10,
+        "min": 1155072,
+        "p50": 1175552.0,
+        "p95_nearest_rank": 1183744,
+        "max": 1183744
+      },
+      "populated_idle_one_core_cpu_percent": {
+        "count": 10,
+        "min": 0.0,
+        "p50": 0.3904300582647173,
+        "p95_nearest_rank": 3.1243518532739123,
+        "max": 3.1243518532739123
+      },
+      "process_creation_to_endpoint_ms": {
+        "count": 10,
+        "min": 39.98923301696777,
+        "p50": 44.667959213256836,
+        "p95_nearest_rank": 46.51379585266113,
+        "max": 46.51379585266113
+      }
+    }
+  },
+  "secure_token_creation": {
+    "milliseconds": {
+      "python": [
+        853.341999987606,
+        798.9707999513485,
+        813.2997999782674,
+        857.3116000043228,
+        839.0042999526486,
+        828.1672000302933,
+        795.9700999781489,
+        805.076899996493,
+        772.1573000308126,
+        819.3307000328787
+      ],
+      "native": [
+        42.36070002662018,
+        41.04799998458475,
+        38.921000028494745,
+        42.38990001613274,
+        35.368100041523576,
+        54.42120000952855,
+        37.412800011225045,
+        43.57290000189096,
+        40.743399993516505,
+        38.96949999034405
+      ]
+    },
+    "summaries": {
+      "python": {
+        "count": 10,
+        "min": 772.1573000308126,
+        "p50": 816.315250005573,
+        "p95_nearest_rank": 857.3116000043228,
+        "max": 857.3116000043228
+      },
+      "native": {
+        "count": 10,
+        "min": 35.368100041523576,
+        "p50": 40.89569998905063,
+        "p95_nearest_rank": 54.42120000952855,
+        "max": 54.42120000952855
+      }
+    },
+    "contract": "create a new same-user read-protected token; includes helper subprocesses and ACL verification; excludes module import",
+    "fixture_root": "C:\\Users\\user\\AppData\\Local\\Temp\\ccb-token-perf-3vp8xc48"
+  },
+  "base_commit": "f474a38de1b2e7ac97325a53c68401288c2fa3dc",
+  "platform": "Windows-11-10.0.28000-SP0",
+  "harness_sha256": "de03e348e66a55544c3ff34285d2f4779d8eae4021ad052fa103b166ed5be91d",
+  "measurement_note": "Token creation was measured after the core run using the added token_benchmark function; core worker logic and parameters were unchanged.",
+  "kernel_transport_parent": "stdio",
+  "validation": {
+    "core_worker_runs": 30,
+    "validated_admissions": 900,
+    "validated_callback_cases": 30,
+    "final_smoke_result": "C:/Users/user/AppData/Local/Temp/ccb-core-perf-zbu97uq8/result.json",
+    "production_install_changed": false
+  }
+}

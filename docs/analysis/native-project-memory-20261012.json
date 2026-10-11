@@ -1,0 +1,212 @@
+{
+  "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-project-memory-live-lues7s7m",
+  "real_model": true,
+  "base_commit": "8b805e5b",
+  "turns": [
+    {
+      "stage": "ONE",
+      "job_id": "job_5d22a221bf44",
+      "reply": "SHARED_ONE_24ae4f4c\nPRIVATE_ONE_24ae4f4c",
+      "session_id": "01a12ca8-1a43-7fb2-b336-fdcdac49ce5b",
+      "runtime_instance_id": "9ec6eb37-1b89-40a0-ac6f-5d7cf8e3ec99",
+      "pid": 41712,
+      "native_history": "C:\\Users\\user\\.codex\\sessions\\2026\\10\\12\\rollout-2026-10-12T04-29-38-01a12ca8-1a43-7fb2-b336-fdcdac49ce5b.jsonl",
+      "host_root": "C:\\Users\\user\\Desktop\\work\\ccb-project-memory-live-lues7s7m\\hosts\\9ec6eb37-1b89-40a0-ac6f-5d7cf8e3ec99"
+    },
+    {
+      "stage": "TWO",
+      "job_id": "job_45a70165fef4",
+      "reply": "SHARED_TWO_24ae4f4c\nPRIVATE_TWO_24ae4f4c",
+      "session_id": "01a12ca8-1a43-7fb2-b336-fdcdac49ce5b",
+      "runtime_instance_id": "9ec6eb37-1b89-40a0-ac6f-5d7cf8e3ec99",
+      "pid": 41712,
+      "native_history": "C:\\Users\\user\\.codex\\sessions\\2026\\10\\12\\rollout-2026-10-12T04-29-38-01a12ca8-1a43-7fb2-b336-fdcdac49ce5b.jsonl",
+      "host_root": "C:\\Users\\user\\Desktop\\work\\ccb-project-memory-live-lues7s7m\\hosts\\9ec6eb37-1b89-40a0-ac6f-5d7cf8e3ec99"
+    },
+    {
+      "stage": "EMPTY",
+      "job_id": "job_5b903bd86ea6",
+      "reply": "NO_CURRENT_MEMORY",
+      "session_id": "01a12ca8-1a43-7fb2-b336-fdcdac49ce5b",
+      "runtime_instance_id": "9ec6eb37-1b89-40a0-ac6f-5d7cf8e3ec99",
+      "pid": 41712,
+      "native_history": "C:\\Users\\user\\.codex\\sessions\\2026\\10\\12\\rollout-2026-10-12T04-29-38-01a12ca8-1a43-7fb2-b336-fdcdac49ce5b.jsonl",
+      "host_root": "C:\\Users\\user\\Desktop\\work\\ccb-project-memory-live-lues7s7m\\hosts\\9ec6eb37-1b89-40a0-ac6f-5d7cf8e3ec99"
+    }
+  ],
+  "success": true,
+  "daemon_pid": 61552,
+  "daemon_stopped": true,
+  "schema_version": 1,
+  "recorded_at": "2026-10-11T20:31:51.910772+00:00",
+  "model": "gpt-6.1-sol",
+  "production_install_changed": false,
+  "source_audits": [
+    {
+      "agent_name": "worker",
+      "bytes": 86,
+      "delivery": "per_turn_live_read",
+      "project_root": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-project-memory-live-lues7s7m\\project",
+      "sources": [
+        {
+          "bytes": 42,
+          "exists": true,
+          "kind": "ccb_shared",
+          "path": ".ccb/ccb_memory.md",
+          "sha256": "714085f427df0d5e642d034e94f0ab64b8ad1e462d4fb8fb6543dcd24f52bb19"
+        },
+        {
+          "bytes": 44,
+          "exists": true,
+          "kind": "agent_private",
+          "path": ".ccb/agents/worker/memory.md",
+          "sha256": "e468f2210b030e3cf7161aea22877718c6d5d5404bfbb5c333b703ef9fdcc558"
+        }
+      ]
+    },
+    {
+      "agent_name": "worker",
+      "bytes": 86,
+      "delivery": "per_turn_live_read",
+      "project_root": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-project-memory-live-lues7s7m\\project",
+      "sources": [
+        {
+          "bytes": 42,
+          "exists": true,
+          "kind": "ccb_shared",
+          "path": ".ccb/ccb_memory.md",
+          "sha256": "537fe6e0cc9a7b52345fa67671d13ab4d3b5de85248eb94c904afc291dcd25e4"
+        },
+        {
+          "bytes": 44,
+          "exists": true,
+          "kind": "agent_private",
+          "path": ".ccb/agents/worker/memory.md",
+          "sha256": "209311aebe063c7e2da799c00ec283c515803dee2127e013d05a350f3313e242"
+        }
+      ]
+    },
+    {
+      "agent_name": "worker",
+      "bytes": 0,
+      "delivery": "per_turn_live_read",
+      "project_root": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-project-memory-live-lues7s7m\\project",
+      "sources": [
+        {
+          "bytes": 0,
+          "exists": false,
+          "kind": "ccb_shared",
+          "path": ".ccb/ccb_memory.md",
+          "sha256": null
+        },
+        {
+          "bytes": 0,
+          "exists": false,
+          "kind": "agent_private",
+          "path": ".ccb/agents/worker/memory.md",
+          "sha256": null
+        }
+      ]
+    },
+    {
+      "agent_name": "worker",
+      "bytes": 96,
+      "delivery": "per_turn_live_read",
+      "project_root": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-project-memory-live-lues7s7m\\project",
+      "sources": [
+        {
+          "bytes": 47,
+          "exists": true,
+          "kind": "ccb_shared",
+          "path": ".ccb/ccb_memory.md",
+          "sha256": "014a020ce25ef270f45cd75d1075eb1a919f092a86b5483d7efa7e6fa6b11255"
+        },
+        {
+          "bytes": 49,
+          "exists": true,
+          "kind": "agent_private",
+          "path": ".ccb/agents/worker/memory.md",
+          "sha256": "13ea3b427745b37838eb98b4d8994e72d3006356433a3e24988e47ba994a2d21"
+        }
+      ]
+    },
+    {
+      "agent_name": "worker",
+      "bytes": 90,
+      "delivery": "per_turn_live_read",
+      "project_root": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-project-memory-live-lues7s7m\\project",
+      "sources": [
+        {
+          "bytes": 44,
+          "exists": true,
+          "kind": "ccb_shared",
+          "path": ".ccb/ccb_memory.md",
+          "sha256": "c3ab907caa8859d7610bf14dbd895d0ce8f2cfbaa3e0a763b7722c22dc42b4b0"
+        },
+        {
+          "bytes": 46,
+          "exists": true,
+          "kind": "agent_private",
+          "path": ".ccb/agents/worker/memory.md",
+          "sha256": "4b8b19a4a1ce08ac6a23c34a3896cce9f232b395daec151f490a879fa4d1ce06"
+        }
+      ]
+    }
+  ],
+  "native_turn_ids": [
+    "01a12ca8-2523-7042-a674-ba84daa26a3e",
+    "01a12ca8-3553-7dc1-95eb-458563687c75",
+    "01a12ca8-3cbc-72f1-9eef-d887fe0aa3b5",
+    "01a12cac-b724-7203-b5dd-2e8ac95ef749",
+    "01a12cb0-26c0-7f30-ad90-d1899d8038f8"
+  ],
+  "native_ccb_user_prompt_count": 5,
+  "provider_tool_calls": 0,
+  "owned_processes_confirmed_absent": [
+    61552,
+    41712,
+    53900,
+    44336,
+    39724,
+    50756,
+    39724,
+    63704,
+    48356
+  ],
+  "native_history_sha256": "23a80d9f78990761775f59914787a1dce2b5a7598f05d494fe28c8369b6c1ca5",
+  "scope": "Real Codex same-thread update/deletion plus explicit cold resume and a final-release source-label probe; five CCB turns. Pi/Claude wire cases use controlled providers. Private selection is not filesystem access control, and prior provider history is retained.",
+  "cold_resume": {
+    "job_id": "job_2f60a3354289",
+    "reply": "SHARED_RESTORED_24ae4f4c\nPRIVATE_RESTORED_24ae4f4c",
+    "thread_id": "01a12ca8-1a43-7fb2-b336-fdcdac49ce5b",
+    "new_runtime_instance_id": "cd8c557f-4d7e-4c6d-b536-a4154d051ebe",
+    "new_pid": 39724,
+    "resume_session_enabled": true,
+    "memory_files_recreated_by_test_before_restart": true
+  },
+  "before_resume_history_sha256": "4c7f6fbb00211990364af79307ba7778acf0ac826ff2982fbc2e7e321097d120",
+  "verification": {
+    "memory_and_role_selection": "28 passed in 59.69s",
+    "queued_dispatch_case": "1 passed in 3.32s",
+    "role_herdr_context_daemon_selection": "81 passed in 229.99s",
+    "rust_unit_tests": "27 passed, plus parent-invoked process-death helper, in 31.25s",
+    "format_clippy_diff": "passed",
+    "full_repository_run": false,
+    "final_project_memory_selection": "10 passed in 20.63s after absolute source-label refinement"
+  },
+  "final_release_probe": {
+    "job_id": "job_fc23b971107d",
+    "reply": "SHARED_FINAL_24ae4f4c\nPRIVATE_FINAL_24ae4f4c",
+    "absolute_source_labels_verified": true,
+    "same_thread": "01a12ca8-1a43-7fb2-b336-fdcdac49ce5b",
+    "runtime_instance_id": "53fbd270-5298-433d-88c6-f16e07239e1b"
+  },
+  "observed_initial_binary_sha256": {
+    "ccb-kernel.exe": "4958830c64cd46ce2a86029b52517232fdde3106c89896e9d3828b5441b15735",
+    "ccb-native.exe": "15a5672a4bd046ea8affce96a99cd7c625dd7cbc472526b24f8583a6d17e4eda"
+  },
+  "final_release_sha256": {
+    "ccb-kernel.exe": "37e98f1a37f2817da9d382b2bf3bcc6eb000ee248d84d85e4bac626ad4a7fc71",
+    "ccb-native.exe": "ed2af872905a0aa472f306c5773ac8bb6d82f825d6f27ce3210311faf3712a35"
+  }
+}

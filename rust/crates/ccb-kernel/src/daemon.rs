@@ -1543,6 +1543,21 @@ impl Daemon {
             .or(spec["workspace_path"].as_str())
             .map(std::path::Path::new);
         let mut body = records::string(&job["request"], "body")?.to_owned();
+        let memory = match crate::project_memory::prepare(project, agent) {
+            Ok(memory) => memory,
+            Err(_) => {
+                let mut decision = failure("failed","project_memory_invalid",
+                    "Project memory could not be loaded. Check the shared and agent-private files, path ownership, UTF-8 encoding and combined 256 KiB size limit, then submit again.");
+                decision["diagnostics"] = json!({"completion_authority":"native_project_memory",
+                    "provider_prompt_sent":false,"configuration_error":true});
+                self.complete(job, &decision)?;
+                self.kernel.store.commit()?;
+                return Ok(None);
+            }
+        };
+        if let Some(memory) = &memory {
+            body.push_str(&memory.shared);
+        }
         let review = &job["request"]["route_options"];
         if review["review_workspace_path"].is_string() && review["review_tree_digest"].is_string() {
             body.push_str(&format!("\n\nCCB bound review workspace:\n{}\nReview this workspace and verify its tree identity before reporting; the observation does not freeze files.",
@@ -1560,7 +1575,10 @@ impl Daemon {
             Ok(prompt)
         });
         match prepared {
-            Ok(prompt) => {
+            Ok(mut prompt) => {
+                if let Some(memory) = &memory {
+                    prompt.text.push_str(&memory.private);
+                }
                 if spec["driver_kind"] == "pi_rpc" {
                     if let Some(roots) = &prompt.skill_roots {
                         self.pi
@@ -1568,6 +1586,15 @@ impl Daemon {
                             .context("Pi session missing for role preparation")?
                             .stage_role_plan(&mut self.kernel.store, job, roots)?;
                     }
+                }
+                if let Some(memory) = &memory {
+                    admission::event(
+                        &mut self.kernel,
+                        job,
+                        "project_memory_loaded",
+                        memory.audit.clone(),
+                        &now(),
+                    )?;
                 }
                 if !prompt.audit.is_null() {
                     admission::event(
@@ -1577,6 +1604,8 @@ impl Daemon {
                         prompt.audit.clone(),
                         &now(),
                     )?;
+                }
+                if memory.is_some() || !prompt.audit.is_null() {
                     self.kernel.store.commit()?;
                 }
                 Ok(Some(prompt))

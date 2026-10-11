@@ -45,6 +45,7 @@ mod pi_context;
 mod pi_rpc;
 mod pi_skills;
 mod pi_terminal;
+mod project_memory;
 mod provider_fault;
 mod records;
 mod result_policy;

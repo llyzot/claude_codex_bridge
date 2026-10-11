@@ -25,6 +25,7 @@ mod provider_fault;
 mod records;
 mod result_policy;
 mod retry;
+mod roles;
 pub mod rpc;
 mod scheduler;
 pub mod security;

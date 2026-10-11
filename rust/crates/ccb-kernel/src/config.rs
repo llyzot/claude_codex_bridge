@@ -92,6 +92,9 @@ pub fn fingerprint(config: &Value) -> Result<String> {
     Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(&value)?)))
 }
 pub fn parse(text: &str) -> Result<Value> {
+    parse_at(text, None)
+}
+pub fn parse_at(text: &str, root: Option<&Path>) -> Result<Value> {
     if text.trim_start().starts_with('{') {
         return Ok(serde_json::from_str(text)?);
     }
@@ -109,7 +112,7 @@ pub fn parse(text: &str) -> Result<Value> {
         return Ok(serde_json::to_value(value)?);
     }
     let header = lines[..rich.unwrap_or(lines.len())].join("\n");
-    let mut parser = Layout::new(&header)?;
+    let mut parser = Layout::new(&header, root)?;
     let layout = parser.horizontal()?;
     ensure!(
         parser.index == parser.tokens.len(),
@@ -119,7 +122,7 @@ pub fn parse(text: &str) -> Result<Value> {
         !parser.names.is_empty(),
         "compact config must define at least one agent"
     );
-    let mut document = json!({"version":2,"default_agents":parser.names,"agents":parser.agents,"cmd_enabled":parser.cmd,"layout":layout});
+    let mut document = json!({"version":2,"default_agents":parser.names,"agents":parser.agents,"cmd_enabled":parser.cmd,"layout":layout.text});
     if let Some(index) = rich {
         let overlay: toml::Value = toml::from_str(&lines[index..].join("\n"))?;
         let overlay = serde_json::to_value(overlay)?;
@@ -154,15 +157,38 @@ pub fn parse(text: &str) -> Result<Value> {
     }
     Ok(document)
 }
+struct LayoutText {
+    text: String,
+    rank: u8,
+}
+impl LayoutText {
+    fn leaf(text: String) -> Self {
+        Self { text, rank: 3 }
+    }
+    fn nested(self, parent: u8) -> String {
+        if self.rank < parent {
+            format!("({})", self.text)
+        } else {
+            self.text
+        }
+    }
+    fn join(left: Self, right: Self, rank: u8, delimiter: char) -> Self {
+        Self {
+            text: format!("{}{delimiter} {}", left.nested(rank), right.nested(rank)),
+            rank,
+        }
+    }
+}
 struct Layout {
     tokens: Vec<String>,
     index: usize,
     agents: serde_json::Map<String, Value>,
     names: Vec<String>,
     cmd: bool,
+    project: Option<PathBuf>,
 }
 impl Layout {
-    fn new(text: &str) -> Result<Self> {
+    fn new(text: &str, project: Option<&Path>) -> Result<Self> {
         let mut tokens = Vec::new();
         let mut leaf = String::new();
         for line in text.lines() {
@@ -207,6 +233,7 @@ impl Layout {
             agents: serde_json::Map::new(),
             names: Vec::new(),
             cmd: false,
+            project: project.map(Path::to_path_buf),
         })
     }
     fn peek(&self) -> &str {
@@ -224,28 +251,28 @@ impl Layout {
         self.index += 1;
         Ok(token)
     }
-    fn horizontal(&mut self) -> Result<String> {
+    fn horizontal(&mut self) -> Result<LayoutText> {
         let mut value = self.vertical()?;
         while self.peek() == ";" {
             self.take()?;
-            value = format!("{value}; {}", self.vertical()?);
+            value = LayoutText::join(value, self.vertical()?, 1, ';');
         }
         Ok(value)
     }
-    fn vertical(&mut self) -> Result<String> {
+    fn vertical(&mut self) -> Result<LayoutText> {
         let mut value = self.primary()?;
         while self.peek() == "," {
             self.take()?;
-            value = format!("{value}, {}", self.primary()?);
+            value = LayoutText::join(value, self.primary()?, 2, ',');
         }
         Ok(value)
     }
-    fn primary(&mut self) -> Result<String> {
+    fn primary(&mut self) -> Result<LayoutText> {
         if self.peek() == "(" {
             self.take()?;
             let value = self.horizontal()?;
             ensure!(self.take()? == ")", "unclosed layout group");
-            return Ok(format!("({value})"));
+            return Ok(value);
         }
         let token = self.take()?;
         ensure!(
@@ -262,12 +289,22 @@ impl Layout {
         if leaf == "cmd" {
             ensure!(!self.cmd, "compact config cannot define cmd more than once");
             self.cmd = true;
-            return Ok(token);
+            return Ok(LayoutText::leaf(token));
         }
         let (name, provider) = leaf
             .split_once(':')
             .context("compact agent requires name:provider")?;
         let name = name.trim().to_lowercase();
+        let role = if name.contains('.') {
+            Some(crate::roles::normalize(&name)?)
+        } else {
+            None
+        };
+        let name = if let Some(role) = &role {
+            crate::roles::default_agent(role, self.project.as_deref())?
+        } else {
+            name
+        };
         crate::models::validate_agent(&name)?;
         ensure!(
             !self.agents.contains_key(&name),
@@ -287,6 +324,9 @@ impl Layout {
         );
         self.names.push(name.clone());
         self.agents.insert(name.clone(),json!({"provider":provider,"target":".","workspace_mode":if worktree{"git-worktree"}else{"inplace"},"restore":"auto","permission":"manual"}));
+        if let Some(role) = role {
+            self.agents[&name]["role"] = json!(role);
+        }
         let mut render = format!(
             "{name}:{provider}{}",
             if worktree { "(worktree)" } else { "" }
@@ -294,7 +334,7 @@ impl Layout {
         if let Some(percent) = percent {
             render.push_str(&format!("@{percent}"));
         }
-        Ok(render)
+        Ok(LayoutText::leaf(render))
     }
 }
 pub fn compile(root: &Path, document: Value, executables: &Value) -> Result<Value> {
@@ -315,6 +355,9 @@ pub fn compile(root: &Path, document: Value, executables: &Value) -> Result<Valu
         let workspace = root.join(target);
         ensure!(workspace.is_dir(), "agent target directory does not exist");
         let mut spec = raw.clone();
+        if let Some(role) = crate::roles::normalized(&raw["role"])? {
+            spec["role"] = json!(role);
+        }
         spec["workspace_path"] = json!(workspace.canonicalize()?);
         let command = executables[provider].as_array().context(format!(
             "native executable argv missing for provider: {provider}"

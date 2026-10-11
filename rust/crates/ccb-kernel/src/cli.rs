@@ -99,7 +99,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         return Ok(());
     }
     if args.first().is_some_and(|s| s == "--help") {
-        println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask [--compact] [--silence] [--chain] [--artifact-request|--inline-request] [--artifact-reply] <agent> [from <actor>] [--] <message...>\n  ask also reads redirected UTF-8 stdin; --artifact-io enables request/reply artifacts\n  --task-id <id>, --reply-to <id>, --mode <type>; native --from <actor> remains supported\nccb-native --state-root <dir> ask get|cancel <job-id>\nccb-native --state-root <dir> cancel <job-id> [--silent] | retry <job-id>\nccb-native --state-root <dir> watch <target> [--cursor <n>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> ping|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> job-recovery|job-reconcile <job-id>\nccb-native --state-root <dir> provider-status <agent>\nccb-native --state-root <dir> provider-terminate <agent> [--silent]\nccb-native --state-root <dir> provider-recover <agent> <fault-id>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
+        println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask [--compact] [--silence] [--chain] [--artifact-request|--inline-request] [--artifact-reply] <agent> [from <actor>] [--] <message...>\n  target accepts a configured agent or uniquely bound role ID; agents lists bindings\n  ask also reads redirected UTF-8 stdin; --artifact-io enables request/reply artifacts\n  --task-id <id>, --reply-to <id>, --mode <type>; native --from <actor> remains supported\nccb-native --state-root <dir> ask get|cancel <job-id>\nccb-native --state-root <dir> cancel <job-id> [--silent] | retry <job-id>\nccb-native --state-root <dir> watch <target> [--cursor <n>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> agents|ping|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> job-recovery|job-reconcile <job-id>\nccb-native --state-root <dir> provider-status <agent>\nccb-native --state-root <dir> provider-terminate <agent> [--silent]\nccb-native --state-root <dir> provider-recover <agent> <fault-id>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
         return Ok(());
     }
     if args.is_empty() {
@@ -122,7 +122,14 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         let operation = args[1].to_str().context("invalid config operation")?;
         if operation == "show" {
             ensure!(args.len() == 3, "config show requires a file");
-            let document = crate::config::parse(&std::fs::read_to_string(Path::new(&args[2]))?)?;
+            let file = Path::new(&args[2]).canonicalize()?;
+            let directory = file.parent().context("config file has no parent")?;
+            let root = if directory.file_name().is_some_and(|n| n == ".ccb") {
+                directory.parent().unwrap_or(directory)
+            } else {
+                directory
+            };
+            let document = crate::config::parse_at(&std::fs::read_to_string(&file)?, Some(root))?;
             println!("{document}");
             return Ok(());
         }
@@ -131,8 +138,10 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             "config compile requires project root and optional executable manifest"
         );
         let root = Path::new(&args[2]).canonicalize()?;
-        let document =
-            crate::config::parse(&std::fs::read_to_string(root.join(".ccb/ccb.config"))?)?;
+        let document = crate::config::parse_at(
+            &std::fs::read_to_string(root.join(".ccb/ccb.config"))?,
+            Some(&root),
+        )?;
         let executables: Value = if args.len() == 4 {
             serde_json::from_slice(&std::fs::read(Path::new(&args[3]))?)?
         } else {
@@ -263,8 +272,10 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
                 .clone()
                 .map(Ok)
                 .unwrap_or_else(|| crate::config::project_root(&std::env::current_dir()?))?;
-            let document =
-                crate::config::parse(&std::fs::read_to_string(project.join(".ccb/ccb.config"))?)?;
+            let document = crate::config::parse_at(
+                &std::fs::read_to_string(project.join(".ccb/ccb.config"))?,
+                Some(&project),
+            )?;
             let executables = if let Some(path) = manifest {
                 serde_json::from_slice(&std::fs::read(path)?)?
             } else {
@@ -279,7 +290,10 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         return Ok(());
     }
     let payload = match op.as_str() {
-        "ping" | "stop" => json!({}),
+        "ping" | "stop" | "agents" => {
+            ensure!(args.is_empty(), "command takes no arguments");
+            json!({})
+        }
         "watch" | "get" | "pend" => {
             return crate::cli_tasks::watch(&root, &args);
         }

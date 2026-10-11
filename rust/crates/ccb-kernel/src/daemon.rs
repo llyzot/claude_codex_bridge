@@ -88,6 +88,7 @@ impl Daemon {
         );
         for (name, spec) in agents {
             crate::models::validate_agent(name)?;
+            crate::roles::normalized(&spec["role"])?;
             ensure!(
                 !records::string(spec, "provider")?.is_empty(),
                 "empty agent provider"
@@ -371,6 +372,11 @@ impl Daemon {
                 Ok(self.recovery_view(&job))
             }
             "job-reconcile" => self.reconcile_execution(records::string(p, "target")?),
+            "agents" => Ok(json!({"agents":self.names().iter().map(|name| {
+                let spec=&self.config["agents"][name];
+                json!({"agent_name":name,"provider":spec["provider"],"role":crate::roles::normalized(&spec["role"]).unwrap(),
+                    "dispatch_disabled":spec["dispatch_disabled"]==true})
+            }).collect::<Vec<_>>()})),
             "submit" => self.submit(p),
             "watch" => self.watch(p),
             "queue" => {
@@ -589,6 +595,10 @@ impl Daemon {
     fn submit(&mut self, p: &Value) -> Result<Value> {
         let mut request = p.clone();
         ensure!(request.is_object(), "submit requires an object");
+        request["to_agent"] = json!(crate::roles::resolve(
+            records::string(&request, "to_agent")?,
+            &self.config["agents"]
+        )?);
         ensure!(
             !self
                 .faults

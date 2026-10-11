@@ -117,6 +117,7 @@ impl Store {
             "callbacks/edges.jsonl",
             "submissions.jsonl",
             "resubmissions.jsonl",
+            "mailbox-acks.jsonl",
         ]
         .contains(&relative);
         let artifact = parts.len() == 4

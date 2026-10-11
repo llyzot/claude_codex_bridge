@@ -19,6 +19,8 @@ use std::{
 mod context;
 #[path = "daemon_herdr.rs"]
 mod herdr;
+#[path = "mailbox_control.rs"]
+mod mailbox_control;
 #[path = "project_view.rs"]
 mod project_view;
 #[path = "daemon_reload.rs"]
@@ -606,13 +608,8 @@ impl Daemon {
                     &json!({"target":target,"state_id":self.state,"accepted_at":now(),"dispatch_disabled":spec["dispatch_disabled"]}),
                 )
             }
-            "inbox" => {
-                let agent = records::string(p, "agent_name")?;
-                self.spec(agent)?;
-                Ok(
-                    json!({"agent_name":agent,"events":self.kernel.dispatch("latest_events",&json!({"agent_name":agent}))?}),
-                )
-            }
+            "inbox" => self.inbox_view(p),
+            "ack" => self.ack_inbox(p),
             "mailbox-head" => {
                 let agent = records::string(p, "agent_name")?;
                 self.spec(agent)?;

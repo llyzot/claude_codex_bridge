@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "base_commit": "bd19edae",
+  "recorded_at": "2026-10-11T19:47:35.446608+00:00",
+  "commands": [
+    "inbox [--detail] <agent>",
+    "ack <agent> [inbound-event-id]"
+  ],
+  "api_operations": [
+    "inbox",
+    "ack"
+  ],
+  "legacy_sources": [
+    "lib/message_bureau/control_queue_runtime/ack.py",
+    "lib/message_bureau/control_queue_runtime/views_runtime/inbox.py",
+    "lib/message_bureau/control_queue_runtime/events.py"
+  ],
+  "real_models": false,
+  "production_install_changed": false,
+  "final_release_sha256": {
+    "ccb-kernel.exe": "309cfee3b6a2c43138aba2db5c72bc4933804fed6f009513f6b621c6611af875",
+    "ccb-native.exe": "0e58ada70b28cf3c57c99747ae994f84430315768e6e298346f11cc5944c49fb"
+  },
+  "repository_bin_matches_release": true,
+  "verification": {
+    "selected_suite_before_final_projection_refinements": "62 passed in 87.34s; mailbox-control/daemon/trace/wait/resubmit/CLI-security",
+    "final_mailbox_suite": "12 passed in 17.83s; includes Python item-summary oracle",
+    "final_rust_unit_tests": "25 passed, subprocess worker ignored as a standalone test and invoked by its passing parent; 31.39s",
+    "format_clippy_diff": "passed",
+    "full_repository_run": false
+  },
+  "limitations": [
+    "Retained events remain unpaginated and subject to transport size limits",
+    "Native mailbox-head remains a claimable-head query",
+    "Production default and authenticated Claude acceptance remain unfinished"
+  ]
+}

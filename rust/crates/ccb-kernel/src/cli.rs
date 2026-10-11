@@ -136,6 +136,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
         println!("ccb-native installation upgrade|recover|rollback --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]\nccb-native installation status --prefix <directory>");
         println!("ccb-native --state-root <dir> view [--limit <1..64>]");
+        println!("ccb-native [--project <directory>] inbox [--detail] <agent>\nccb-native [--project <directory>] ack <agent> [inbound-event-id]");
         println!(
             "ccb-native [--project <directory>] resubmit <message-id> [--operation-id <uuid>]"
         );
@@ -694,6 +695,51 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     if op == "clear" || op == "compact" {
         return crate::cli_context::run(&root, &op, &args);
     }
+    if op == "ack" {
+        ensure!(
+            args.len() == 1 || args.len() == 2,
+            "ack requires agent and optional inbound event ID"
+        );
+        let agent = arg(&args, 0)?;
+        let id = if args.len() == 2 {
+            arg(&args, 1)?.to_owned()
+        } else {
+            let view = request(&root, "inbox", json!({"agent_name":agent}))?;
+            view["head"]["inbound_event_id"]
+                .as_str()
+                .context("inbox is empty")?
+                .to_owned()
+        };
+        let result = request(
+            &root,
+            "ack",
+            json!({"agent_name":agent,"inbound_event_id":id}),
+        )
+        .with_context(|| {
+            format!("ack for {agent} event {id} was not observed; retry this exact event ID")
+        })?;
+        println!("{}", request_preview(&result));
+        return Ok(());
+    }
+    if op == "inbox" {
+        let detail = args.iter().any(|s| s == "--detail");
+        let names = args.iter().filter(|s| *s != "--detail").collect::<Vec<_>>();
+        ensure!(
+            names.len() == 1 && args.len() == 1 + usize::from(detail),
+            "inbox requires agent and optional --detail"
+        );
+        let agent = names[0].to_str().context("invalid agent")?;
+        ensure!(!agent.starts_with('-'), "invalid inbox agent");
+        println!(
+            "{}",
+            request_preview(&request(
+                &root,
+                "inbox",
+                json!({"agent_name":agent,"detail":detail})
+            )?)
+        );
+        return Ok(());
+    }
     if op == "resubmit" {
         ensure!(
             args.len() == 1 || args.len() == 3 && arg(&args, 1)? == "--operation-id",
@@ -773,7 +819,6 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             json!({"target":arg(&args,0)?})
         }
         "queue" => json!({"target":args.first().and_then(|s|s.to_str()).unwrap_or("all")}),
-        "inbox" => json!({"agent_name":arg(&args,0)?}),
         "provider-status" => {
             ensure!(args.len() == 1, "provider-status requires an agent");
             json!({"agent_name":arg(&args,0)?})

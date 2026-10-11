@@ -657,6 +657,29 @@ impl Daemon {
             request["message_type"] != "reply_delivery",
             "reply_delivery is reserved for the native mailbox"
         );
+        let context = json!({"request":request,"state_id":self.state,
+            "agent_names":self.names(),"bureau_enabled":true,"max_callback_depth":self.config["max_callback_depth"].as_u64().unwrap_or(5)});
+        let parent = crate::callback_policy::validate(&mut self.kernel, &context)?;
+        // These claims belong to the authority, never to the submitting worker.
+        if let Some(options) = request["route_options"].as_object_mut() {
+            options.remove("review_workspace_path");
+            options.remove("review_tree_digest");
+        }
+        if !parent.is_null()
+            && (records::truthy(&parent["request"]["route_options"]["bind_chain_workspace_tree"])
+                || records::truthy(&request["route_options"]["bind_chain_workspace_tree"]))
+        {
+            let agent = records::string(&parent, "agent_name")?;
+            let spec = self.spec(agent)?;
+            let workspace = parent["workspace_path"]
+                .as_str()
+                .or(spec["workspace_path"].as_str())
+                .context("restricted review chain requires a parent workspace")?;
+            let observed = crate::git_observation::current(std::path::Path::new(workspace), true)?;
+            request["route_options"]["bind_chain_workspace_tree"] = json!(true);
+            request["route_options"]["review_workspace_path"] = observed["workspace_path"].clone();
+            request["route_options"]["review_tree_digest"] = observed["digest"].clone();
+        }
         let transport = request["body_transport"]
             .as_str()
             .unwrap_or("inline")
@@ -1340,19 +1363,23 @@ impl Daemon {
             .as_str()
             .or(spec["workspace_path"].as_str())
             .map(std::path::Path::new);
-        let prepared =
-            crate::roles::prompt(&spec, project, records::string(&job["request"], "body")?)
-                .and_then(|prompt| {
-                    if spec["driver_kind"] == "claude_stream" {
-                        if let Some(roots) = &prompt.skill_roots {
-                            self.claude
-                                .get_mut(agent)
-                                .context("Claude session missing for role preparation")?
-                                .stage_role_paths(job, roots)?;
-                        }
-                    }
-                    Ok(prompt)
-                });
+        let mut body = records::string(&job["request"], "body")?.to_owned();
+        let review = &job["request"]["route_options"];
+        if review["review_workspace_path"].is_string() && review["review_tree_digest"].is_string() {
+            body.push_str(&format!("\n\nCCB bound review workspace:\n{}\nReview this workspace and verify its tree identity before reporting; the observation does not freeze files.",
+                json!({"workspace_path":review["review_workspace_path"],"tree_digest":review["review_tree_digest"]})));
+        }
+        let prepared = crate::roles::prompt(&spec, project, &body).and_then(|prompt| {
+            if spec["driver_kind"] == "claude_stream" {
+                if let Some(roots) = &prompt.skill_roots {
+                    self.claude
+                        .get_mut(agent)
+                        .context("Claude session missing for role preparation")?
+                        .stage_role_paths(job, roots)?;
+                }
+            }
+            Ok(prompt)
+        });
         match prepared {
             Ok(prompt) => {
                 if spec["driver_kind"] == "pi_rpc" {

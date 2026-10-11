@@ -102,6 +102,21 @@ class GitOperations:
         return self.format_tree_digest(tree)
 
     def current_tree_digest(self, cwd: Path, *, ignore_controller_state: bool = False) -> str:
+        from native_kernel import kernel_binary, rust_core_enabled
+        if rust_core_enabled():
+            import json
+            from process_background import background_process_kwargs
+            command = [str(kernel_binary()), '--inspect-tree', str(Path(cwd).resolve())]
+            if not ignore_controller_state:
+                command.append('--include-controller-state')
+            result = subprocess.run(command, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                    text=True, encoding='utf-8', **background_process_kwargs())
+            if result.returncode != 0:
+                raise RuntimeError((result.stderr or 'native tree observation failed').strip())
+            observed = json.loads(result.stdout)
+            if observed.get('record_type') != 'git_workspace_tree':
+                raise RuntimeError('invalid native tree observation response')
+            return str(observed['digest'])
         cwd = Path(cwd).resolve()
         fd, raw_index = tempfile.mkstemp(prefix='ccb-git-index-')
         os.close(fd)

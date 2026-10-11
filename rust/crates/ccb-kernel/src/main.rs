@@ -10,6 +10,18 @@ fn main() {
 }
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.first().is_some_and(|arg| arg == "--inspect-tree") {
+        ccb_kernel::security::own_process_tree()?;
+        ensure!(
+            args.len() == 2 || args.len() == 3 && args[2] == "--include-controller-state",
+            "--inspect-tree requires a workspace and optional --include-controller-state"
+        );
+        println!(
+            "{}",
+            ccb_kernel::git_observation::current(&PathBuf::from(&args[1]), args.len() == 2)?
+        );
+        return Ok(());
+    }
     ensure!(
         [2,4,6,7].contains(&args.len()) && args[0] == "--state-root",
         "usage: ccb-kernel --state-root <directory> [--token-file <path> [--daemon-config <path> [--standalone]]]"

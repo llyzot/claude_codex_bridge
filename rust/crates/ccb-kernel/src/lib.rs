@@ -20,6 +20,7 @@ pub mod daemon;
 mod executables;
 mod execution_recovery;
 mod finalization;
+pub mod git_observation;
 mod lifecycle;
 mod live_directory;
 pub mod models;
@@ -125,6 +126,12 @@ impl Kernel {
                 )
             }
             "callback.validate" => return callback_policy::validate(self, args),
+            "git.current_tree" => {
+                return git_observation::current(
+                    std::path::Path::new(records::string(args, "workspace_path")?),
+                    args["ignore_controller_state"] != false,
+                )
+            }
             "bureau.submit" => return bureau::submission(self, args),
             "bureau.retry" => return bureau::retry(self, args),
             "bureau.reply" => return bureau::reply(self, args),

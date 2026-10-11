@@ -46,7 +46,9 @@ def stop(state):
     deadline=time.monotonic()+10
     while time.monotonic()<deadline:
         lifecycle=state/'lifecycle.json'
-        if lifecycle.exists() and record(lifecycle).get('phase')=='unmounted' and cli('process-identity',pid).returncode!=0:
+        # Read the final journal only after its writer exits; Windows can deny
+        # opens while the live writer atomically replaces this file.
+        if cli('process-identity',pid).returncode!=0 and lifecycle.exists() and record(lifecycle).get('phase')=='unmounted':
             return
         time.sleep(.025)
     pytest.fail('owned workspace daemon did not finish unmounting')

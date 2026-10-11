@@ -1,5 +1,5 @@
 {
-  "status": "prepared_not_started",
+  "status": "passed_with_skips_after_targeted_test_cleanup_recheck",
   "base_commit": "8c90aa23e1024d103d61fb624db7ca315eaa70df",
   "shards": [
     {
@@ -21,7 +21,14 @@
         "test/test_native_completion.py",
         "test/test_native_config.py"
       ],
-      "prior_duration_seconds": 541.7390000000001
+      "prior_duration_seconds": 541.7390000000001,
+      "exec_session_id": null,
+      "status": "finished_passed",
+      "expected_cases": 241,
+      "cases": 241,
+      "passed": 241,
+      "failures": [],
+      "skips": []
     },
     {
       "files": [
@@ -43,7 +50,55 @@
         "test/test_native_startup.py",
         "test/test_native_real_models.py"
       ],
-      "prior_duration_seconds": 541.5319999999999
+      "prior_duration_seconds": 541.5319999999999,
+      "exec_session_id": null,
+      "status": "finished_passed",
+      "expected_cases": 279,
+      "cases": 279,
+      "passed": 269,
+      "failures": [],
+      "skips": [
+        {
+          "name": "test.test_native_real_models::test_real_claude_clear_and_empty_compact_without_model",
+          "reason": "Explicit real-model opt-in required"
+        },
+        {
+          "name": "test.test_native_real_models::test_real_claude_compact_against_local_protocol_backend",
+          "reason": "Explicit real-model opt-in required"
+        },
+        {
+          "name": "test.test_native_real_models::test_real_context_clear_without_model_or_credentials[pi]",
+          "reason": "Explicit real-model opt-in required"
+        },
+        {
+          "name": "test.test_native_real_models::test_real_context_clear_without_model_or_credentials[codex]",
+          "reason": "Explicit real-model opt-in required"
+        },
+        {
+          "name": "test.test_native_real_models::test_real_codex_worker_model_round_trip",
+          "reason": "Explicit real-model opt-in required"
+        },
+        {
+          "name": "test.test_native_real_models::test_real_pi_lead_codex_worker_automatic_callback",
+          "reason": "Explicit real-model opt-in required"
+        },
+        {
+          "name": "test.test_native_real_models::test_real_native_compaction_preserves_conversation_and_process[pi]",
+          "reason": "Explicit real-model opt-in required"
+        },
+        {
+          "name": "test.test_native_real_models::test_real_native_compaction_preserves_conversation_and_process[codex]",
+          "reason": "Explicit real-model opt-in required"
+        },
+        {
+          "name": "test.test_native_real_models::test_real_codex_role_skill_reads_updated_body_in_same_thread",
+          "reason": "Explicit real-model opt-in required"
+        },
+        {
+          "name": "test.test_native_real_models::test_real_pi_role_skill_reads_updated_body_in_same_session",
+          "reason": "Explicit real-model opt-in required"
+        }
+      ]
     },
     {
       "files": [
@@ -64,7 +119,23 @@
         "test/test_native_installation_recovery.py",
         "test/test_native_agent_journal_authority.py"
       ],
-      "prior_duration_seconds": 541.6730000000001
+      "prior_duration_seconds": 541.6730000000001,
+      "exec_session_id": null,
+      "status": "finished_failed",
+      "expected_cases": 272,
+      "cases": 272,
+      "passed": 270,
+      "failures": [
+        {
+          "name": "test.test_native_workspaces::test_reuse_preserves_dirty_worktree_and_does_not_follow_new_source_head",
+          "error": "test\\test_native_workspaces.py:111: in test_reuse_preserves_dirty_worktree_and_does_not_follow_new_source_head\n    finally:stop(Path(second['state_root']))\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntest\\test_native_workspaces.py:49: in stop\n    if lifecycle.exists() and record(lifecycle).get('phase')=='unmounted' and cli('process-identity',pid).returncode!=0:\n                              ^^^^^^^^^^^^^^^^^\ntest\\test_native_workspaces.py:56: in record\n    def record(path):return json.loads(path.read_text(encoding='utf-8'))\n                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n..\\..\\..\\..\\..\\scoop\\apps\\python\\current\\Lib\\pathlib\\__init__.py:787: in read_text\n    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n..\\..\\..\\..\\..\\scoop\\apps\\python\\current\\Lib\\pathlib\\__init__.py:771: in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   PermissionError: [Errno 13] Permission denied: '\\\\\\\\?\\\\C:\\\\Users\\\\user\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-user\\\\pytest-418\\\\test_reuse_preserves_dirty_wor0\\\\project\\\\.ccb\\\\ccbd\\\\lifecycle.json'"
+        },
+        {
+          "name": "test.test_native_workspaces::test_explicit_base_and_branch_template_are_applied",
+          "error": "test\\test_native_workspaces.py:190: in test_explicit_base_and_branch_template_are_applied\n    finally:stop(Path(result['state_root']))\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntest\\test_native_workspaces.py:49: in stop\n    if lifecycle.exists() and record(lifecycle).get('phase')=='unmounted' and cli('process-identity',pid).returncode!=0:\n                              ^^^^^^^^^^^^^^^^^\ntest\\test_native_workspaces.py:56: in record\n    def record(path):return json.loads(path.read_text(encoding='utf-8'))\n                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n..\\..\\..\\..\\..\\scoop\\apps\\python\\current\\Lib\\pathlib\\__init__.py:787: in read_text\n    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n..\\..\\..\\..\\..\\scoop\\apps\\python\\current\\Lib\\pathlib\\__init__.py:771: in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   PermissionError: [Errno 13] Permission denied: '\\\\\\\\?\\\\C:\\\\Users\\\\user\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-user\\\\pytest-418\\\\test_explicit_base_and_branch_0\\\\project\\\\.ccb\\\\ccbd\\\\lifecycle.json'"
+        }
+      ],
+      "skips": []
     },
     {
       "files": [
@@ -84,7 +155,19 @@
         "test/test_native_roles.py",
         "test/test_native_lifecycle.py"
       ],
-      "prior_duration_seconds": 542.191
+      "prior_duration_seconds": 542.191,
+      "exec_session_id": null,
+      "status": "finished_passed",
+      "expected_cases": 231,
+      "cases": 231,
+      "passed": 230,
+      "failures": [],
+      "skips": [
+        {
+          "name": "test.test_native_pi_terminal::test_installed_pi_loads_bridge_and_session_switch_rotates_log_without_a_model",
+          "reason": "Explicit installed-Pi no-model probe"
+        }
+      ]
     }
   ],
   "real_model_opt_in": false,
@@ -104,5 +187,88 @@
     "Wait for actual daemon unmount/process exit before moving a worktree",
     "Wait for confirmed empty Windows Job after helper exit",
     "Ordinary offline Herdr query budget 1500 to 5000 ms; dedicated timeout cases unchanged"
+  ],
+  "source_commit": "08d0ad33aaf8d6f81b123ca0679469c8d5e078e1",
+  "started_at": "2026-10-11T23:10:37.364312+00:00",
+  "test_file_sha256": {
+    "test/test_native_herdr_host_recovery.py": "5832ca0a7814efbb2edbb23337a29d95c3aa74f6e7dd3a0b532f8376249f7687",
+    "test/test_native_execution_recovery.py": "200c40fba5d817c4235b347afc04e72f973efa37a1061386f5271f21a8537ba8",
+    "test/test_native_context.py": "e0d0ee72d945b75c979d212fee6ba24d49aec62724a6335d19ecab739d42f3d0",
+    "test/test_native_claude_role_skills.py": "9a7530216633b7183f36c587ed6a11ee0c59a9e227cda929cdd0fbf26dcab461",
+    "test/test_native_kernel.py": "bd495b9a452495a1fbef166d7d79ecec8421e229c2c7b81c2ff517eb3aca25c8",
+    "test/test_native_rpc_lifetime.py": "f2fb4c4ae4a55d883fb0375677738f9e134944ed906a31f9c91a94f09caa8e6e",
+    "test/test_native_restart.py": "a29df6fec2cce05f67c9de65ddeae5d5d09a6db1a051a261e279ca9da6c20ef8",
+    "test/test_native_task_cli.py": "d63c77fbe4c0947369f9d5de56b6dc8293b381f5a9b8d437e3aa3ff953a8f472",
+    "test/test_native_project_memory.py": "e6a566f6367c3162e4aeebf2f9197049dec3d56b05fdce457fdb169f59fdfe2e",
+    "test/test_native_codex_controls.py": "13c21c8ad2746c3cdd3ca56ac36d4a70cd1fcff81beae8e94c1ba402fecec9ad",
+    "test/test_native_admission.py": "91e277ea4bdaa55b9b159722e6c03cbfbf31412ded5fda33dc19232839b4f58c",
+    "test/test_native_wait.py": "1f218509d32afe9f2fa34025a9aef3bec9908020877794c44ad922ead0c72ae8",
+    "test/test_native_codex_tui_host.py": "4e4fea231cee3f8cc57e6e66a8ca8b00c6d0dd4644a59e5a948ad338a7e08415",
+    "test/test_native_coordination.py": "c23e092ca436250bbc920c7d9be849acf7100775194e098c14be1d661ceb51b3",
+    "test/test_native_completion.py": "d2ec4f5fb880af8d6cdd7d2126dbc60bbe85693b27725a57bd1f330a15810ee6",
+    "test/test_native_config.py": "6cc4d66ef0efc8f74eff203c6aeb093845b22cd2edff9161e8682c18db7e8777",
+    "test/test_native_herdr_worker.py": "7422cee0192285bb4fe998e6074924adcbe9574f2f9a3df3acf5e40320eecd30",
+    "test/test_native_git_observation.py": "35122c4282a2896c8b6a80818d094b0a452573f68cf612292d384e88762e42b4",
+    "test/test_native_provider_faults.py": "b778b1b448dfb1a2535b79ae50a3176c8e1798861cf62a2f604ef6ccf5e3683b",
+    "test/test_native_installation_upgrade.py": "36077f606c284ebdc7ff4ff8eefcce6c6105a8aa7cec1f830a432d8041b8cdf3",
+    "test/test_native_codex_role_skills.py": "1f80c2808d8a3a93e59fb9d39eeab295ea5ab54c4b93334dd1bae0fc4a980fc8",
+    "test/test_native_role_memory.py": "e5292aef610c38a3405343d75d8b33c2dd87c5d71e39c019a484cfe427136f2f",
+    "test/test_native_idle_fault_recovery.py": "b3a3a877f6c8acacd7e4c3465e1ce301c526632d72a6a4587ea51455a8d7902f",
+    "test/test_native_provider_termination.py": "5746bca59012154997ad991eb7eb682d4aa7a70d9a368350f03d71ca479f9f70",
+    "test/test_native_installation.py": "bf2a789d8645b13baad414d3dbd100dc7759058e978ccb934383b44697556748",
+    "test/test_native_resubmit.py": "a380caffebd52846ae36a431cc62c735d316d7bf6be869f90eb30ac4b9d86acb",
+    "test/test_native_daemon.py": "df4c9b68b574745660e67651db1ebc68462589707faff2d0bf0ea53ac5b2452c",
+    "test/test_native_codex_rpc.py": "866332750a6d499618aaca31fb2f72cde6e5d997fc302b2a4e931d3578316e81",
+    "test/test_native_role_delivery.py": "2be98705058ccba29affa3eb240b5e25aa49482c60f20f28d7e2ef4047dab494",
+    "test/test_native_herdr_transport.py": "a7dd89fe53b487970da5ff43b169fcc27ec911a929383d26bcf59528cbe13568",
+    "test/test_native_cli_security.py": "a6421ac64728fb586279316d80b9786f721d1cf51225f6416c94a0dc27ba05bf",
+    "test/test_native_startup.py": "ae73d1378f7667eaba0280300454775fc53f917077361d1739a600a56d7c232f",
+    "test/test_native_real_models.py": "3bd1a271edafbd16d97b822a55dbee604ac973b1d7c86e6bbb8b3e7343e22daa",
+    "test/test_native_herdr_open.py": "7fbab371e89d760aa88998c8adaa6032aefbe0e8a6205146b2a235ad541968eb",
+    "test/test_native_claude_requests.py": "e0f9027c9c086b44ffbf777c32b296139d905191f1eae9f33efcca726ed16a6d",
+    "test/test_native_codex_requests.py": "a0d805494b7d01393d0c4349f3a6022b108b3b6e6f97e22112cb0062c69d88d1",
+    "test/test_native_herdr_namespace.py": "d409cbca209d1644ea8df88fab4d63a075aaf57a656b78e9e62b8c0b86b60bae",
+    "test/test_native_herdr_recovery.py": "bb0b48099dab9d2f1083d596fdd9fc43d4254193b7518bf945479e6002776634",
+    "test/test_native_workspaces.py": "29a1ec048071b6906c86a99d7cec25ef691618f0aa5fe71d77a320a78b6e9e78",
+    "test/test_native_herdr_discovery.py": "7583d964afb780e3a39237023b5ddcf0d707c0a126f438018fc1a51434fd40a4",
+    "test/test_native_project_view.py": "5b61c609b6c14e6232a6a9b2e67da91b0ff11f0d0c4363b28bb47253334914cd",
+    "test/test_native_ping.py": "a04afc2cd17ab7077767fe320012f31a18ee002026a93e7a37c98c3e7d22faae",
+    "test/test_native_trace.py": "059455f953eec36b27232f1fa793096d3817719253426ed1d22c3b29fcef13fb",
+    "test/test_native_mailbox_control.py": "02da700f79644be51c8eccf0c06ad4cbea50ade78b0792fa31abd9e49064e9f1",
+    "test/test_native_claude_question_cli.py": "fec02cc2f69a348fedf8e92109f567a254aa80718718d50835949dfb412f5a2f",
+    "test/test_native_claude_stream.py": "4cb105f15bed08370de168dc5cb7d193a120232f3c53329dd799d1b44f10014a",
+    "test/test_native_control_plane.py": "da83b4dd49d1109352b08c3326d29e3f1cf28bfb0fe5b91c3a5f1a2141c4f6ab",
+    "test/test_native_installation_recovery.py": "fa83f0464cf9f53a106504593b05f61844512690469ec1c940dfb5e04f02c003",
+    "test/test_native_agent_journal_authority.py": "12a4ff59206349d43a166e42b82b47635919524f5c244698df7c9f6d895b4e12",
+    "test/test_native_herdr_agents.py": "bab2107e1eff9b593d805d8da25c3fa2645da56ff8dd3bd87a8ca048bc52f3d9",
+    "test/test_native_pi_terminal.py": "e18545fe765c35f8822d18b75683c8541d63c2ab821fec7e4a513f9bf17ebc9d",
+    "test/test_native_reload.py": "90199957aeb73f34798614e779a0ee10d075d83cef822df70d965b5013160bff",
+    "test/test_native_pi_role_skills.py": "ba2005805c764a560496efb2bff1f7474c9671c3c2ed573d2eafe374bbd6feeb",
+    "test/test_native_claude_context.py": "fe4b6b8d84d93b39421c06678ba57cfe75ff068678d9a976c747896568ccaffa",
+    "test/test_native_transport_eof.py": "c74d6f6f64888593b89ceb652821d88ab3cefe71bb6de4ecf5ff7419467a4014",
+    "test/test_native_finalization.py": "0b4b1d66af60e72c4148f57cbb144dd0d86012418b0123ae1b73f329aaa43108",
+    "test/test_native_followup.py": "40504dd5d3f68576f06c862fd29147ebb74433668207ae286c4ccf5bc29e01d8",
+    "test/test_native_claude_controls.py": "9587858fa20835190e81e76d3cb9f8c0a9792a6649c5a122467c7e3707a2f44b",
+    "test/test_native_result_policy.py": "4f3d939a3e323b319566f1cff672e011c063bf67fe9f4470b823b3c484e14591",
+    "test/test_native_pi_rpc.py": "c0afbd72c7a5368b9e661a6901fa43c9b08ee92f02e7f65c9e6f5b34f68544e0",
+    "test/test_native_records.py": "2e7eb5dcd84076002bb97535808d96328896142432c36c37893b2f9568d868fe",
+    "test/test_native_observation.py": "2cdcb081ac8e2a3cfb7a13859c3f753c7bb33303b3f5fd2eef3094d7b28d35eb",
+    "test/test_native_roles.py": "b055a1e069b957e5bf0c91077099ef440290dac895ef34581c1807eb5c166b73",
+    "test/test_native_lifecycle.py": "951dd870d9befcb0dc2933d62945579c72da2ba72ec21e4da1c3700d1609dcfb"
+  },
+  "workspace_recheck": {
+    "report": "docs/analysis/native-workspace-final-20261012.xml",
+    "passed": 27,
+    "seconds": 49.02,
+    "change": "Check owned writer exit before reading its final lifecycle JSON; no runtime binary change."
+  },
+  "completed_at": "2026-10-11T23:22:58.533096+00:00",
+  "effective_unique_case_counts": {
+    "passed": 1012,
+    "failed": 0,
+    "skipped": 11
+  },
+  "post_full_run_test_changes": [
+    "test/test_native_workspaces.py"
   ]
 }

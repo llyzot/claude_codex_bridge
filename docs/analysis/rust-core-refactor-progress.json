@@ -606,6 +606,8 @@
       "docs/analysis/native-recovery-recheck-20261012.xml",
       "docs/analysis/herdr-query-probe-20261012.json",
       "docs/analysis/legacy-provider-baseline-20261012.json"
-    ]
+    ],
+    "native_full_suite_recheck": "Four fixed-binary shards at 08d0ad33 completed 1023 cases: 1010 passed, 2 test cleanup errors, 11 explicit opt-in skips, maximum shard 679.28s. Both errors were PermissionError reading lifecycle.json during its live writer atomic replacement in the new workspace test stop helper. Reordered the helper to confirm writer exit first. All 27 workspace cases passed in 49.02s. Effective unique coverage after this targeted recheck: 1012 passed, 11 skipped; no failed case remains. Original shard failures retained. Rust source and tested release/bin hashes unchanged during/after full run. This is a full run plus targeted recheck, not a second uninterrupted all-green run.",
+    "native_full_suite_recheck_evidence": "docs/analysis/native-suite-recheck-plan-20261012.json"
   }
 }

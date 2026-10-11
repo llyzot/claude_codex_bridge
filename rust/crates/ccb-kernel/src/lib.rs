@@ -37,6 +37,7 @@ pub mod security;
 mod skill_surface;
 mod startup;
 pub mod store;
+mod workspaces;
 
 use anyhow::{bail, ensure, Result};
 use chrono::{DateTime, Duration, NaiveDateTime, SecondsFormat, Utc};

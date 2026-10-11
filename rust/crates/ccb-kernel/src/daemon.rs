@@ -75,6 +75,7 @@ impl Drop for Daemon {
 }
 impl Daemon {
     pub fn validate_config(config: &Value) -> Result<()> {
+        crate::workspaces::validate(config)?;
         ensure!(
             config["schema_version"] == 2 && !records::string(config, "project_id")?.is_empty(),
             "invalid native daemon config"

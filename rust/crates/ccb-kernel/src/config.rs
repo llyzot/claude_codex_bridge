@@ -7,6 +7,13 @@ use std::path::{Path, PathBuf};
 pub fn project_root(cwd: &Path) -> Result<PathBuf> {
     let mut path = cwd.canonicalize()?;
     loop {
+        if let Some(project) = crate::workspaces::binding_project(&path)? {
+            ensure!(
+                project.join(".ccb/ccb.config").is_file(),
+                "bound project has no CCB configuration"
+            );
+            return Ok(project);
+        }
         if path.join(".ccb/ccb.config").is_file() {
             return Ok(path);
         }
@@ -77,7 +84,7 @@ pub fn state_root(root: &Path) -> Result<PathBuf> {
     }
     Ok(root.join(".ccb/ccbd"))
 }
-fn expand_home(path: &Path) -> Result<PathBuf> {
+pub(crate) fn expand_home(path: &Path) -> Result<PathBuf> {
     if path.starts_with("~") {
         let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
             .context("cannot expand account home")?;
@@ -346,19 +353,15 @@ pub fn compile(root: &Path, document: Value, executables: &Value) -> Result<Valu
     {
         crate::models::validate_agent(name)?;
         let provider = raw["provider"].as_str().context("agent provider missing")?;
-        ensure!(
-            raw["workspace_mode"].is_null() || raw["workspace_mode"] == "inplace",
-            "native workspace mode not yet supported: {}",
-            raw["workspace_mode"]
-        );
-        let target = raw["target"].as_str().unwrap_or(".");
-        let workspace = root.join(target);
-        ensure!(workspace.is_dir(), "agent target directory does not exist");
+        let (workspace, plan) = crate::workspaces::plan(root, name, raw)?;
         let mut spec = raw.clone();
         if let Some(role) = crate::roles::normalized(&raw["role"])? {
             spec["role"] = json!(role);
         }
-        spec["workspace_path"] = json!(workspace.canonicalize()?);
+        spec["workspace_path"] = json!(workspace);
+        if let Some(plan) = plan {
+            spec["workspace_plan"] = serde_json::to_value(plan)?;
+        }
         let command = executables[provider].as_array().context(format!(
             "native executable argv missing for provider: {provider}"
         ))?;
@@ -416,7 +419,7 @@ pub fn compile(root: &Path, document: Value, executables: &Value) -> Result<Valu
         agents.insert(name.clone(), spec);
     }
     ensure!(!agents.is_empty(), "config has no agents");
-    Ok(
-        json!({"schema_version":2,"project_id":id,"project_root":root,"agents":agents,"source_config":document}),
-    )
+    let compiled = json!({"schema_version":2,"project_id":id,"project_root":root,"agents":agents,"source_config":document});
+    crate::workspaces::validate(&compiled)?;
+    Ok(compiled)
 }

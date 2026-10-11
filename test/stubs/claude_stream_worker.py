@@ -71,7 +71,7 @@ for line in sys.stdin.buffer:
     if mode=='lead' and not body.startswith('CCB result-chain continuation.'):
         result=api(dict(project_id='native-test',to_agent='worker',from_actor='lead',body='delegated',route_options={'mode':'chain'}));assert result['ok']
         reply='delegated'
-    else:reply='Claude reviewed result' if mode=='lead' else 'Claude final result'
+    else:reply='Claude reviewed result' if mode=='lead' else json.dumps({'cwd':os.getcwd(),'agent':os.environ['CCB_AGENT_NAME']}) if mode=='workspace' else 'Claude final result'
     emit(dict(type='assistant',session_id=session,parent_tool_use_id=None,message={'content':[{'type':'text','text':'intermediate'}]}))
     time.sleep(.1)
     record=dict(type='result',subtype='success',is_error=False,session_id='foreign' if mode=='foreign' else session,uuid='result-'+user['uuid'],parent_tool_use_id=None,result=reply)

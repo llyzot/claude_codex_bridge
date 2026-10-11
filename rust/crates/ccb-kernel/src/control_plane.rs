@@ -114,6 +114,9 @@ fn serve_runtime(
         crate::security::own_process_tree()?;
     }
     let kernel = Kernel::open(root)?;
+    if let Some(config) = &config {
+        crate::workspaces::materialize(config)?;
+    }
     let public = config.is_some();
     let mut runtime = if let Some(config) = config {
         Runtime::Daemon(Box::new(crate::daemon::Daemon::new(

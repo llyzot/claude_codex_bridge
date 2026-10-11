@@ -113,7 +113,8 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             "version":crate::installation::version(),"core_version":env!("CARGO_PKG_VERSION"),
             "public_api_version":2,"native_prefix_installation":{"schema_version":1,
                 "supported":cfg!(all(windows,target_arch="x86_64")),"commands":["ccb","ask","ccb-native"],
-                "modifies_account_settings":false,"in_place_upgrade":false}})
+                "modifies_account_settings":false,"in_place_upgrade":true,"upgrade_requires_stopped_commands":true,
+                "upgrade_recovery":true,"program_file_rollback":true,"runtime_state_rollback":false}})
         );
         return Ok(());
     }
@@ -132,6 +133,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask [--compact] [--silence] [--chain] [--artifact-request|--inline-request] [--artifact-reply] <agent> [from <actor>] [--] <message...>\n  target accepts a configured agent or uniquely bound role ID; agents lists bindings\n  ask also reads redirected UTF-8 stdin; --artifact-io enables request/reply artifacts\n  --task-id <id>, --reply-to <id>, --mode <type>; native --from <actor> remains supported\nccb-native --state-root <dir> ask get|cancel <job-id>\nccb-native --state-root <dir> cancel <job-id> [--silent] | retry <job-id>\nccb-native --state-root <dir> watch <target> [--cursor <n>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> agents|ping|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> job-recovery|job-reconcile <job-id>\nccb-native --state-root <dir> provider-status <agent>\nccb-native --state-root <dir> provider-terminate <agent> [--silent]\nccb-native --state-root <dir> provider-recover <agent> <fault-id>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native workspace-tree <path> [--include-controller-state]\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
         println!("ccb-native [--project <directory>] [--state-root <dir>] reload [--config <json>|--executables <manifest>] [--dry-run] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> reload-status");
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
+        println!("ccb-native installation upgrade|recover|rollback --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]\nccb-native installation status --prefix <directory>");
         println!("ccb-native --state-root <dir> view [--limit <1..64>]");
         println!("ccb-native --state-root <dir> clear|compact [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> context-status <operation-id>");
         println!("ccb-native --state-root <dir> restart [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> restart-status [operation-id]");
@@ -158,6 +160,43 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         .first()
         .is_some_and(|s| s == "install" || s == "installation")
     {
+        if args[0] == "installation" && args.get(1).is_some_and(|s| s != "verify") {
+            let action = arg(&args, 1)?;
+            ensure!(
+                ["upgrade", "recover", "rollback", "status"].contains(&action),
+                "unknown installation action"
+            );
+            let (mut prefix, mut operation, mut expected) = (None, None, None);
+            let mut dry_run = false;
+            let mut i = 2;
+            while i < args.len() {
+                match arg(&args, i)? {
+                    "--prefix" => {
+                        i += 1;
+                        prefix = Some(PathBuf::from(args.get(i).context("missing prefix")?));
+                    }
+                    "--operation-id" if action != "status" => {
+                        i += 1;
+                        operation = Some(arg(&args, i)?);
+                    }
+                    "--expected-manifest" if action != "status" => {
+                        i += 1;
+                        expected = Some(arg(&args, i)?);
+                    }
+                    "--dry-run" if action != "status" => dry_run = true,
+                    option => bail!("unknown installation option: {option}"),
+                }
+                i += 1;
+            }
+            let prefix = prefix.context("installation management requires --prefix")?;
+            let result = if action == "status" {
+                crate::installation::status(&prefix)?
+            } else {
+                crate::installation::manage(action, &prefix, dry_run, operation, expected)?
+            };
+            println!("{result}");
+            return Ok(());
+        }
         let verify = args[0] == "installation";
         let offset = if verify { 2 } else { 1 };
         if verify {
@@ -189,6 +228,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         );
         return Ok(());
     }
+    crate::installation::check_command_installation()?;
     if args.is_empty() {
         args.push("start".into());
     }

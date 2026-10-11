@@ -8,6 +8,7 @@
   [ValidateSet("python", "rust")]
   [string]$Runtime = "python",
   [switch]$DryRun,
+  [switch]$Upgrade,
   [switch]$Yes
 )
 
@@ -24,6 +25,7 @@ try { [Console]::InputEncoding = $script:utf8NoBom } catch {}
 try { chcp 65001 | Out-Null } catch {}
 
 $ErrorActionPreference = "Stop"
+if ($Upgrade -and ($Runtime -ne "rust" -or $Command -ne "install")) { throw "-Upgrade requires install -Runtime rust." }
 if ($DryRun -and $Runtime -ne "rust") { throw "-DryRun currently requires -Runtime rust." }
 if ($Runtime -eq "rust" -and $Command -ne "help" -and -not $PSBoundParameters.ContainsKey("InstallPrefix")) {
   throw "Rust installation requires an explicit -InstallPrefix for the native runtime."
@@ -1543,13 +1545,14 @@ function Uninstall-Native {
 if ($Command -eq "help") {
   Show-Usage
   Write-Host "Rust core: install.ps1 install -Runtime rust -InstallPrefix <new-absolute-directory> [-DryRun]"
+  Write-Host "Rust upgrade: install.ps1 install -Runtime rust -InstallPrefix <stopped-native-prefix> -Upgrade [-DryRun]"
   Write-Host "Rust mode installs no Python environment and changes no PATH or provider account settings."
   exit 0
 }
 
 if ($Runtime -eq "rust") {
   try {
-    if ($Command -ne "install") { throw "Native prefix removal/upgrade is not automatic; keep the old prefix for explicit rollback." }
+    if ($Command -ne "install") { throw "Native prefix removal is not automatic; use explicit native installation management." }
     $nativeCore = Join-Path $repoRoot "bin\ccb-native.exe"
     if (-not (Test-Path -LiteralPath $nativeCore -PathType Leaf)) {
       throw "Rust core binary is missing. Build bin/build-ccb-kernel.ps1 or use a release containing ccb-native.exe."
@@ -1561,7 +1564,10 @@ if ($Runtime -eq "rust") {
         $capabilities.native_prefix_installation.schema_version -ne 1 -or -not $capabilities.native_prefix_installation.supported) {
       throw "Rust binary does not support native prefix installation on this platform."
     }
-    $nativeArgs = @("install", "--prefix", $InstallPrefix)
+    if ($Upgrade -and -not $capabilities.native_prefix_installation.in_place_upgrade) {
+      throw "Rust payload does not support native prefix upgrade."
+    }
+    $nativeArgs = if ($Upgrade) { @("installation", "upgrade", "--prefix", $InstallPrefix) } else { @("install", "--prefix", $InstallPrefix) }
     if ($DryRun) { $nativeArgs += "--dry-run" }
     & $nativeCore @nativeArgs
     if ($LASTEXITCODE -ne 0) { throw "Rust native prefix installation failed." }

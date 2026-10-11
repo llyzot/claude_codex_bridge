@@ -335,6 +335,155 @@ pub(super) fn descriptor(prefix: &Path) -> Result<Value> {
     )
 }
 
+pub(super) fn removal_proof(root: &Path) -> Result<Value> {
+    let identity = descriptor(root)?;
+    let manifest = super::super::read_manifest(root)?;
+    let mut entries = json!({});
+    for relative in FILES {
+        entries[relative] = json!({"file_id":path_identity(&root.join(relative))?,
+            "sha256":if relative=="NATIVE_INSTALLATION.json" {&identity["manifest_sha256"]} else {&manifest["files"][relative]}});
+    }
+    Ok(
+        json!({"identity":identity,"entries":entries,"root_id":path_identity(root)?,
+        "bin_id":path_identity(&root.join("bin"))?}),
+    )
+}
+
+pub(super) fn matches_removal_root(root: &Path, proof: &Value) -> Result<()> {
+    super::super::unlinked(root)?;
+    ensure!(
+        json!(path_identity(root)?) == proof["root_id"],
+        "removal directory identity changed"
+    );
+    Ok(())
+}
+
+#[cfg(windows)]
+fn pinned_directory(path: &Path) -> Result<fs::File> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use windows_sys::Win32::Storage::FileSystem::*;
+    // Keep the selected directory from being renamed or replaced while files
+    // are validated and deleted. New entries remain visible to remove_dir.
+    Ok(fs::OpenOptions::new()
+        .access_mode(FILE_READ_ATTRIBUTES)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS)
+        .open(path)?)
+}
+
+#[cfg(windows)]
+pub(super) fn purge_removal(root: &Path, proof: &Value) -> Result<()> {
+    use std::os::windows::{fs::OpenOptionsExt, io::AsRawHandle};
+    use windows_sys::Win32::Storage::FileSystem::*;
+    matches_removal_root(root, proof)?;
+    let root_pin = pinned_directory(root)?;
+    ensure!(
+        json!(identity(&root_pin)?) == proof["root_id"],
+        "removal root changed before pinning"
+    );
+    let bin = root.join("bin");
+    let bin_pin = if super::present(&bin)? {
+        super::super::unlinked(&bin)?;
+        let pin = pinned_directory(&bin)?;
+        ensure!(
+            json!(identity(&pin)?) == proof["bin_id"],
+            "removal bin identity changed"
+        );
+        Some(pin)
+    } else {
+        None
+    };
+    for directory in std::iter::once(root).chain(bin_pin.as_ref().map(|_| bin.as_path())) {
+        for entry in fs::read_dir(directory)? {
+            let entry = entry?;
+            let relative = entry
+                .path()
+                .strip_prefix(root)?
+                .to_string_lossy()
+                .replace('\\', "/");
+            ensure!(
+                relative == "bin" || FILES.contains(&relative.as_str()),
+                "removal refuses additional installation entries"
+            );
+        }
+    }
+    let mut guards = BTreeMap::new();
+    let mut deletes = Vec::new();
+    // Validate and exclude launches/edits for every remaining file before the
+    // first deletion. The journal permits missing files after a crash only.
+    for relative in FILES {
+        let path = root.join(relative);
+        if !super::present(&path)? {
+            continue;
+        }
+        super::super::unlinked(&path)?;
+        let id = path_identity(&path)?;
+        ensure!(
+            json!(id) == proof["entries"][relative]["file_id"],
+            "removal file identity changed: {relative}"
+        );
+        if let std::collections::btree_map::Entry::Vacant(entry) = guards.entry(id) {
+            let mut file = exclusive(&path)?;
+            ensure!(
+                identity(&file)? == id,
+                "removal file changed before exclusion"
+            );
+            let mut bytes = Vec::new();
+            file.read_to_end(&mut bytes)?;
+            ensure!(
+                proof["entries"][relative]["sha256"] == super::super::digest(&bytes),
+                "removal file content changed: {relative}"
+            );
+            entry.insert(file);
+        }
+        // A separate DELETE-only handle identifies each hard-link name, while
+        // the single exclusive data handle above protects its shared contents.
+        let file = fs::OpenOptions::new()
+            .access_mode(DELETE | FILE_READ_ATTRIBUTES)
+            .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+            .open(&path)?;
+        ensure!(
+            identity(&file)? == id,
+            "removal name changed before deletion handle"
+        );
+        deletes.push(file);
+    }
+    for (index, file) in deletes.iter().enumerate() {
+        let disposition = FILE_DISPOSITION_INFO { DeleteFile: true };
+        ensure!(
+            unsafe {
+                SetFileInformationByHandle(
+                    file.as_raw_handle(),
+                    FileDispositionInfo,
+                    (&disposition as *const FILE_DISPOSITION_INFO).cast(),
+                    std::mem::size_of::<FILE_DISPOSITION_INFO>() as u32,
+                )
+            } != 0,
+            "native removal could not delete an owned file: {}",
+            std::io::Error::last_os_error()
+        );
+        if index == 0 {
+            super::checkpoint("removal_first_file");
+        }
+    }
+    drop(deletes);
+    drop(guards);
+    if bin_pin.is_some() {
+        drop(bin_pin);
+        fs::remove_dir(&bin)?;
+    }
+    drop(root_pin);
+    // Never recursively remove anything. Unexpected files keep their directory.
+    fs::remove_dir(root)?;
+    Ok(())
+}
+
+#[cfg(not(windows))]
+pub(super) fn purge_removal(_: &Path, _: &Value) -> Result<()> {
+    anyhow::bail!("native removal requires Windows")
+}
+
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;

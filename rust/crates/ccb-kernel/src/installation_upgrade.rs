@@ -8,6 +8,8 @@ use std::{
 };
 #[path = "installation_files.rs"]
 mod files;
+#[path = "installation_remove.rs"]
+mod removal;
 use files::Guards;
 
 struct Paths {
@@ -145,6 +147,7 @@ fn save(paths: &Paths, record: &Value) -> Result<()> {
 }
 pub(super) fn check_pending(prefix: &Path) -> Result<()> {
     let paths = Paths::new(prefix)?;
+    removal::check_pending(&paths)?;
     if let Some(record) = read(&paths)? {
         ensure!(
             terminal(&record),
@@ -167,8 +170,9 @@ fn response(paths: &Paths, record: &Value, status: &str) -> Value {
 }
 pub fn status(prefix: &Path) -> Result<Value> {
     let paths = Paths::new(prefix)?;
+    let removal = removal::status(&paths)?;
     let Some(record) = read(&paths)? else {
-        return Ok(json!({"status":"no_upgrade_record","prefix":paths.target}));
+        return Ok(json!({"status":"no_upgrade_record","prefix":paths.target,"removal":removal}));
     };
     let mut result = response(&paths, &record, "observed");
     let id = record["operation_id"].as_str().unwrap();
@@ -187,6 +191,7 @@ pub fn status(prefix: &Path) -> Result<Value> {
         };
     }
     result["observed"] = observations;
+    result["removal"] = removal;
     Ok(result)
 }
 
@@ -385,11 +390,15 @@ pub fn manage(
     operation: Option<&str>,
     expected: Option<&str>,
 ) -> Result<Value> {
+    if action == "remove" {
+        return removal::manage(prefix, dry_run, operation, expected);
+    }
     ensure!(
         ["upgrade", "recover", "rollback"].contains(&action),
         "unknown native installation action"
     );
     let paths = Paths::new(prefix)?;
+    removal::check_pending(&paths)?;
     let supplied = operation
         .map(|s| uuid::Uuid::parse_str(s).map(|u| u.to_string()))
         .transpose()?;

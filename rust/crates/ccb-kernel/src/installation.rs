@@ -152,10 +152,11 @@ fn populate(prefix: &Path, bytes: &[u8], sha: &str) -> Result<()> {
         }
         files[relative] = json!(sha);
     }
+    let guide = format!("{GUIDE}\nTo remove a stopped native prefix, use an external ccb-native.exe:\n  ccb-native installation remove --prefix <directory> --dry-run\n  ccb-native installation remove --prefix <directory>\nOnly verified program files are removed. Project data, PATH, provider settings and retained upgrade backups are preserved. A retained backup can be removed by naming its exact directory separately; that gives up rollback to that backup. If interrupted, inspect installation status and repeat remove with its recorded --operation-id.\n");
     for (relative, content) in [
         ("LICENSE", LICENSE),
         ("VERSION", version()),
-        ("README-native.txt", GUIDE),
+        ("README-native.txt", guide.as_str()),
     ] {
         write(&prefix.join(relative), content.as_bytes())?;
         files[relative] = json!(digest(content.as_bytes()));

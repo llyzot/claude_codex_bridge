@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-11T23:35:57.099708+00:00",
+  "base_commit": "db422cb07f2c8567ae294a8ab009d0ccfba97e6f",
+  "implemented": [
+    "Native installation remove with read-only preview, manifest precondition and exact recovery operation ID",
+    "Shared prefix installer lock, mapped-image exclusion, verified same-parent retirement and durable removal stages",
+    "Windows directory pins, per-file identity/hash validation and handle-based deletion; no recursive removal",
+    "Recovery from partial deletion; refusal of foreign/replaced/linked/extra entries and pending upgrades",
+    "Immutable per-operation completed receipts prevent stale request replay from deleting later installations",
+    "Explicit retained-backup removal leaves current installation intact",
+    "PowerShell uninstall -Runtime rust delegates to the Rust contract; optional OperationId and ExpectedManifest forwarded for removal/upgrade"
+  ],
+  "verification": {
+    "initial_red": "Native CLI rejected unknown installation action; PowerShell entry rejected OperationId before implementation",
+    "rust_units": {
+      "passed": 32,
+      "ignored_worker_entries": 2,
+      "actual_removal_process_death_boundaries": [
+        "after rename before phase update",
+        "after durable deleting intent",
+        "after first file disposition",
+        "after directory deletion before terminal journal"
+      ]
+    },
+    "first_extended_selection": {
+      "passed": 71,
+      "failed": 2,
+      "reason": "Test containment assertions compared DOS and extended Windows path spelling; replaced with samefile directory identity checks."
+    },
+    "final_selection": {
+      "passed": 74,
+      "seconds": 105.4,
+      "junit": "docs/analysis/native-removal-final-20261012.xml"
+    },
+    "fmt": "passed",
+    "clippy_all_targets_deny_warnings": "passed",
+    "release_bin_hashes_match": true
+  },
+  "binary_sha256": {
+    "ccb-kernel.exe": "d38c3bfa486759885e9ff2d48051326dcbfe08b30692cc4e540560aaffdb64e3",
+    "ccb-native.exe": "3dd369eeee5b9900409e6f1af66f0aa4f7d920348538123def71b7f90a8d57c8"
+  },
+  "source_sha256": {
+    "install.ps1": "f3d49457f08a29046d5a55cacc44c55934fa9eda90019508de29b3ce5b5c776e",
+    "platforms/windows/installer/install.ps1": "96b4f23f4c3434eedc78a1eb1c5fe272ca35426257a129eeebb53cb6e79fbfde",
+    "rust/crates/ccb-kernel/src/cli.rs": "2f19a935cff7a589521e681a31182b2f3ca9dc38619e031b5c8dcfab100af0ff",
+    "rust/crates/ccb-kernel/src/installation.rs": "87304c36380b836de220320e0115db70f1d33f1931e6f68b863d889db5dbbe3b",
+    "rust/crates/ccb-kernel/src/installation_upgrade.rs": "fc18697a524a6275fe14df644408612fa3d0277c0fb7efaa735a1ce4731e53fe",
+    "rust/crates/ccb-kernel/src/installation_files.rs": "331375b181f510050a3490c3bcf40cfeb67b6a721df24535a4be923c391576e6",
+    "rust/crates/ccb-kernel/src/installation_remove.rs": "e9e88e798002318579065ee6b93b2dde760c5d9e9172fbbcea004045314c9bdd",
+    "test/test_native_installation_remove.py": "8b734a1c76929bc6797feecc99ffc02cfaf81388bbf612fe7617d8a8e66c4a2a"
+  },
+  "production_install_changed": false,
+  "existing_agents_controlled": false,
+  "limits": [
+    "Windows x64 native schema-1 program inventories only; no Python-prefix conversion/removal",
+    "Current implementation keeps parent-side lock/journal/receipts and other retained versions; no automatic orphan scan or audit-record garbage collection",
+    "No automatic service stop or account/PATH/provider-setting edits",
+    "Removing an explicitly selected retained backup intentionally gives up rollback to that directory",
+    "Production/default Rust promotion and broader project-state rollback remain open"
+  ]
+}

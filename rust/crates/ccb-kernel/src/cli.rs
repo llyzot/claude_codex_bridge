@@ -115,7 +115,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             "public_api_version":2,"herdr_open":{"experimental":true,"supported":cfg!(windows),"terminal_providers":["pi","codex"],"background_startup":true,"quiescent_stopped_recovery":true},"native_prefix_installation":{"schema_version":1,
                 "supported":cfg!(all(windows,target_arch="x86_64")),"commands":["ccb","ask","ccb-native"],
                 "modifies_account_settings":false,"in_place_upgrade":true,"upgrade_requires_stopped_commands":true,
-                "upgrade_recovery":true,"program_file_rollback":true,"runtime_state_rollback":false}})
+                "upgrade_recovery":true,"program_file_rollback":true,"runtime_state_rollback":false,"prefix_removal":true,"removal_recovery":true}})
         );
         return Ok(());
     }
@@ -135,6 +135,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native [--project <directory>] [--state-root <dir>] reload [--config <json>|--executables <manifest>] [--dry-run] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> reload-status");
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
         println!("ccb-native installation upgrade|recover|rollback --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]\nccb-native installation status --prefix <directory>");
+        println!("ccb-native installation remove --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]");
         println!("ccb-native --state-root <dir> view [--limit <1..64>]");
         println!("ccb-native --state-root <dir> ping [ccbd|all|agent] (passive local runtime observation)");
         println!("ccb-native --state-root <dir> queue [--detail] [agent|all]\nccb-native --state-root <dir> pend [--inbox|--queue] [--detail] <target>\nccb-native --state-root <dir> pend --watch <target> [--timeout-ms <ms>]");
@@ -175,7 +176,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         if args[0] == "installation" && args.get(1).is_some_and(|s| s != "verify") {
             let action = arg(&args, 1)?;
             ensure!(
-                ["upgrade", "recover", "rollback", "status"].contains(&action),
+                ["upgrade", "recover", "rollback", "status", "remove"].contains(&action),
                 "unknown installation action"
             );
             let (mut prefix, mut operation, mut expected) = (None, None, None);

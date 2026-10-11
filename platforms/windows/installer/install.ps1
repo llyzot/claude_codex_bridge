@@ -9,6 +9,8 @@
   [string]$Runtime = "python",
   [switch]$DryRun,
   [switch]$Upgrade,
+  [string]$OperationId = "",
+  [string]$ExpectedManifest = "",
   [switch]$Yes
 )
 
@@ -26,6 +28,9 @@ try { chcp 65001 | Out-Null } catch {}
 
 $ErrorActionPreference = "Stop"
 if ($Upgrade -and ($Runtime -ne "rust" -or $Command -ne "install")) { throw "-Upgrade requires install -Runtime rust." }
+if (($OperationId -or $ExpectedManifest) -and ($Runtime -ne "rust" -or ($Command -ne "uninstall" -and -not $Upgrade))) {
+  throw "-OperationId and -ExpectedManifest require Rust uninstall or upgrade."
+}
 if ($DryRun -and $Runtime -ne "rust") { throw "-DryRun currently requires -Runtime rust." }
 if ($Runtime -eq "rust" -and $Command -ne "help" -and -not $PSBoundParameters.ContainsKey("InstallPrefix")) {
   throw "Rust installation requires an explicit -InstallPrefix for the native runtime."
@@ -1546,13 +1551,13 @@ if ($Command -eq "help") {
   Show-Usage
   Write-Host "Rust core: install.ps1 install -Runtime rust -InstallPrefix <new-absolute-directory> [-DryRun]"
   Write-Host "Rust upgrade: install.ps1 install -Runtime rust -InstallPrefix <stopped-native-prefix> -Upgrade [-DryRun]"
+  Write-Host "Rust removal: install.ps1 uninstall -Runtime rust -InstallPrefix <stopped-native-prefix> [-DryRun] [-OperationId <uuid>] [-ExpectedManifest <sha256>]"
   Write-Host "Rust mode installs no Python environment and changes no PATH or provider account settings."
   exit 0
 }
 
 if ($Runtime -eq "rust") {
   try {
-    if ($Command -ne "install") { throw "Native prefix removal is not automatic; use explicit native installation management." }
     $nativeCore = Join-Path $repoRoot "bin\ccb-native.exe"
     if (-not (Test-Path -LiteralPath $nativeCore -PathType Leaf)) {
       throw "Rust core binary is missing. Build bin/build-ccb-kernel.ps1 or use a release containing ccb-native.exe."
@@ -1567,10 +1572,15 @@ if ($Runtime -eq "rust") {
     if ($Upgrade -and -not $capabilities.native_prefix_installation.in_place_upgrade) {
       throw "Rust payload does not support native prefix upgrade."
     }
-    $nativeArgs = if ($Upgrade) { @("installation", "upgrade", "--prefix", $InstallPrefix) } else { @("install", "--prefix", $InstallPrefix) }
+    if ($Command -eq "uninstall" -and -not $capabilities.native_prefix_installation.prefix_removal) {
+      throw "Rust payload does not support native prefix removal."
+    }
+    $nativeArgs = if ($Command -eq "uninstall") { @("installation", "remove", "--prefix", $InstallPrefix) } elseif ($Upgrade) { @("installation", "upgrade", "--prefix", $InstallPrefix) } else { @("install", "--prefix", $InstallPrefix) }
     if ($DryRun) { $nativeArgs += "--dry-run" }
+    if ($OperationId) { $nativeArgs += @("--operation-id", $OperationId) }
+    if ($ExpectedManifest) { $nativeArgs += @("--expected-manifest", $ExpectedManifest) }
     & $nativeCore @nativeArgs
-    if ($LASTEXITCODE -ne 0) { throw "Rust native prefix installation failed." }
+    if ($LASTEXITCODE -ne 0) { throw "Rust native prefix operation failed." }
   } finally {
     if ($script:extractedReleaseRoot -and (Test-Path -LiteralPath $script:extractedReleaseRoot)) {
       Remove-Item -LiteralPath $script:extractedReleaseRoot -Recurse -Force -ErrorAction SilentlyContinue

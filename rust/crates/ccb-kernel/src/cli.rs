@@ -111,6 +111,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             "{}",
             json!({"schema_version":1,"service":"ccb-native","runtime":"rust",
             "version":crate::installation::version(),"core_version":env!("CARGO_PKG_VERSION"),
+            "codex_tui_host":{"experimental":true,"supported":cfg!(windows),"input":"authenticated_websocket","herdr_open_integrated":false},
             "public_api_version":2,"herdr_open":{"experimental":true,"supported":cfg!(windows),"terminal_providers":["pi","codex"],"background_startup":true,"quiescent_stopped_recovery":true},"native_prefix_installation":{"schema_version":1,
                 "supported":cfg!(all(windows,target_arch="x86_64")),"commands":["ccb","ask","ccb-native"],
                 "modifies_account_settings":false,"in_place_upgrade":true,"upgrade_requires_stopped_commands":true,
@@ -135,6 +136,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
         println!("ccb-native installation upgrade|recover|rollback --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]\nccb-native installation status --prefix <directory>");
         println!("ccb-native --state-root <dir> view [--limit <1..64>]");
+        println!("ccb-native codex-tui-attach <host-directory> (experimental native Codex TUI)");
         println!("ccb-native [--project <directory>] herdr open [--herdr-exe <path>] [--session <name>] [--options <json>] [--no-attach] [--timeout-ms <0..60000>] [--dry-run] [--recover-stopped]");
         println!("ccb-native --state-root <dir> clear|compact [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> context-status <operation-id>");
         println!("ccb-native --state-root <dir> restart [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> restart-status [operation-id]");
@@ -285,6 +287,20 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         let pid: u32 = args[1].to_str().context("invalid process PID")?.parse()?;
         println!("{}", crate::owned_process::observe_external_process(pid)?);
         return Ok(());
+    }
+    if args[0] == "codex-tui-host" {
+        ensure!(
+            args.len() == 3,
+            "codex-tui-host requires a new absolute directory and Codex executable"
+        );
+        return crate::codex_tui_host::run(Path::new(&args[1]), Path::new(&args[2]));
+    }
+    if args[0] == "codex-tui-attach" {
+        ensure!(
+            args.len() == 2,
+            "codex-tui-attach requires a host directory"
+        );
+        return crate::codex_tui_host::attach(Path::new(&args[1]));
     }
     if args[0] == "private-copy" {
         ensure!(

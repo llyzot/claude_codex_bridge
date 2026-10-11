@@ -1,0 +1,232 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-11T17:07:06.118801+00:00",
+  "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-rust-host-live-n4c7al72",
+  "base_commit": "94cfe6ab",
+  "real_models": true,
+  "pi_mode": "rpc",
+  "codex_mode": "owned authenticated websocket app-server with independently attached original TUI",
+  "herdr_used": false,
+  "jobs": [
+    {
+      "job_id": "job_7dcedf17697d",
+      "agent": "lead",
+      "status": "completed",
+      "created_at": "2026-10-11T17:05:43.795362600Z",
+      "updated_at": "2026-10-11T17:05:54.307244600Z",
+      "result": {
+        "status": "completed",
+        "reply": "HOST_REVIEW_OK_2021",
+        "completion_reason": "pi_agent_settled",
+        "visible_reply_source": "message_bureau_reply"
+      }
+    },
+    {
+      "job_id": "job_18f026fd4dc2",
+      "agent": "lead",
+      "status": "completed",
+      "created_at": "2026-10-11T17:05:54.462498900Z",
+      "updated_at": "2026-10-11T17:06:01.591575100Z",
+      "result": {
+        "status": "completed",
+        "reply": "HOST_REVIEW_OK_2021",
+        "completion_reason": "pi_agent_settled",
+        "visible_reply_source": "job_terminal_decision"
+      }
+    },
+    {
+      "job_id": "job_4ea53449b075",
+      "agent": "worker",
+      "status": "completed",
+      "created_at": "2026-10-11T16:57:42.376363300Z",
+      "updated_at": "2026-10-11T16:57:46.114868400Z",
+      "result": {
+        "status": "completed",
+        "reply": "HOST_RESULT_1517",
+        "completion_reason": "codex_turn_completed",
+        "visible_reply_source": "job_terminal_decision"
+      }
+    },
+    {
+      "job_id": "job_2adbdf84a099",
+      "agent": "worker",
+      "status": "completed",
+      "created_at": "2026-10-11T17:05:51.308991200Z",
+      "updated_at": "2026-10-11T17:05:54.462498900Z",
+      "result": {
+        "status": "completed",
+        "reply": "HOST_WORKER_2021",
+        "completion_reason": "codex_turn_completed",
+        "visible_reply_source": "job_terminal_decision"
+      }
+    },
+    {
+      "job_id": "job_7631b97a191d",
+      "agent": "worker",
+      "status": "completed",
+      "created_at": "2026-10-11T17:06:25.185503400Z",
+      "updated_at": "2026-10-11T17:06:26.897347700Z",
+      "result": {
+        "status": "completed",
+        "reply": "HOST_SURVIVES_UI_CLOSE_8633",
+        "completion_reason": "codex_turn_completed",
+        "visible_reply_source": "job_terminal_decision"
+      }
+    }
+  ],
+  "callbacks": [
+    {
+      "callback_target_agent": "lead",
+      "child_job_id": "job_2adbdf84a099",
+      "child_message_id": "msg_1d1f6c67295a",
+      "child_reply_id": "rep_953f661a43f2",
+      "child_status": "completed",
+      "continuation_job_id": "job_18f026fd4dc2",
+      "continuation_message_id": "msg_9eeec92af45f",
+      "created_at": "2026-10-11T17:05:51.308991200Z",
+      "diagnostics": {
+        "allowed_chain_targets": [],
+        "bind_chain_workspace_tree": false,
+        "child_agent": "worker",
+        "child_body": "Calculate 43*47 without any tools and return HOST_WORKER_2021.",
+        "child_body_artifact": null,
+        "parent_body": "Test the native callback chain. Use your bash tool to run the exact executable C:/Users/user/Desktop/work/4.user/2.github/claude_codex_bridge/bin/ccb-native.exe with arguments ask --chain worker and this task: Calculate 43*47 without any tools and return HOST_WORKER_2021. This child result is required for your review. End this first turn after submission; do not wait or poll. When the automatic continuation arrives, verify the answer and return HOST_REVIEW_OK_2021.",
+        "parent_body_artifact": null,
+        "review_tree_digest": null,
+        "review_workspace_path": null,
+        "route_mode": "chain"
+      },
+      "edge_id": "cb_d3d99a303882",
+      "original_caller": "user",
+      "original_task_id": "msg_9eeec92af45f",
+      "parent_agent": "lead",
+      "parent_job_id": "job_7dcedf17697d",
+      "parent_message_id": "msg_9eeec92af45f",
+      "record_type": "callback_edge",
+      "schema_version": 1,
+      "state": "done",
+      "timeout_at": null,
+      "updated_at": "2026-10-11T17:06:01.591575100Z"
+    }
+  ],
+  "hosts": [
+    {
+      "cwd": "C:\\Users\\user\\Desktop\\work\\ccb-rust-host-live-n4c7al72\\project",
+      "endpoint": "ws://127.0.0.1:58363",
+      "executable": "C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe",
+      "host_process": {
+        "created": "134362119263367752",
+        "pid": 48088,
+        "windows_session": 1
+      },
+      "schema_version": 1,
+      "server_process": {
+        "created": "134362119263957034",
+        "pid": 57992,
+        "windows_session": 1
+      },
+      "status": "running",
+      "thread_id": "01a12be5-4673-77e2-86f1-124f5015ae38"
+    },
+    {
+      "endpoint": "ws://127.0.0.1:60279",
+      "executable": "C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe",
+      "host_process": {
+        "created": "134362114080225772",
+        "pid": 33800,
+        "windows_session": 1
+      },
+      "schema_version": 1,
+      "server_process": {
+        "created": "134362114080656592",
+        "pid": 49608,
+        "windows_session": 1
+      },
+      "status": "running",
+      "thread_id": "01a12be5-4673-77e2-86f1-124f5015ae38"
+    }
+  ],
+  "sessions": {
+    "lead": {
+      "agent_name": "lead",
+      "observed_at": "2026-10-11T17:06:01.591591600Z",
+      "pid": 16732,
+      "record_type": "pi_rpc_session",
+      "runtime_instance_id": "0fdfba11-8298-4bf4-8fa7-48bcde7ced26",
+      "schema_version": 1,
+      "state": {
+        "isCompacting": false,
+        "isStreaming": false,
+        "messageCount": 7,
+        "pendingMessageCount": 0,
+        "sessionFile": "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-rust-host-live-n4c7al72-project--\\2026-10-11T17-05-26-574Z_01a12bed-2e2d-75a7-8ddf-6773f536d4bf.jsonl",
+        "sessionId": "01a12bed-2e2d-75a7-8ddf-6773f536d4bf"
+      }
+    },
+    "worker": {
+      "agent_name": "worker",
+      "observed_at": "2026-10-11T17:06:26.897366600Z",
+      "pid": 48088,
+      "record_type": "codex_app_server_session",
+      "runtime_instance_id": "2c0e9d76-336d-491e-a588-ec4ef3b962bb",
+      "schema_version": 1,
+      "state": {
+        "control": null,
+        "path": "\\\\?\\C:\\Users\\user\\.codex\\sessions\\2026\\10\\12\\rollout-2026-10-12T00-56-50-01a12be5-4673-77e2-86f1-124f5015ae38.jsonl",
+        "pending_requests": [],
+        "status": {
+          "type": "idle"
+        },
+        "thread_id": "01a12be5-4673-77e2-86f1-124f5015ae38",
+        "tui_host": {
+          "input_transport": "authenticated_websocket",
+          "path": "C:\\Users\\user\\Desktop\\work\\ccb-rust-host-live-n4c7al72\\hosts\\2c0e9d76-336d-491e-a588-ec4ef3b962bb"
+        }
+      }
+    }
+  },
+  "tui_closed_during_task": {
+    "ProcessId": 35348,
+    "ParentProcessId": 64892,
+    "CreationDate": "2026-10-12T01:05:45.572677+08:00"
+  },
+  "regression": "22 host/Codex-RPC/Pi-RPC cases passed in 38.26s; canonical-cwd Pi case failed before fix",
+  "limitations": [
+    "Not integrated into herdr open yet",
+    "No model tool execution in these arithmetic tests",
+    "No pixel-level UI inspection",
+    "Initial UI did not automatically exit with its host; after the attach lifetime-monitor fix, a second real TUI and its attach process exited automatically when the native daemon was stopped.",
+    "No production/default promotion"
+  ],
+  "production_install_changed": false,
+  "credentials_copied": false,
+  "cleanup": {
+    "pending": false,
+    "native_daemon_stopped": true,
+    "recorded_process_exit_codes": {
+      "59748": 1,
+      "25796": 1,
+      "57992": 1,
+      "49608": 1,
+      "33800": 1,
+      "63344": 1,
+      "48088": 1,
+      "16732": 1
+    },
+    "tui_after_server_stop_exited_automatically": true,
+    "shutdown_tui": {
+      "ProcessId": 25796,
+      "ParentProcessId": 59748,
+      "CreationDate": "2026-10-12T01:07:06.662311+08:00"
+    }
+  },
+  "release_sha256": {
+    "ccb-kernel.exe": "9d8e85ed3e56109cc4c0e4904c075ca4ba4dc2e6d93a0db5b23f349890058000",
+    "ccb-native.exe": "7e8dcebdb2af67a824ceab1403b6d7336744d308f2104806b3d39f69cd3222bd"
+  },
+  "final_release_sha256": {
+    "ccb-kernel.exe": "653b3f98e3f9c807111505b3c35e68718f497c0aadf7a682d2e86b5008a53f39",
+    "ccb-native.exe": "7f190b97fa017c0d257cb615eedc83baeb11be129a1f3531768f9d7caef36be7"
+  },
+  "repository_bin_matches_release": true
+}

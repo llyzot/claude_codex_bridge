@@ -203,7 +203,9 @@
     "Real Herdr flat running/not_running status data is accepted only by the explicit server-status query; matching real-shape fixtures now protect cold startup",
     "Public native herdr open foreground branch was exercised in Windows Terminal with Scoop pwsh; the Herdr attach client was parented by ccb.exe, and repaired original Pi process completed a real no-tool request",
     "Native Pi mounting now handles Herdr full-lifecycle-hook readiness and can repair a lost initial launch name only after exact native bridge/process/pane/session proof, without process restart or uncertain rename replay",
-    "Explicit quiescent stopped Herdr server recovery with journaled workspace retirement, native Pi/Codex session resume and real Pi memory continuity validation"
+    "Explicit quiescent stopped Herdr server recovery with journaled workspace retirement, native Pi/Codex session resume and real Pi memory continuity validation",
+    "Owned authenticated Codex WebSocket host behind the native RPC driver with same-thread original TUI attachment, real Pi callback and task completion after closing that TUI",
+    "Normalize Pi process cwd from Win32 verbatim paths to portable Windows paths; installed-Pi regression reproduced and fixed session-folder ENOENT"
   ],
   "remaining": [
     "Complete legacy/provider-history and cross-Windows-session recovery where new ownership proof is unavailable; verify non-Windows scoped process-tree termination and recovery",
@@ -226,7 +228,8 @@
     "Complete operator-directed repair/reassignment for ambiguous legacy Agent-journal parents and verify older mixed-version/cross-platform migration; current cooperative ownership checks do not govern arbitrary direct filesystem edits or unmodified alternate-root writers",
     "Complete other-provider native clear/compact, graphical context controls and authenticated Claude model/cancellation/error scenarios; verify general empty-startup recovery, explicit Codex old-thread unloading, large-history compaction, real-model restart continuity, broader retained-history migration and runtime/context-control journal retention",
     "Resolve or externally repair the now-isolated Codex sandbox runtime ACL/sharing failure on desktop node_repl.exe; shared-process interruption needs the pending human approval, and sandbox policy must not be weakened",
-    "Fix recovered terminal input/foreground-process race: real Codex exited and the prompt reached pwsh; failed worker and waiting callback retained without replay. Confirm provider exit cause and require atomic dispatch or a provider-native channel before production promotion"
+    "Fix recovered terminal input/foreground-process race: real Codex exited and the prompt reached pwsh; failed worker and waiting callback retained without replay. Confirm provider exit cause and require atomic dispatch or a provider-native channel before production promotion",
+    "Compose the verified native Codex TUI host into Herdr open/mount/recovery instead of terminal prompt injection; retain original Pi/Claude TUI support and complete TUI context-switch/approval/interactive-input coordination before promotion"
   ],
   "verification": {
     "native_role_addressing": "20 final-release cases passed: compact canonical/legacy role expansion against the existing parser, project/user/current-directory precedence, adapter and source-home naming, managed-HOME avoidance, hybrid/rich binding, invalid IDs/manifests/names, duplicate default names, unambiguous/ambiguous/disabled targeting, agents listing, and actual native project startup plus role-addressed fixture work",
@@ -519,6 +522,8 @@
     },
     "native_stopped_recovery_evidence": "docs/analysis/native-herdr-stopped-recovery-20261012.json",
     "native_stopped_recovery_results": "Eight offline recovery tests passed in 48.40s. Real original Windows Terminal/pwsh launcher recovered w1 to w2 and Pi recalled prior FOREGROUND_READY_OK in its original native session. Subsequent Codex chain failed: provider exited and input reached PowerShell; Rust quarantined without replay. No successful recovered chain claim. Test service/server stopped; historical jobs retained.",
-    "native_stopped_recovery_regression": "Eight dedicated recovery cases passed in 48.40s; 73 opener/mount/namespace regression cases passed in 245.90s. Rust tests 25 passed with one subprocess helper ignored by the ordinary runner and invoked by its parent. Formatting, clippy all-targets with warnings denied and diff checks passed. This was not a full curated-suite run."
+    "native_stopped_recovery_regression": "Eight dedicated recovery cases passed in 48.40s; 73 opener/mount/namespace regression cases passed in 245.90s. Rust tests 25 passed with one subprocess helper ignored by the ordinary runner and invoked by its parent. Formatting, clippy all-targets with warnings denied and diff checks passed. This was not a full curated-suite run.",
+    "native_codex_tui_host_evidence": "docs/analysis/native-codex-tui-host-20261012.json",
+    "native_codex_tui_host_results": "22 host/Codex-RPC/Pi-RPC cases passed in 38.26s; Rust tests 25 passed plus parent-invoked subprocess helper. Real Codex result HOST_RESULT_1517, same-thread host restart, Pi callback HOST_REVIEW_OK_2021 with done edge, and HOST_SURVIVES_UI_CLOSE_8633 after exact TUI closure. Second TUI and attach wrapper automatically exited on host shutdown. No Herdr integration, model-tool execution, pixel-level UI inspection or production/default promotion claimed."
   }
 }

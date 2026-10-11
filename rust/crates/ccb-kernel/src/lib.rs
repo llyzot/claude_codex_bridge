@@ -16,6 +16,7 @@ mod codex_context;
 mod codex_requests;
 mod codex_rpc;
 mod codex_skills;
+mod codex_tui_host;
 mod completion;
 mod completion_gate;
 pub mod config;

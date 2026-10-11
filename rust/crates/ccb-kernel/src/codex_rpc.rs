@@ -40,6 +40,7 @@ enum StreamEvent {
     End,
 }
 pub struct Session {
+    tui_host: Option<std::path::PathBuf>,
     role_skills_bound: bool,
     child: crate::owned_process::OwnedChild,
     commands: mpsc::SyncSender<Value>,
@@ -93,10 +94,31 @@ impl Session {
         let params = json!({"clientInfo":{"name":"ccb-native","version":env!("CARGO_PKG_VERSION")},"capabilities":capabilities});
         crate::codex_requests::validate_initialize(&params)?;
         let initialize = json!({"id":init,"method":"initialize","params":params});
-        let mut command = Command::new(argv[0].as_str().unwrap());
-        for arg in &argv[1..] {
-            command.arg(arg.as_str().unwrap());
-        }
+        crate::codex_tui_host::validate(spec)?;
+        let tui_host = spec["tui_host_root"]
+            .as_str()
+            .map(|root| std::path::Path::new(root).join(&runtime));
+        let mut command = if let Some(path) = &tui_host {
+            std::fs::create_dir_all(path.parent().unwrap())?;
+            let native = std::env::current_exe()?.with_file_name(if cfg!(windows) {
+                "ccb-native.exe"
+            } else {
+                "ccb-native"
+            });
+            ensure!(native.is_file(), "native TUI host executable is missing");
+            let mut command = Command::new(native);
+            command
+                .arg("codex-tui-host")
+                .arg(path)
+                .arg(argv[0].as_str().unwrap());
+            command
+        } else {
+            let mut command = Command::new(argv[0].as_str().unwrap());
+            for arg in &argv[1..] {
+                command.arg(arg.as_str().unwrap());
+            }
+            command
+        };
         if let Some(cwd) = spec["workspace_path"].as_str() {
             command.current_dir(cwd);
         }
@@ -186,6 +208,7 @@ impl Session {
             String::new()
         };
         Ok(Self {
+            tui_host,
             role_skills_bound: false,
             child,
             commands,
@@ -639,6 +662,10 @@ impl Session {
                 Some(crate::codex_context::Step::Send(request)) => self.send(request)?,
                 Some(crate::codex_context::Step::Finished(state, decision)) => {
                     self.state = state;
+                    if let Some(path) = &self.tui_host {
+                        self.state["tui_host"] =
+                            json!({"path":path,"input_transport":"authenticated_websocket"});
+                    }
                     if decision["status"] == "completed"
                         && decision["diagnostics"]["context_action"] == "clear"
                     {
@@ -690,6 +717,10 @@ impl Session {
                 "Codex resumed wrong thread"
             );
             self.state = json!({"thread_id":id,"path":thread["path"],"status":thread["status"]});
+            if let Some(path) = &self.tui_host {
+                self.state["tui_host"] =
+                    json!({"path":path,"input_transport":"authenticated_websocket"});
+            }
             crate::context_session::restore_marker(
                 &mut self.state,
                 &self.saved_state,

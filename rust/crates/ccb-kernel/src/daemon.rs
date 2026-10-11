@@ -147,6 +147,7 @@ impl Daemon {
             if spec["driver_kind"] == "herdr_tui" {
                 crate::herdr_worker::validate(config, name, spec)?;
             }
+            crate::codex_tui_host::validate(spec)?;
             ensure!(
                 spec["profile_family"].is_null()
                     || [

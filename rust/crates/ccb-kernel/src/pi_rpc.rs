@@ -92,7 +92,9 @@ impl Session {
             command.arg("--session").arg(file);
         }
         if let Some(cwd) = spec["workspace_path"].as_str() {
-            command.current_dir(cwd);
+            // Pi derives its session directory name from cwd. A Win32 verbatim
+            // prefix would become a literal '?' in that directory component.
+            command.current_dir(crate::workspaces::portable(std::path::Path::new(cwd))?);
         }
         if let Some(env) = spec["env"].as_object() {
             for (key, value) in env {

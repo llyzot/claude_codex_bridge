@@ -37,6 +37,7 @@ pub struct Session {
     pub ready: bool,
     pub closed: bool,
     pub quarantined: bool,
+    forced: bool,
     stdout_closed: bool,
     input_closed: bool,
     saved_state: Value,
@@ -170,6 +171,7 @@ impl Session {
             ready: false,
             closed: false,
             quarantined: false,
+            forced: false,
             stdout_closed: false,
             input_closed: false,
             saved_state: saved["state"].clone(),
@@ -245,6 +247,7 @@ impl Session {
             }
         }
         let exit = self.child.try_wait()?;
+        let tree_empty = exit.is_some() && self.child.tree_empty()?;
         if exit.is_some() || self.stdout_closed || self.input_closed {
             self.ready = false;
         }
@@ -261,37 +264,56 @@ impl Session {
             .is_some_and(|turn| turn.decision.is_some())
         {
             let turn = self.active.take().unwrap();
-            self.closed = exit.is_some() && self.stdout_closed;
-            self.ready =
-                !self.quarantined && exit.is_none() && !self.stdout_closed && !self.input_closed;
+            self.closed = exit.is_some() && self.stdout_closed && tree_empty;
+            self.ready = !self.quarantined
+                && !self.forced
+                && exit.is_none()
+                && !self.stdout_closed
+                && !self.input_closed;
             let mut decision = turn.decision.clone().unwrap();
             control_diagnostics(&turn, &mut decision);
             return Ok(Some((turn.job, decision)));
         }
         // Process exit alone does not prove that the bounded reader has drained
         // the last result or that inherited stdout handles have reached EOF.
-        if let Some(exit) = exit.filter(|_| self.stdout_closed) {
+        if let Some(exit) = exit.filter(|_| self.stdout_closed && tree_empty) {
             self.closed = true;
             if let Some(turn) = self.active.take() {
                 let mut decision = failure(
-                    if self.quarantined {
+                    if self.forced {
+                        "cancelled"
+                    } else if self.quarantined {
                         "failed"
                     } else {
                         "incomplete"
                     },
-                    if self.quarantined {
+                    if self.forced {
+                        "provider_terminated"
+                    } else if self.quarantined {
                         "provider_protocol_error"
                     } else {
                         "pi_process_exit"
                     },
                     &format!("Pi exited before settled completion: {exit}"),
                 );
+                if self.forced {
+                    decision["diagnostics"]["completion_authority"] =
+                        json!("owned_windows_job_exit");
+                    decision["diagnostics"]["owned_tree_empty"] = json!(true);
+                    decision["diagnostics"]["scope_id"] =
+                        self.child.scope_info()?["scope_id"].clone();
+                }
                 control_diagnostics(&turn, &mut decision);
                 return Ok(Some((turn.job, decision)));
             }
             return Ok(None);
         }
-        if !self.quarantined && exit.is_none() && !self.stdout_closed && !self.input_closed {
+        if !self.quarantined
+            && !self.forced
+            && exit.is_none()
+            && !self.stdout_closed
+            && !self.input_closed
+        {
             if let Some(turn) = self.active.as_mut() {
                 if turn.cancel.is_some() && !turn.abort_sent {
                     turn.abort_sent = enqueue(
@@ -311,6 +333,7 @@ impl Session {
     }
     pub fn deadline_due(&self) -> bool {
         !self.quarantined
+            && !self.forced
             && self.active.as_ref().is_some_and(|turn| {
                 self.timeout_s.is_finite()
                     && self.timeout_s > 0.0
@@ -489,6 +512,19 @@ impl Session {
         self.quarantined = true;
         self.ready = false;
         self.dirty = false;
+    }
+    pub fn terminate_tree(&mut self) -> Result<()> {
+        ensure!(
+            self.child.scope_info()?["supported"] == true,
+            "provider tree termination is unsupported on this platform"
+        );
+        self.forced = true;
+        self.ready = false;
+        self.child.kill()?;
+        Ok(())
+    }
+    pub fn scope_info(&self) -> Result<Value> {
+        self.child.scope_info()
     }
     pub fn pid(&self) -> u32 {
         self.child.id()

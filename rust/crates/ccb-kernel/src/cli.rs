@@ -95,7 +95,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         return Ok(());
     }
     if args.first().is_some_and(|s| s == "--help") {
-        println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask <agent> [--from <actor>] [--chain] [--silence] <message>\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> ping|watch <target>|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> provider-status <agent>\nccb-native --state-root <dir> provider-recover <agent> <fault-id>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
+        println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask <agent> [--from <actor>] [--chain] [--silence] <message>\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> ping|watch <target>|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> provider-status <agent>\nccb-native --state-root <dir> provider-terminate <agent> [--silent]\nccb-native --state-root <dir> provider-recover <agent> <fault-id>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
         return Ok(());
     }
     if args.is_empty() {
@@ -275,6 +275,25 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         "provider-status" => {
             ensure!(args.len() == 1, "provider-status requires an agent");
             json!({"agent_name":arg(&args,0)?})
+        }
+        "provider-terminate" => {
+            ensure!(
+                args.len() == 1 || args.len() == 2 && arg(&args, 1)? == "--silent",
+                "provider-terminate requires agent and optional --silent"
+            );
+            let agent = arg(&args, 0)?;
+            let current = request(&root, "provider-status", json!({"agent_name":agent}))?;
+            let prior = &current["fault"]["termination_intent"]["binding"];
+            let mut binding = if !prior.is_null() {
+                prior.clone()
+            } else {
+                json!({"runtime_instance_id":current["owned"]["runtime_instance_id"],"pid":current["owned"]["pid"],"scope_id":current["scope"]["scope_id"],
+                    "job_id":current["active"]["job_id"],"execution_instance_id":current["active"]["execution_instance_id"]})
+            };
+            binding["agent_name"] = json!(agent);
+            binding["record_reply"] = json!(args.len() == 1);
+            println!("{}", request(&root, "provider-terminate", binding)?);
+            return Ok(());
         }
         "provider-recover" => {
             ensure!(

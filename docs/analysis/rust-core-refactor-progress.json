@@ -4,6 +4,12 @@
   "complete": false,
   "production_install_changed": false,
   "existing_agents_controlled": false,
+  "existing_runtime_control_authorization": {
+    "may_close_when_needed": true,
+    "scope": "Existing Workspace and codex_impl during this Rust migration",
+    "user_instruction": "现有 Workspace 和 codex_impl ，不用管这个，有需要就关闭",
+    "note": "This supersedes the earlier preservation constraint; actual controls are recorded separately"
+  },
   "runtime_selection": {
     "transition_default": "python",
     "experimental_mode": "CCB_CORE_RUNTIME=rust",
@@ -104,10 +110,13 @@
     "Owned Pi/Codex/Claude startup, initialization and malformed/semantic protocol failures persist provider-local fault identity while other Agents and the authority daemon continue; rejected frames cannot replace validated session metadata",
     "Faulted providers fence new prompts and retries, fail preaccepted unsent task requests without replay, retain ordinary reply-delivery heads and allow failed Worker results to automatically continue the same persistent Pi Lead",
     "Native provider-status/provider-recover API and CLI expose safe fault identity, recheck durable authority, require closed owned sessions and idle execution slots, commit recovery before retiring handles, and preserve blocked faults across daemon restart",
-    "Owned process cleanup covers post-spawn transport setup failures; quarantined live/uncertain executions remain fenced without automatic termination or replacement"
+    "Owned process cleanup covers post-spawn transport setup failures; quarantined live/uncertain executions remain fenced without automatic termination or replacement",
+    "Windows Pi/Codex/Claude processes enter separate anonymous Job Objects atomically at creation with an explicit stdio handle allow-list; descendant accounting fences exit fallback and closure even when descendants have null stdout",
+    "Native provider-terminate API/CLI fences runtime/PID/scope/job/execution identity, commits durable Job/Event/fault intent before OS control, preserves silent policy and idempotence, and waits for exited parent, drained output and an empty owned Job",
+    "Windows native argv/environment handling preserves UTF-16, quoting and drive-directory entries; executable lookup follows configured PATH/application/system/parent-PATH order without implicit project-directory shadowing"
   ],
   "remaining": [
-    "Finish ordinary terminal-result recovery and explicit cancellation/scoped process-tree termination orchestration; reconcile uncertain running executions after daemon restart",
+    "Finish ordinary terminal-result recovery and reconcile uncertain running executions after daemon restart; verify non-Windows scoped process-tree termination",
     "Migrate Git tree observation, provider completion/control adapters and remaining failure-notice orchestration",
     "Complete public API-2/CLI/config-schema/worktree/role parity and full Keeper/reload integration; verify non-Windows process lifetime and default native routing",
     "Finish native CLI/provider command composition and installer integration after interface parity",
@@ -119,6 +128,9 @@
     "Reconcile legacy Python provider test assumptions with the user-approved live-resource behavior and Windows fixtures; wider repository regression is not yet green"
   ],
   "verification": {
+    "native_windows_termination": "13 final-release Windows cases passed: live-parent and exited-parent trees with silent child/grandchild processes across Pi/Codex/Claude, foreign/stale runtime/PID/scope/job/execution rejection, silent and repeated termination, durable intent, idle CLI termination and restart/recovery, already-running peer PID/scope preservation, and Unicode/quote/backslash/PATH behavior including a project-local executable namesake",
+    "native_windows_scope_current_suite": "All 264 selected Rust kernel/CLI contracts passed against final release artifacts in 418.53s; Rust tests 7, fmt check and clippy all-targets with warnings denied passed. Repository bin hashes match release builds. This does not claim whole-repository compatibility or Unix tree control",
+    "native_windows_scope_regressions": "An initial complete run passed 261/264; three historical mailbox tests submitted on behalf of an already-faulted Lead and conflicted with the new caller fence. Replaced with healthy idle delegation followed by a controlled Lead fault and exact mailbox recovery. A separate executable-shadow regression failed against the prior build, then passed after matching Rust executable lookup order. Focused final scenarios and the full 264-case release run passed",
     "native_provider_faults": "27 final-release fixture cases passed: spawn and initialization failure isolation for Pi/Codex/Claude, malformed and active protocol quarantine, independent healthy Agent work, exact/durable fault recovery fences, persisted blocked startup faults, preaccepted FIFO failure without prompt replay, same-Pi-Lead failure callbacks, error-secret exclusion, native CLI controls, daemon-death active-slot fencing and retention/delivery of faulted Lead reply heads",
     "native_fault_current_suite": "All 251 selected Rust kernel/CLI contracts passed on final release artifacts in 392.01s; Rust tests 7 passed, fmt check and clippy all-targets with warnings denied passed. Repository bin hashes match release builds; no remaining native_rpc_fault fixture process was observed after suite termination. Production install and existing Workspace/agents remain unchanged",
     "native_fault_red_loop": "The preceding release failed all 12 initial fault cases, including confirmed daemon exits on spawn/initialization failure and missing malformed-frame fault handling. First debug implementation passed 12, expanded debug coverage passed 22. Final release expansion initially passed 26/27 because a test observer mistook an invisible claimed mailbox head for completed delivery; observer now waits for the same receiver Job terminal result, and final 251-case run passed",
@@ -153,7 +165,7 @@
     "result_policy_differential": "14 retry/notice cases match the existing Python oracle, including boolean policy opt-out and structured permission code precedence over auth message text",
     "result_policy_integration": "56 existing retry/empty-result/callback/finalization cases passed in native mode",
     "daemon_scope": "Real model-backed Pi Lead/Codex Worker automatic callback verified; native Claude protocol and actual unauthenticated failure verified, but successful Claude inference and Herdr execution remain unverified. Unknown prior running executions remain fenced, not automatically replayed",
-    "native_contract_tests": 251,
+    "native_contract_tests": 264,
     "native_claude_release": "All 6 Claude stream contracts passed on final release; complete debug contract suite 130 passed; Rust tests 5 passed and clippy warnings denied",
     "native_provider_suite": "Complete debug suite 123 passed before adding delayed-idle case; all 15 final Pi/Codex provider contracts passed on final release; Rust 5 passed and clippy warnings denied",
     "native_cli_pi_release": "8 CLI/security/Pi RPC cases passed on final release executables, including installed Pi get_state handshake; final debug contract suite 114 passed",

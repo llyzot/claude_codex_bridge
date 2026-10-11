@@ -210,28 +210,42 @@ def test_faulted_active_execution_remains_fenced_after_daemon_death(tmp_path):
 
 @pytest.mark.parametrize('provider', ['pi', 'codex', 'claude'])
 def test_faulted_lead_retains_result_mailbox_head_until_recovery(tmp_path, provider):
-    record = provider_spec(provider, 'normal', tmp_path)
-    record['workspace_path'] = str(tmp_path / 'missing-directory')
-    server = Server(tmp_path / 'state', {'lead': record, 'worker': spec('worker')})
+    record = provider_spec(provider, 'idle-late-fault', tmp_path)
+    server = Server(tmp_path / 'state', {'lead': record, 'worker': spec('slow-input')})
     try:
-        before = fault(server, 'lead')
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            owned = status(server, 'lead')['owned']
+            if owned and owned['ready']: break
+            time.sleep(.025)
+        assert owned and owned['ready']
+        # Delegate while the Lead is healthy; a quarantined caller cannot ask anew.
         receipt = submit(server, actor='lead')
+        (tmp_path / 'release-error').touch()
+        before = fault(server, 'lead')
+        (tmp_path / 'release-fault').touch()
+        deadline = time.monotonic() + 8
+        while status(server, 'lead')['process_state'] != 'closed' and time.monotonic() < deadline: time.sleep(.025)
         await_watch(server, receipt['job_id'], lambda r: r['terminal'])
         head = server.rpc('mailbox-head', {'agent_name': 'lead'})['head']
         assert head is not None
         time.sleep(.2)
         assert server.rpc('mailbox-head', {'agent_name': 'lead'})['head']['inbound_event_id'] == head['inbound_event_id']
-        assert server.rpc('records.list', dict(stream='jobs', agent_name='lead'), version=1)['result'] == []
-        (tmp_path / 'missing-directory').mkdir()
+        prior = server.rpc('records.latest', dict(stream='jobs', agent_name='lead', identity='job_id'), version=1)['result']
+        assert prior == []
         recover(server, before)
         deadline = time.monotonic() + 8
         while time.monotonic() < deadline:
             jobs = server.rpc('records.latest', dict(stream='jobs', agent_name='lead', identity='job_id'), version=1)['result']
-            if jobs and jobs[0]['status'] == 'completed': break
+            if len(jobs) == 1 and jobs[-1]['status'] == 'completed': break
             time.sleep(.025)
-        assert len(jobs) == 1 and jobs[0]['status'] == 'completed'
+        assert len(jobs) == 1 and jobs[-1]['status'] == 'completed'
+        assert jobs[-1]['request']['message_type'] == 'reply_delivery'
         assert server.rpc('mailbox-head', {'agent_name': 'lead'})['head'] is None
-    finally: server.close()
+    finally:
+        (tmp_path / 'release-error').touch()
+        (tmp_path / 'release-fault').touch()
+        server.close()
 
 @pytest.mark.parametrize('provider', ['pi', 'codex', 'claude'])
 @pytest.mark.parametrize('mode', ['active', 'malformed'])

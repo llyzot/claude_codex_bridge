@@ -342,6 +342,8 @@ impl Daemon {
                 let agent = records::string(p, "agent_name")?;
                 self.spec(agent)?;
                 let owned = self.owned_view(agent);
+                let scope = self.owned_scope(agent)?;
+                let active = self.active_provider_view(agent)?;
                 let fault = self.faults.get(agent).cloned().unwrap_or(Value::Null);
                 let state = if !owned.is_null() {
                     if owned["closed"] == true {
@@ -358,9 +360,12 @@ impl Daemon {
                 } else {
                     "unknown"
                 };
-                Ok(json!({"agent_name":agent,"fault":fault,"owned":owned,"process_state":state}))
+                Ok(
+                    json!({"agent_name":agent,"fault":fault,"owned":owned,"scope":scope,"active":active,"process_state":state}),
+                )
             }
             "provider-recover" => self.recover_provider(p),
+            "provider-terminate" => self.terminate_provider(p),
             "submit" => self.submit(p),
             "watch" => self.watch(p),
             "queue" => {
@@ -562,6 +567,12 @@ impl Daemon {
     fn submit(&mut self, p: &Value) -> Result<Value> {
         let mut request = p.clone();
         ensure!(request.is_object(), "submit requires an object");
+        ensure!(
+            !self
+                .faults
+                .contains_key(records::string(&request, "from_actor")?),
+            "caller provider is faulted"
+        );
         for (k, v) in [
             ("message_type", json!("ask")),
             ("delivery_scope", json!("single")),
@@ -744,6 +755,123 @@ impl Daemon {
             return json!({"pid":s.pid(),"runtime_instance_id":s.runtime,"closed":s.closed,"ready":s.ready});
         }
         Value::Null
+    }
+    fn owned_scope(&self, agent: &str) -> Result<Value> {
+        if let Some(s) = self.pi.get(agent) {
+            return s.scope_info();
+        }
+        if let Some(s) = self.codex.get(agent) {
+            return s.scope_info();
+        }
+        if let Some(s) = self.claude.get(agent) {
+            return s.scope_info();
+        }
+        Ok(Value::Null)
+    }
+    fn active_provider_view(&mut self, agent: &str) -> Result<Value> {
+        let slot = json!({"state_id":self.state,"target_kind":"agent","target_name":agent});
+        let id = self.kernel.dispatch("scheduler.active_job_for", &slot)?;
+        if id.is_null() {
+            return Ok(Value::Null);
+        }
+        let job = self.get_job(id.as_str().context("invalid active job identity")?)?;
+        Ok(
+            json!({"job_id":id,"execution_instance_id":job["provider_options"]["native_execution_instance"],
+            "daemon_instance_id":job["provider_options"]["native_daemon_instance"]}),
+        )
+    }
+    fn send_tree_termination(&mut self, agent: &str) -> Result<()> {
+        if let Some(session) = self.pi.get_mut(agent) {
+            return session.terminate_tree();
+        }
+        if let Some(session) = self.codex.get_mut(agent) {
+            return session.terminate_tree();
+        }
+        if let Some(session) = self.claude.get_mut(agent) {
+            return session.terminate_tree();
+        }
+        bail!("owned provider process is unavailable")
+    }
+    fn terminate_provider(&mut self, p: &Value) -> Result<Value> {
+        let agent = records::string(p, "agent_name")?;
+        let spec = self.spec(agent)?;
+        let owned = self.owned_view(agent);
+        let scope = self.owned_scope(agent)?;
+        ensure!(
+            !owned.is_null() && scope["supported"] == true,
+            "no owned provider process tree is available"
+        );
+        ensure!(
+            owned["runtime_instance_id"] == p["runtime_instance_id"]
+                && owned["pid"] == p["pid"]
+                && scope["scope_id"] == p["scope_id"],
+            "provider termination runtime identity mismatch"
+        );
+        let requested = json!({"runtime_instance_id":p["runtime_instance_id"],"pid":p["pid"],"scope_id":p["scope_id"],
+            "job_id":p["job_id"],"execution_instance_id":p["execution_instance_id"],"record_reply":p["record_reply"]!=false});
+        let prior = self
+            .faults
+            .get(agent)
+            .map(|f| &f["termination_intent"])
+            .cloned()
+            .unwrap_or(Value::Null);
+        if !prior.is_null() {
+            ensure!(
+                prior["binding"] == requested,
+                "provider termination intent already fixed"
+            );
+            if owned["closed"] != true {
+                self.send_tree_termination(agent)?;
+            }
+            return Ok(
+                json!({"agent_name":agent,"termination_id":prior["termination_id"],
+                "status":if owned["closed"] == true {"terminated"} else {"termination_requested"}}),
+            );
+        }
+        let active = self.active_provider_view(agent)?;
+        ensure!(
+            active["job_id"] == p["job_id"]
+                && active["execution_instance_id"] == p["execution_instance_id"],
+            "provider termination active execution mismatch"
+        );
+        ensure!(
+            active.is_null() || active["daemon_instance_id"] == self.state,
+            "provider termination cannot control a prior uncertain execution"
+        );
+        let termination_id = uuid::Uuid::new_v4().to_string();
+        let timestamp = now();
+        let intent =
+            json!({"termination_id":termination_id,"requested_at":timestamp,"binding":requested});
+        if !active.is_null() {
+            let job = self.get_job(records::string(&active, "job_id")?)?;
+            let mut job = self.mark_provider_cancel(job, p["record_reply"] != false, false)?;
+            job["provider_options"]["native_termination_intent"] = intent.clone();
+            job["updated_at"] = json!(timestamp);
+            admission::append(&mut self.kernel, "jobs", &job)?;
+            admission::event(
+                &mut self.kernel,
+                &job,
+                "provider_termination_requested",
+                json!({"termination_id":termination_id,"scope_id":scope["scope_id"]}),
+                &timestamp,
+            )?;
+        }
+        let mut fault = self.faults.get(agent).cloned().unwrap_or_else(||json!({"schema_version":1,"record_type":"native_provider_fault",
+            "project_id":self.config["project_id"],"agent_name":agent,"provider":spec["provider"],"fault_id":uuid::Uuid::new_v4().to_string(),
+            "status":"blocked","phase":"terminate","reason":"provider_terminated","pid":owned["pid"],"runtime_instance_id":owned["runtime_instance_id"],
+            "daemon_instance_id":self.state,"job_id":active["job_id"],"execution_instance_id":active["execution_instance_id"],"observed_at":timestamp,"io_error_kind":null}));
+        fault["termination_intent"] = intent;
+        self.kernel.store.save(
+            &crate::provider_fault::path(spec["provider"].as_str().unwrap(), agent),
+            &fault,
+        )?;
+        self.kernel.store.commit()?;
+        self.faults.insert(agent.to_owned(), fault);
+        // No process control occurs before Job/Event/fault intent is durable.
+        self.send_tree_termination(agent)?;
+        Ok(
+            json!({"agent_name":agent,"termination_id":termination_id,"status":"termination_requested"}),
+        )
     }
     fn record_provider_fault(
         &mut self,

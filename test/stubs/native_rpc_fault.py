@@ -4,8 +4,13 @@ import os
 from pathlib import Path
 import sys
 import time
+import subprocess
+import threading
 
 provider, mode, directory = sys.argv[1:4]
+tree = mode in {'tree', 'tree-exit'}
+tree_exit = mode == 'tree-exit'
+if tree: mode = 'active'
 directory = Path(directory)
 launches = directory / 'fault-launches'
 first = not launches.exists()
@@ -20,9 +25,24 @@ else: delayed = False
 def emit(value): print(json.dumps(value), flush=True)
 
 def hold():
+    if tree:
+        child = Path(__file__).with_name('native_scope_descendant.py')
+        subprocess.Popen([sys.executable, '-I', str(child), str(directory), 'child'],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        deadline = time.monotonic() + 8
+        while not (directory / 'grandchild.pid').exists() and time.monotonic() < deadline: time.sleep(.025)
     (directory / 'fault-emitted').touch()
+    if tree_exit: os._exit(0)
     while not (directory / 'release-fault').exists(): time.sleep(.025)
     os._exit(0)
+
+def fault_when_released():
+    while not (directory / 'release-error').exists(): time.sleep(.025)
+    print('invalid-json-' + secret, flush=True)
+    hold()
+
+if first and mode == 'idle-late-fault':
+    threading.Thread(target=fault_when_released, daemon=True).start()
 
 state = dict(sessionId='fault-session', sessionFile=None, isStreaming=False,
              isCompacting=False, pendingMessageCount=0, messageCount=0)

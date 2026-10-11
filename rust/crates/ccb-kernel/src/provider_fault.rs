@@ -13,9 +13,14 @@ pub fn validate(row: &Value, provider: &Value, agent: &str, project: &Value) -> 
             && row["provider"] == *provider
             && row["project_id"] == *project
             && ["blocked", "recovered"].contains(&row["status"].as_str().unwrap_or(""))
-            && ["startup", "poll", "start"].contains(&row["phase"].as_str().unwrap_or(""))
-            && ["provider_start_failed", "provider_protocol_error"]
-                .contains(&row["reason"].as_str().unwrap_or(""))
+            && ["startup", "poll", "start", "terminate"]
+                .contains(&row["phase"].as_str().unwrap_or(""))
+            && [
+                "provider_start_failed",
+                "provider_protocol_error",
+                "provider_terminated"
+            ]
+            .contains(&row["reason"].as_str().unwrap_or(""))
             && row["fault_id"]
                 .as_str()
                 .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok())

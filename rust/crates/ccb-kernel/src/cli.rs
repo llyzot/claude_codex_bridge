@@ -232,7 +232,11 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     if args.is_empty() {
         args.push("start".into());
     }
-    if args[0] == "herdr-transport" || args[0] == "herdr-namespace" || args[0] == "herdr-agents" {
+    if args[0] == "herdr-transport"
+        || args[0] == "herdr-namespace"
+        || args[0] == "herdr-agents"
+        || args[0] == "pi-terminal-bridge"
+    {
         ensure!(
             args.len() == 1,
             "herdr-transport reads one JSON request from stdin"
@@ -250,7 +254,9 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         crate::security::own_process_tree()?;
         println!(
             "{}",
-            if args[0] == "herdr-transport" {
+            if args[0] == "pi-terminal-bridge" {
+                crate::pi_terminal::execute(&request)?
+            } else if args[0] == "herdr-transport" {
                 crate::herdr_transport::execute(&request)?
             } else if args[0] == "herdr-agents" {
                 crate::herdr_agents::execute(&request)?
@@ -258,6 +264,12 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
                 crate::herdr_namespace::execute(&request)?
             }
         );
+        return Ok(());
+    }
+    if args[0] == "process-identity" {
+        ensure!(args.len() == 2, "process-identity requires one PID");
+        let pid: u32 = args[1].to_str().context("invalid process PID")?.parse()?;
+        println!("{}", crate::owned_process::observe_external_process(pid)?);
         return Ok(());
     }
     if args[0] == "private-copy" {

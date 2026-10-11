@@ -7,6 +7,10 @@ its initial turn and later receive a continuation in the same process and sessio
 This checkpoint connects task execution to the earlier Herdr mounting foundation;
 it does not yet provide a complete native `ccb herdr open` workflow.
 
+The subsequent [Pi terminal checkpoint](native-pi-terminal-20261011.md) also
+supports a Pi terminal Lead and idle extension reload. The Codex behavior below
+remains valid; its original Codex-only limitation describes this earlier checkpoint.
+
 ## Execution and completion
 
 The daemon configuration opts an Agent into `driver_kind: "herdr_tui"`. Currently

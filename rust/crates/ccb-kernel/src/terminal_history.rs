@@ -1,4 +1,4 @@
-//! Append-only Codex rollout observation. A lifecycle badge is never evidence.
+//! Append-only Codex rollout and native Pi extension observation.
 //! The caller persists the baseline before granting permission to send input.
 use anyhow::{ensure, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -75,6 +75,8 @@ pub(crate) struct Baseline {
     pub identity: Value,
     pub offset: u64,
     pub digest: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub producer: Option<Value>,
 }
 #[cfg(windows)]
 fn identity(file: &File) -> Result<Value> {
@@ -152,6 +154,7 @@ pub(crate) fn baseline(binding: &Binding) -> Result<Baseline> {
                 identity: Value::Null,
                 offset: 0,
                 digest: String::new(),
+                producer: None,
             })
         }
         Err(e) => return Err(e.into()),
@@ -159,7 +162,15 @@ pub(crate) fn baseline(binding: &Binding) -> Result<Baseline> {
     let size = file.metadata()?.len();
     let id = identity(&file)?;
     let first = line(&mut BufReader::new(&mut file))?.context("history header is incomplete")?;
-    binding.header(&serde_json::from_slice(&first)?)?;
+    let header: Value = serde_json::from_slice(&first)?;
+    binding.header(&header)?;
+    let producer = if header["payload"]["source"] == "ccb_native_pi" {
+        let producer = header["payload"]["ccb_bridge"].clone();
+        crate::pi_terminal::validate_producer(&producer)?;
+        Some(producer)
+    } else {
+        None
+    };
     file.seek(SeekFrom::Start(
         size.checked_sub(1).context("empty history")?,
     ))?;
@@ -173,6 +184,7 @@ pub(crate) fn baseline(binding: &Binding) -> Result<Baseline> {
         identity: id,
         offset: size,
         digest: boundary_digest(&mut file, size)?,
+        producer,
     })
 }
 
@@ -187,6 +199,7 @@ pub(crate) struct Reader {
     anchored: bool,
     final_answer: String,
     terminal: Option<Value>,
+    sequence: Option<u64>,
 }
 impl Reader {
     pub fn new(binding: Binding, baseline: Baseline, request: String) -> Result<Self> {
@@ -210,6 +223,7 @@ impl Reader {
             anchored: false,
             final_answer: String::new(),
             terminal: None,
+            sequence: None,
         })
     }
     pub fn poll(&mut self) -> Result<Option<Value>> {
@@ -244,7 +258,21 @@ impl Reader {
             let Some(first) = line(&mut BufReader::new(&mut current))? else {
                 return Ok(None);
             };
-            self.binding.header(&serde_json::from_slice(&first)?)?;
+            let header: Value = serde_json::from_slice(&first)?;
+            self.binding.header(&header)?;
+            ensure!(
+                (header["payload"]["source"] == "ccb_native_pi")
+                    == self.baseline.producer.is_some(),
+                "history provider format changed"
+            );
+            if let Some(producer) = &self.baseline.producer {
+                crate::pi_terminal::validate_producer(producer)?;
+                ensure!(
+                    header["payload"]["source"] == "ccb_native_pi"
+                        && header["payload"]["ccb_bridge"] == *producer,
+                    "Pi event producer changed"
+                );
+            }
             self.offset = self.baseline.offset.max(first.len() as u64);
             current.seek(SeekFrom::Start(self.offset))?;
             self.identity = id;
@@ -266,7 +294,25 @@ impl Reader {
             self.offset += bytes.len() as u64;
             let value: Value =
                 serde_json::from_slice(&bytes).context("invalid Codex history record")?;
-            self.event(&value)?;
+            if let Some(producer) = self.baseline.producer.clone() {
+                let normalized =
+                    crate::pi_terminal::normalize(&value, &producer, &mut self.sequence)?;
+                if let Some(normalized) = normalized {
+                    self.event(&normalized)?;
+                }
+                if let Some(decision) = &mut self.terminal {
+                    decision["diagnostics"]["completion_authority"] =
+                        json!("pi_extension_agent_settled");
+                    decision["diagnostics"]["pi_bridge"] = producer.clone();
+                    decision["reason"] = json!(match decision["status"].as_str().unwrap_or("") {
+                        "completed" => "pi_agent_settled",
+                        "cancelled" => "pi_agent_aborted",
+                        _ => "pi_agent_error",
+                    });
+                }
+            } else {
+                self.event(&value)?;
+            }
             if self.terminal.is_some() {
                 break;
             }
@@ -604,5 +650,133 @@ mod tests {
             .write_all(&vec![b' '; MAX_LINE + 1])
             .unwrap();
         assert!(r.poll().is_err());
+    }
+
+    fn pi_header(b: &Binding) -> Value {
+        let producer = json!({"schema_version":1,"owner":uuid::Uuid::new_v4().to_string(),"instance":uuid::Uuid::new_v4().to_string(),"process":{"pid":123,"created":"1","windows_session":1},"session_path":b.root.join("native-pi.jsonl")});
+        append(
+            b,
+            &[
+                json!({"type":"session_meta","payload":{"id":b.session_id,"cwd":b.cwd,"source":"ccb_native_pi","ccb_bridge":producer}}),
+            ],
+        );
+        producer
+    }
+    fn pi_event(producer: &Value, seq: u64, kind: &str, extra: Value) -> Value {
+        let mut payload = json!({"type":kind,"turn_id":"pi-turn"});
+        payload
+            .as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        json!({"type":"pi_event","bridge":producer,"seq":seq,"payload":payload})
+    }
+    #[test]
+    fn pi_requires_settlement_and_classifies_final_stop_abort_and_error() {
+        for (stop, aborted, error, status) in [
+            ("stop", false, false, "completed"),
+            ("toolUse", false, false, "failed"),
+            ("length", false, false, "failed"),
+            ("stop", false, true, "failed"),
+            ("stop", true, false, "cancelled"),
+        ] {
+            let (_dir, b) = setup();
+            let producer = pi_header(&b);
+            let mut r = reader(&b);
+            append(
+                &b,
+                &[
+                    pi_event(&producer, 1, "agent_start", json!({})),
+                    pi_event(
+                        &producer,
+                        2,
+                        "user_message",
+                        json!({"request_anchor":"request-1"}),
+                    ),
+                    pi_event(&producer, 3, "agent_end", json!({})),
+                ],
+            );
+            assert!(r.poll().unwrap().is_none());
+            append(
+                &b,
+                &[pi_event(
+                    &producer,
+                    4,
+                    "agent_settled",
+                    json!({"idle":true,"aborted":aborted,"assistant":{"stop_reason":stop,"text":"final","error":error}}),
+                )],
+            );
+            let result = r.poll().unwrap().unwrap();
+            assert_eq!(result["status"], status);
+            assert_eq!(
+                result["diagnostics"]["completion_authority"],
+                "pi_extension_agent_settled"
+            );
+            assert_eq!(
+                result["reply"],
+                if status == "completed" { "final" } else { "" }
+            );
+        }
+    }
+    #[test]
+    fn pi_rejects_generation_changes_gaps_nonidle_and_superseding_inputs() {
+        for mode in ["generation", "gap", "idle", "superseded"] {
+            let (_dir, b) = setup();
+            let producer = pi_header(&b);
+            let mut r = reader(&b);
+            append(
+                &b,
+                &[
+                    pi_event(&producer, 1, "agent_start", json!({})),
+                    pi_event(
+                        &producer,
+                        2,
+                        "user_message",
+                        json!({"request_anchor":"request-1"}),
+                    ),
+                ],
+            );
+            assert!(r.poll().unwrap().is_none());
+            let mut event = pi_event(
+                &producer,
+                3,
+                "agent_settled",
+                json!({"idle":true,"aborted":false,"assistant":{"stop_reason":"stop","error":false,"text":"final"}}),
+            );
+            match mode {
+                "generation" => {
+                    event["bridge"]["instance"] = json!(uuid::Uuid::new_v4().to_string())
+                }
+                "gap" => event["seq"] = json!(4),
+                "idle" => event["payload"]["idle"] = json!(false),
+                _ => event["payload"]["type"] = json!("request_superseded"),
+            }
+            append(&b, &[event]);
+            assert!(r.poll().is_err());
+        }
+    }
+    #[test]
+    fn pi_foreign_request_marker_never_completes_the_observed_job() {
+        let (_dir, b) = setup();
+        let producer = pi_header(&b);
+        let mut r = reader(&b);
+        append(
+            &b,
+            &[
+                pi_event(&producer, 1, "agent_start", json!({})),
+                pi_event(
+                    &producer,
+                    2,
+                    "user_message",
+                    json!({"request_anchor":"foreign"}),
+                ),
+                pi_event(
+                    &producer,
+                    3,
+                    "agent_settled",
+                    json!({"idle":true,"aborted":false,"assistant":{"stop_reason":"stop","error":false,"text":"foreign result"}}),
+                ),
+            ],
+        );
+        assert!(r.poll().unwrap().is_none());
     }
 }

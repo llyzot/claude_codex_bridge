@@ -171,9 +171,10 @@ impl Daemon {
         let mut fault = self.faults[agent].clone();
         fault["status"] = json!("recovered");
         fault["recovered_at"] = json!(now());
-        self.kernel
-            .store
-            .save(&crate::provider_fault::path("codex", agent), &fault)?;
+        self.kernel.store.save(
+            &crate::provider_fault::path(crate::records::string(&job, "provider")?, agent),
+            &fault,
+        )?;
         admission::event(
             &mut self.kernel,
             &job,

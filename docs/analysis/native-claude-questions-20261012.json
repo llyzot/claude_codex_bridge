@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "base_commit": "9fd27662",
+  "recorded_at": "2026-10-11T18:44:19.075938+00:00",
+  "claude_version": "2.1.296",
+  "default_auth_status": {
+    "loggedIn": false,
+    "authMethod": "none",
+    "apiProvider": "firstParty",
+    "configDirectory": "C:\\Users\\user\\.claude"
+  },
+  "real_model_inference": false,
+  "real_cli_tests": {
+    "backend": "loopback-only deterministic Messages API, dummy key, no forwarding",
+    "cases": [
+      "single selection",
+      "multiple selection",
+      "general reply",
+      "denial",
+      "cancellation invalidates handle",
+      "canonical Windows working directory"
+    ],
+    "credentials_copied": false,
+    "permissions_bypassed": false
+  },
+  "verification": {
+    "selected_suite": "76 passed in 135.58s",
+    "additional_cancel": "1 passed in 2.52s",
+    "additional_canonical_cwd": "1 passed in 2.49s",
+    "rust_unit_tests": "25 passed plus parent-invoked helper",
+    "format_clippy_diff": "passed"
+  },
+  "production_install_changed": false,
+  "final_release_sha256": {
+    "ccb-kernel.exe": "a4ed15ec2952e61e03a5658ac479fd473a52f7e7ce10d956a8eee4ee7d7213f7",
+    "ccb-native.exe": "fbfc49b1fdbb1e9cbab8377428282e6b5a36356c4d975bb1beb7546506672cd7"
+  },
+  "repository_bin_matches_release": true
+}

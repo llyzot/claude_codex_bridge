@@ -1,4 +1,4 @@
-//! One-time Claude tool permissions bound to observed, stamped tool calls.
+//! One-time Claude tool permissions and answers bound to stamped tool calls.
 use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
@@ -148,7 +148,10 @@ impl Broker {
             .is_some_and(|name| p.params["tool_name"] == *name)
     }
     fn needs_ui(p: &Pending) -> bool {
-        p.params["requires_user_interaction"] == true || p.params["tool_name"] == "AskUserQuestion"
+        if p.params["tool_name"] == "AskUserQuestion" {
+            return crate::claude_questions::validate(&p.params["input"]).is_err();
+        }
+        p.params["requires_user_interaction"] == true
     }
     pub fn rows(&self, job: &Value, runtime: &str) -> Value {
         json!(self.pending.iter().map(|p| json!({"request_id":p.handle,"method":"can_use_tool","params":p.params,
@@ -249,6 +252,13 @@ fn answer(params: &Value, result: &Value) -> Result<Value> {
         );
     }
     if allow {
+        if params["tool_name"] == "AskUserQuestion" {
+            let updated =
+                crate::claude_questions::answer(&params["input"], &result["updatedInput"])?;
+            return Ok(
+                json!({"behavior":"allow","updatedInput":updated,"toolUseID":params["tool_use_id"]}),
+            );
+        }
         if let Some(input) = map.get("updatedInput") {
             ensure!(
                 *input == params["input"],

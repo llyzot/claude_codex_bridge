@@ -6,6 +6,7 @@ mod callback;
 mod callback_policy;
 mod callback_recovery;
 mod claude_context;
+mod claude_questions;
 mod claude_requests;
 mod claude_skills;
 mod claude_stream;

@@ -67,7 +67,7 @@ def test_invalid_or_widening_answers_do_not_reach_provider(tmp_path,result):
         assert await_watch(server,receipt['job_id'],lambda r:r['terminal'])['status']=='cancelled'
     finally:server.close()
 
-@pytest.mark.parametrize('mode,status',[('no-stamp','awaiting_tool_anchor'),('foreign-stamp','awaiting_tool_anchor'),('foreign-parent','awaiting_tool_anchor'),('mixed-stamp','awaiting_tool_anchor'),('native-ui','native_ui_required'),('question','native_ui_required')])
+@pytest.mark.parametrize('mode,status',[('no-stamp','awaiting_tool_anchor'),('foreign-stamp','awaiting_tool_anchor'),('foreign-parent','awaiting_tool_anchor'),('mixed-stamp','awaiting_tool_anchor'),('question-no-anchor','awaiting_tool_anchor'),('native-ui','native_ui_required'),('question-duplicate','native_ui_required')])
 def test_unproven_or_native_ui_requests_cannot_be_approved(tmp_path,mode,status):
     server=Server(tmp_path/'state',{'worker':spec(tmp_path,mode)})
     try:
@@ -76,6 +76,38 @@ def test_unproven_or_native_ui_requests_cannot_be_approved(tmp_path,mode,status)
         server.rpc('cancel',{'job_id':receipt['job_id'],'record_reply':False})
         assert await_watch(server,receipt['job_id'],lambda r:r['terminal'])['status']=='cancelled'
         assert pending(server)==[]
+    finally:server.close()
+
+@pytest.mark.parametrize('mode,value',[('question','A'),('question','PRIVATE_USER_ANSWER'),('question-multi',['Intro','Summary'])])
+def test_claude_questions_accept_exact_explicit_answers_and_do_not_finish_on_ack(tmp_path,mode,value):
+    import copy
+    server=Server(tmp_path/'state',{'worker':spec(tmp_path,mode)})
+    try:
+        receipt=submit(server);row=request(server,'awaiting_user');updated=copy.deepcopy(row['params']['input'])
+        updated['answers']={'Choose a value':value if mode=='question' else 'B'}
+        if mode=='question-multi':updated['answers']['Choose sections']=value
+        result={'behavior':'allow','updatedInput':updated};payload=answer(row,result)
+        server.rpc('provider-respond',payload);server.rpc('provider-respond',payload)
+        assert server.rpc('watch',{'target':receipt['job_id']})['status']=='running'
+        assert await_watch(server,receipt['job_id'],lambda r:r['terminal'])['status']=='completed'
+        replies=[v for v in wire(tmp_path) if v.get('type')=='control_response'];assert len(replies)==1
+        assert replies[0]['response']['response']['updatedInput']==updated
+        for base in [server.root,tmp_path/'agents']:
+            for path in base.rglob('*.json*'):
+                assert 'PRIVATE_USER_ANSWER' not in path.read_text(encoding='utf-8')
+    finally:server.close()
+
+@pytest.mark.parametrize('bad',[{}, {'answers':{}}, {'answers':{'Other question':'A'}},
+    {'answers':{'Choose a value':['A','B']}}, {'answers':{'Choose a value':''}},
+    {'answers':{'Choose a value':'A'},'response':'Conflicting general reply'},
+    {'answers':{'Choose a value':'A'},'questions':[]}, {'answers':{'Choose a value':'A'},'permissionMode':'bypassPermissions'}])
+def test_question_answers_cannot_change_questions_or_policy(tmp_path,bad):
+    server=Server(tmp_path/'state',{'worker':spec(tmp_path,'question')})
+    try:
+        receipt=submit(server);row=request(server,'awaiting_user');updated={**row['params']['input'],**bad}
+        with pytest.raises(AssertionError):server.rpc('provider-respond',answer(row,{'behavior':'allow','updatedInput':updated}))
+        assert not [v for v in wire(tmp_path) if v.get('type')=='control_response']
+        server.rpc('cancel',{'job_id':receipt['job_id']});await_watch(server,receipt['job_id'],lambda r:r['terminal'])
     finally:server.close()
 
 def test_early_request_waits_for_matching_tool_stamp(tmp_path):

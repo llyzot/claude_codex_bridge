@@ -30,7 +30,7 @@ fn classify(args: &[String]) -> Result<bool> {
         ("workspace", "create" | "close" | "focus" | "report-metadata") => false,
         ("tab", "rename" | "create" | "close") => false,
         ("pane", "split" | "run" | "close" | "move" | "resize" | "report-agent" | "report-agent-session" | "release-agent" | "report-metadata") => false,
-        ("agent", "start" | "stop" | "prompt" | "send-keys") => false,
+        ("agent", "start" | "stop" | "prompt" | "send-keys" | "rename") => false,
         _ => anyhow::bail!("unsupported Herdr transport command; server/session lifecycle and interactive attachment are separate"),
     };
     let control_args = if first == "agent" && second == "start" {

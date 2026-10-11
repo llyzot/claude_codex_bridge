@@ -54,6 +54,12 @@ def test_mount_keeps_layout_focus_and_binds_local_process_lifetimes(prepared):
     assert 'literal;not-a-shell-command' not in text and 'DO_NOT_PERSIST_SECRET_ARGUMENT' not in text
     assert 'PRIVATE_SESSION_ARGUMENT' not in text
 
+def test_hook_report_without_native_bridge_proof_cannot_repair_a_lost_name(prepared):
+    project,backend,request,_=prepared
+    change(backend,lambda s:s.update(pi_hook_authority=True,agent_sessions={'pi':{'agent':'pi','kind':'path','value':str(project/'session.jsonl'),'source':'herdr:pi'}}))
+    result=run(request)['mount']
+    assert result['status']=='uncertain' and mutate_count(backend,['agent','rename'])==0
+
 @pytest.mark.parametrize('mode',['after-error','hang-after'])
 def test_lost_start_receipt_recovers_by_unique_alias_without_relaunch(prepared,mode):
     project,backend,request,_=prepared;fault(backend,['agent','start'],mode)

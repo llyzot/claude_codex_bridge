@@ -99,6 +99,27 @@ def test_short_observation_returns_without_restarting_live_opener(project):
     wait_for(p['ready'],timeout=20)
     assert mutate_count(p['backend'],['agent','start'])==2
 
+def test_hook_authoritative_pi_recovers_its_initial_name_without_relaunch(project):
+    p=project;change(p['backend'],lambda s:s.update(pi_hook_authority=True))
+    result=p['open']();assert result.returncode==0,result.stderr
+    wait_for(p['ready'],timeout=8)
+    assert mutate_count(p['backend'],['agent','start'])==2
+    assert mutate_count(p['backend'],['agent','rename'])==1
+    assert p['open']().returncode==0 and mutate_count(p['backend'],['agent','rename'])==1
+
+def test_initial_pi_name_repair_recovers_lost_ack_without_repeating_rename(project):
+    p=project;change(p['backend'],lambda s:s.update(pi_hook_authority=True))
+    fault(p['backend'],['agent','rename'],'after-error')
+    result=p['open']();assert result.returncode==0,result.stderr;wait_for(p['ready'],timeout=8)
+    assert p['open']().returncode==0 and mutate_count(p['backend'],['agent','rename'])==1
+
+def test_initial_pi_name_repair_refuses_a_foreign_extension_owner(project):
+    p=project;change(p['backend'],lambda s:s.update(pi_hook_authority=True))
+    current=p['native']/'pi-terminal-events/lead/current.json';row=json.loads(current.read_text())
+    row['owner']='00000000-0000-0000-0000-000000000000';current.write_text(json.dumps(row),encoding='utf-8')
+    result=p['open']();assert result.returncode!=0
+    assert mutate_count(p['backend'],['agent','rename'])==0 and p['pi'].poll() is None
+
 def test_delayed_native_session_binding_continues_in_background(project):
     p=project
     change(p['backend'],lambda s:s['agent_sessions'].pop('codex'))

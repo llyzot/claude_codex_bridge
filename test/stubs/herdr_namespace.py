@@ -48,7 +48,14 @@ elif args[:2]==['agent','start']:
          'terminal_id':pane['terminal_id'],'tab_id':pane['workspace_id']+':t1','interactive_ready':status in ['idle','done'],
          'launch_pending':False,'revision':1,'focused':False,'tokens':pane['tokens'].copy()}
     if kind in state.get('agent_sessions',{}):row['agent_session']=state['agent_sessions'][kind]
+    if kind=='pi' and state.get('pi_hook_authority'):
+        row.pop('name');row.pop('interactive_ready');row['screen_detection_skipped']=True
+        row['agent_session']['source']='herdr:pi'
     state.setdefault('agents',{})[name]=row;save();result={'type':'agent_started','agent':row,'argv':['DO_NOT_PERSIST_SECRET_ARGUMENT']}
+elif args[:2]==['agent','rename']:
+    matches=[(key,a) for key,a in state['agents'].items() if a['pane_id']==args[2]];assert len(matches)==1
+    key,row=matches[0];del state['agents'][key];row['name']=args[3];state['agents'][args[3]]=row;save()
+    result={'type':'agent_renamed','agent':row}
 elif args[:2]==['agent','prompt']:
     assert len(args)==4 and '--wait' not in args
     row=state['agents'][args[2]]

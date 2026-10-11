@@ -37,6 +37,13 @@ fn contract(name: &str, value: &Value) -> Result<()> {
 fn hash(value: &Value) -> Result<String> {
     Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(value)?)))
 }
+fn pi_hook_ready(agent: &Value) -> bool {
+    agent["agent"] == "pi"
+        && agent["interactive_ready"].is_null()
+        && agent["screen_detection_skipped"] == true
+        && agent["agent_session"]["source"] == "herdr:pi"
+        && ["idle", "done"].contains(&agent["agent_status"].as_str().unwrap_or(""))
+}
 fn text<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
     value[key]
         .as_str()
@@ -296,7 +303,8 @@ impl Manager<'_> {
             ["idle", "done", "working", "blocked", "unknown"].contains(&status),
             "unknown Herdr agent lifecycle"
         );
-        let ready = agent["interactive_ready"] == true && ["idle", "done"].contains(&status);
+        let ready = (agent["interactive_ready"] == true || pi_hook_ready(agent))
+            && ["idle", "done"].contains(&status);
         // A tool can temporarily own the PTY foreground while the recognized
         // provider remains alive. Keep its previously bound process identity;
         // fresh readiness still requires the same provider back in foreground.
@@ -329,8 +337,128 @@ impl Manager<'_> {
             "binding":{"process":process},"agent_session":session,"observed_lifecycle":status,"interactive_ready":ready}),
         )
     }
-    fn refresh(&mut self, name: &str) -> Result<()> {
-        let snapshot = self.snapshot()?;
+    fn pi_bridge(&self, name: &str) -> Result<Option<Value>> {
+        if self.plan["agents"][name]["provider"] != "pi" {
+            return Ok(None);
+        }
+        let Some(store) = self.store.as_ref() else {
+            return Ok(None);
+        };
+        let Some(bridge) = store.json(&format!("providers/pi/{name}/terminal-bridge.json"))? else {
+            return Ok(None);
+        };
+        ensure!(
+            bridge["schema_version"] == 1 && bridge["agent_name"] == name,
+            "invalid native Pi bridge manifest"
+        );
+        uuid::Uuid::parse_str(text(&bridge, "owner")?)?;
+        let extension = Path::new(text(&bridge, "extension")?);
+        let native = args(self.request, name)?;
+        if !native.windows(2).any(|pair| {
+            ["-e", "--extension"].contains(&pair[0].as_str()) && Path::new(&pair[1]) == extension
+        }) {
+            return Ok(None);
+        }
+        Ok(Some(bridge))
+    }
+    fn repair_initial_pi_name(&mut self, snapshot: &Value, name: &str) -> Result<bool> {
+        let row = self.record["agents"][name].clone();
+        if row["sent"] != true || !row["binding"].is_null() || !row["name_repair"].is_null() {
+            return Ok(false);
+        }
+        let Some(bridge) = self.pi_bridge(name)? else {
+            return Ok(false);
+        };
+        let candidates = snapshot["agents"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|a| a["pane_id"] == row["pane_id"])
+            .collect::<Vec<_>>();
+        if candidates.len() != 1 {
+            return Ok(false);
+        }
+        let agent = candidates[0];
+        if !agent["name"].is_null() || agent["launch_pending"] == true || !pi_hook_ready(agent) {
+            return Ok(false);
+        }
+        ensure!(
+            !snapshot["agents"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|a| a["name"] == row["herdr_name"]),
+            "Pi repair name is already occupied"
+        );
+        contract("AgentInfo", agent)?;
+        ensure!(
+            agent["terminal_id"] == row["terminal_id"] && self.owns(agent, Some(name)),
+            "Pi initial repair target changed"
+        );
+        let pane = self.pane(snapshot, name)?;
+        let (process, shell, cwd) = self.foreground(pane)?;
+        ensure!(
+            process["pid"] != shell
+                && crate::pi_terminal::same_session_path(&cwd, &self.plan["agents"][name]["cwd"]),
+            "Pi initial repair foreground/cwd differs from launch"
+        );
+        let root = std::path::PathBuf::from(text(&bridge, "event_root")?);
+        let current = root.join("current.json");
+        herdr_namespace::unlinked(&current)?;
+        let mut bytes = Vec::new();
+        std::fs::File::open(&current)?
+            .take(65537)
+            .read_to_end(&mut bytes)?;
+        ensure!(
+            bytes.len() <= 65536,
+            "Pi initial repair state exceeds limit"
+        );
+        let state: Value = serde_json::from_slice(&bytes)?;
+        let binding = crate::terminal_history::Binding {
+            root,
+            path: current,
+            session_id: text(&state, "session_id")?.into(),
+            cwd: std::path::PathBuf::from(text(&self.plan["agents"][name], "cwd")?),
+        };
+        let (_, producer) = crate::pi_terminal::resolve(&binding, text(&bridge, "owner")?, name)?;
+        ensure!(
+            producer["process"] == process,
+            "Pi initial repair belongs to another process lifetime"
+        );
+        ensure!(
+            agent["agent_session"]["kind"] == "id"
+                && agent["agent_session"]["value"] == binding.session_id
+                || agent["agent_session"]["kind"] == "path"
+                    && crate::pi_terminal::same_session_path(
+                        &agent["agent_session"]["value"],
+                        &producer["session_path"]
+                    ),
+            "Pi initial repair session changed"
+        );
+        self.record["agents"][name]["name_repair"] = json!({"permitted":true,"process":process,"bridge_owner":bridge["owner"],"pane_id":row["pane_id"],"terminal_id":row["terminal_id"]});
+        self.save()?;
+        let _ = rpc(
+            self.request,
+            vec![
+                "agent".into(),
+                "rename".into(),
+                text(&row, "pane_id")?.into(),
+                text(&row, "herdr_name")?.into(),
+            ],
+        );
+        let after = self.snapshot()?;
+        let (current, _, _) = self.foreground(self.pane(&after, name)?)?;
+        ensure!(
+            current == process,
+            "Pi process changed during initial name repair"
+        );
+        Ok(true)
+    }
+    fn refresh(&mut self, name: &str, repair: bool) -> Result<()> {
+        let mut snapshot = self.snapshot()?;
+        if repair && self.repair_initial_pi_name(&snapshot, name)? {
+            snapshot = self.snapshot()?;
+        }
         let observed = self.observe(&snapshot, name)?;
         self.record["agents"][name]
             .as_object_mut()
@@ -365,7 +493,7 @@ impl Manager<'_> {
             self.save()?;
         }
         for name in &names {
-            self.refresh(name)?;
+            self.refresh(name, mount)?;
             if mount && self.record["agents"][name]["sent"] == false {
                 let snapshot = self.snapshot()?;
                 let shell = self.shell(&snapshot, name)?;
@@ -375,6 +503,13 @@ impl Manager<'_> {
                         "Herdr shell changed before launch"
                     );
                 }
+                let native_pi = self.pi_bridge(name)?.is_some();
+                let timeout = if native_pi {
+                    self.plan["startup_timeout_ms"].as_u64().unwrap().min(4000)
+                } else {
+                    self.plan["startup_timeout_ms"].as_u64().unwrap()
+                };
+                self.record["agents"][name]["effective_startup_timeout_ms"] = json!(timeout);
                 self.record["agents"][name]["sent"] = json!(true);
                 self.save()?;
                 let row = &self.record["agents"][name];
@@ -387,14 +522,18 @@ impl Manager<'_> {
                     "--pane".into(),
                     text(row, "pane_id")?.into(),
                     "--timeout".into(),
-                    self.plan["startup_timeout_ms"].to_string(),
+                    timeout.to_string(),
                 ];
                 let native = args(self.request, name)?;
                 if !native.is_empty() {
                     arguments.push("--".into());
                     arguments.extend(native);
                 }
-                let acknowledgement = rpc(self.request, arguments);
+                let mut request = self.request.clone();
+                if native_pi {
+                    request["timeout_ms"] = json!(timeout + 1000);
+                }
+                let acknowledgement = rpc(&request, arguments);
                 let acknowledged = acknowledgement.as_ref().is_ok_and(|a| {
                     a["agent"]["name"] == row["herdr_name"]
                         && a["agent"]["pane_id"] == row["pane_id"]
@@ -405,7 +544,7 @@ impl Manager<'_> {
                 // A timeout/error can mean Herdr already started the provider.
                 // Only a fresh unique-name and process-identity observation can
                 // bind it. Absence never authorizes a second launch request.
-                self.refresh(name)?;
+                self.refresh(name, true)?;
             }
         }
         let rows = self.record["agents"].as_object().unwrap();
@@ -447,6 +586,17 @@ fn validate(record: &Value, plan: &Value, namespace: &Value, request: &Value) ->
     );
     for (name, row) in rows {
         let operation = uuid::Uuid::parse_str(text(row, "operation_id")?)?;
+        if !row["name_repair"].is_null() {
+            let repair = &row["name_repair"];
+            ensure!(
+                repair["permitted"] == true
+                    && process_identity(&repair["process"])
+                    && repair["pane_id"] == row["pane_id"]
+                    && repair["terminal_id"] == row["terminal_id"]
+                    && uuid::Uuid::parse_str(text(repair, "bridge_owner")?).is_ok(),
+                "invalid Pi name repair proof"
+            );
+        }
         ensure!(
             plan["agents"].get(name).is_some()
                 && row["pane_id"] == namespace["bindings"][name]["pane_id"]

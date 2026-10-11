@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "base_commit": "b301fc78",
+  "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-rust-foreground-c43bdcf5",
+  "session": "ccb-rust-foreground-c43bdcf5",
+  "shell": "C:/Users/user/scoop/apps/pwsh/current/pwsh.exe",
+  "public_native_foreground_command": true,
+  "foreground_ccb_pid": 51428,
+  "foreground_herdr_client_pid": 45156,
+  "original_pi_pid": 25812,
+  "pi_process_after_repair": {
+    "created": "134362064612439217",
+    "pid": 25812,
+    "windows_session": 1
+  },
+  "name_repair": {
+    "bridge_owner": "b2eb9319-2726-4b3a-ad89-9da696295c29",
+    "pane_id": "w1:p1",
+    "permitted": true,
+    "process": {
+      "created": "134362064612439217",
+      "pid": 25812,
+      "windows_session": 1
+    },
+    "terminal_id": "term_65d9250a0f51d1"
+  },
+  "ready": "ready",
+  "job_id": "job_48f710c40837",
+  "job_status": "completed",
+  "reply_marker_present": true,
+  "completion_authority": "pi_extension_agent_settled",
+  "shared_desktop_node_repl_processes_stopped": false,
+  "initial_failure": {
+    "pi_alive": true,
+    "registered_name_lost": true,
+    "interactive_ready_absent": true,
+    "screen_detection_skip_reason": "full_lifecycle_hook_authority"
+  },
+  "initial_test_client_forced_closed_to_upgrade_prefix": 57392,
+  "cleanup": {
+    "server_status": "not_running",
+    "pids_no_longer_observable": [
+      25812,
+      61432,
+      41516,
+      45156,
+      51428,
+      37908
+    ],
+    "public_foreground_exit_after_server_stop": 1,
+    "normal_keyboard_detach_tested": false
+  }
+}

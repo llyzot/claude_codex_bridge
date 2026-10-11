@@ -200,7 +200,9 @@
     "Agent shell routing now supplies native state-root and Agent identity, with native-prefix PATH precedence and stale inherited endpoint/token clearing; native ask can infer its caller and service outside the project directory",
     "Real Herdr 0.9.0 / Windows Terminal / pwsh validation completed Pi Lead and Codex Worker model-backed callback review, including a 35.233-second Worker task after the Lead released its initial turn 30.627 seconds earlier",
     "Deferred Codex rollout binding admits the first real task against its exact mounted process, correlates a unique structured execution marker and turn, persists observed history and recovers without replay; no warm-up model request is required",
-    "Real Herdr flat running/not_running status data is accepted only by the explicit server-status query; matching real-shape fixtures now protect cold startup"
+    "Real Herdr flat running/not_running status data is accepted only by the explicit server-status query; matching real-shape fixtures now protect cold startup",
+    "Public native herdr open foreground branch was exercised in Windows Terminal with Scoop pwsh; the Herdr attach client was parented by ccb.exe, and repaired original Pi process completed a real no-tool request",
+    "Native Pi mounting now handles Herdr full-lifecycle-hook readiness and can repair a lost initial launch name only after exact native bridge/process/pane/session proof, without process restart or uncertain rename replay"
   ],
   "remaining": [
     "Complete legacy/provider-history and cross-Windows-session recovery where new ownership proof is unavailable; verify non-Windows scoped process-tree termination and recovery",
@@ -218,11 +220,11 @@
     "Complete native copy-mode and controller worktree lifecycle/retirement/reload parity, explicit workspace setup hooks and broader project-target/config-schema compatibility; validate cross-platform workspace behavior and production startup performance before default rollout",
     "Complete remaining workgroup Git operations and integration controller migration, evaluate asynchronous/bounded Git observation latency and content-filter behavior on production repositories, and extend explicitly rejected sparse/conflicted/submodule states where safe",
     "Complete native prefix removal and explicit orphan/retained-version cleanup, extend active-runtime coexistence beyond stopped-prefix exclusion, and verify cross-version project-state rollback; complete signed release/distribution validation and production/default Rust promotion",
-    "Complete native automatic foreground-attach acceptance and stopped-server recovery, Claude terminal history adapters and fresh-session publication timing, external active cancellation/context controls, idle-fault recovery and Agent migration/retirement, multi-workspace reload and cross-server-generation recovery; explicitly bound Pi/Codex terminal dispatch/history/callback wiring now has offline coverage, but the native open composition has offline coverage, with real Pi/Codex result-chain acceptance now verified; broader UI/tool/provider acceptance remains incomplete",
+    "Complete normal foreground detach/exit acceptance and stopped-server recovery, Claude terminal history adapters and fresh-session publication timing, external active cancellation/context controls, idle-fault recovery and Agent migration/retirement, multi-workspace reload and cross-server-generation recovery; explicitly bound Pi/Codex terminal dispatch/history/callback wiring now has offline coverage, but the native open composition has offline coverage, with real Pi/Codex result-chain acceptance now verified; broader UI/tool/provider acceptance remains incomplete",
     "Complete native sidebar focus/recovery/config UI and packaging/installer integration, verify actual terminal/Herdr interaction, and benchmark helper-per-request polling against direct transport before production promotion",
     "Complete operator-directed repair/reassignment for ambiguous legacy Agent-journal parents and verify older mixed-version/cross-platform migration; current cooperative ownership checks do not govern arbitrary direct filesystem edits or unmodified alternate-root writers",
     "Complete other-provider native clear/compact, graphical context controls and authenticated Claude model/cancellation/error scenarios; verify general empty-startup recovery, explicit Codex old-thread unloading, large-history compaction, real-model restart continuity, broader retained-history migration and runtime/context-control journal retention",
-    "Diagnose the actual Codex read-only sandbox shell process failure helper_unknown_error observed in the scoped live Herdr test; do not weaken sandbox policy to claim success"
+    "Resolve or externally repair the now-isolated Codex sandbox runtime ACL/sharing failure on desktop node_repl.exe; shared-process interruption needs the pending human approval, and sandbox policy must not be weakened"
   ],
   "verification": {
     "native_role_addressing": "20 final-release cases passed: compact canonical/legacy role expansion against the existing parser, project/user/current-directory precedence, adapter and source-home naming, managed-HOME avoidance, hybrid/rich binding, invalid IDs/manifests/names, duplicate default names, unambiguous/ambiguous/disabled targeting, agents listing, and actual native project startup plus role-addressed fixture work",
@@ -503,6 +505,14 @@
     "native_herdr_live_release_sha256": {
       "ccb-kernel.exe": "a40de2f974f2e990acd3ddec40fe205d1ec03eb2914a1325374e70c6c8859a98",
       "ccb-native.exe": "38819755680a789f6735eafb335f417f2bc96f15416eec4455d32d45dded0a7e",
+      "repository_core_bin_matches_release": true
+    },
+    "native_foreground_evidence": "docs/analysis/native-herdr-foreground-20261011.json",
+    "native_sandbox_diagnosis": "No-model codex sandbox :read-only cmd.exe echo outside CCB/Herdr reproduces helper_unknown_error. Setup log identifies runtime read/execute ACL validation of the desktop node_repl.exe failing with Windows sharing error 32 while several desktop tool processes map the image. Per-invocation MCP/plugin/environment controls did not remove the failure. No sandbox weakening, shared-process termination or persistent config edits were used. Separate approval to stop shared desktop tool processes remains unanswered; this is not a whole-goal impasse.",
+    "native_pi_hook_name_recovery": "The live public foreground open exposed hook-authoritative Pi idle state with no interactive_ready and a subsequently lost initial name. A matching fixture failed before the fix. Three targeted repair cases passed in 21.19s. Final open/mount/transport/Pi-terminal regression passed 96 cases with one opt-in real-Pi probe skipped in 292.24s. Rust tests 25 passed, one subprocess helper ignored by the ordinary runner and invoked by its parent; formatting, clippy all-targets with warnings denied and diff checks passed. Real recovery retained Pi PID 25812 and completed FOREGROUND_READY_OK. Foreground client parentage proved the public ccb.exe attach branch was used; normal keyboard detach remains unverified.",
+    "native_pi_hook_name_recovery_release_sha256": {
+      "ccb-kernel.exe": "cfcc87cb4d6f37127767565b8db316022c5ac46dd958075ceb452eeff8093cbe",
+      "ccb-native.exe": "6c4eaf935b86a6edf1a4ff222b78464a902d28b0214804fc1e55029fd1f4b511",
       "repository_core_bin_matches_release": true
     }
   }

@@ -44,11 +44,14 @@ def fault_when_released():
 if first and mode == 'idle-late-fault':
     threading.Thread(target=fault_when_released, daemon=True).start()
 
-def close_output_when_released():
-    while not (directory / 'release-error').exists(): time.sleep(.025)
+def close_output():
     os.close(sys.stdout.fileno())
     (directory / 'stdout-closed').touch()
     hold()
+
+def close_output_when_released():
+    while not (directory / 'release-error').exists(): time.sleep(.025)
+    close_output()
 
 if first and mode == 'idle-eof':
     threading.Thread(target=close_output_when_released, daemon=True).start()
@@ -64,6 +67,9 @@ if provider == 'claude':
 
 for line in sys.stdin.buffer:
     command = json.loads(line)
+    if first and mode == 'active-eof' and (command.get('type') in {'prompt', 'user'} or command.get('method') == 'turn/start'):
+        (directory / 'prompt-seen').touch()
+        close_output_when_released()
     if first and mode == 'hold' and (command.get('type') in {'prompt', 'user'} or command.get('method') == 'turn/start'):
         root = Path(os.environ['CCB_NATIVE_TOKEN_FILE']).parent.parent
         actor = os.environ['CCB_AGENT_NAME']
@@ -87,6 +93,7 @@ for line in sys.stdin.buffer:
             emit(dict(type='response', command=kind, id=command['id'],
                       success=not (first and mode == 'init'), data=state, error=secret))
             if first and mode == 'init': hold()
+            if first and mode == 'completed-eof' and command['id'].startswith('settled-'): close_output()
         elif kind == 'prompt':
             emit(dict(type='response', command='wrong-' + secret if first and mode == 'active' else kind,
                       id=command['id'], success=True, data={'disposition': 'started'}))
@@ -101,6 +108,7 @@ for line in sys.stdin.buffer:
         emit(dict(type='result', subtype='success', is_error=False, session_id=session,
                   uuid='result-' + command['uuid'], user_message_uuid=command['uuid'],
                   parent_tool_use_id=None, result='fault fixture result'))
+        if first and mode == 'completed-eof': close_output()
     else:
         kind = command['method']
         if kind == 'initialize':
@@ -117,4 +125,6 @@ for line in sys.stdin.buffer:
             emit({'id': command['id'], 'result': {'turn': dict(turn, status='inProgress', items=[])}})
             thread['turns'] = [turn]
             emit(dict(method='turn/completed', params=dict(threadId=thread['id'], turn=turn)))
-        elif kind == 'thread/read': emit({'id': command['id'], 'result': {'thread': thread}})
+        elif kind == 'thread/read':
+            emit({'id': command['id'], 'result': {'thread': thread}})
+            if first and mode == 'completed-eof': close_output()

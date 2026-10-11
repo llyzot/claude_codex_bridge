@@ -2,10 +2,28 @@
 use anyhow::{ensure, Result};
 use serde_json::Value;
 
+#[derive(Debug)]
+pub struct TransportClosed(pub &'static str);
+impl std::fmt::Display for TransportClosed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "provider {} transport closed before owned process-tree exit",
+            self.0
+        )
+    }
+}
+impl std::error::Error for TransportClosed {}
+
 pub fn path(provider: &str, agent: &str) -> String {
     format!("providers/{provider}/{agent}/fault.json")
 }
 pub fn validate(row: &Value, provider: &Value, agent: &str, project: &Value) -> Result<()> {
+    ensure!(
+        row["transport_closed"].is_null()
+            || ["stdout", "stdin"].contains(&row["transport_closed"].as_str().unwrap_or("")),
+        "invalid provider transport fault detail"
+    );
     ensure!(
         row["schema_version"] == 1
             && row["record_type"] == "native_provider_fault"

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "base_commit": "ea0d1896",
+  "recorded_at": "2026-10-11T22:01:46.940064+00:00",
+  "behavior": "Observed provider transport closure publishes a durable fault without inferring completion, terminating a live process or replaying work",
+  "fault_reason": "provider_protocol_error",
+  "optional_fault_detail": "transport_closed: stdout or stdin",
+  "real_model_inference": false,
+  "production_install_changed": false,
+  "verification": {
+    "initial_red": "Initialized idle Pi output EOF did not publish a fault within the observation window",
+    "initial_eof_selection": "12 passed in 24.38s",
+    "extended_eof_selection": "18 passed in 34.65s before final idle-retirement refinement",
+    "broader_intermediate_selection": "135 passed and 2 failed in 257.99s: Claude idle fixture triggered before protocol initialization and intended restart EOF entered normal fault handling",
+    "final_selection": "110 passed in 213.48s; EOF/provider-fault/ping/context/Claude-context paths",
+    "final_rust_unit_tests": "28 passed plus parent-invoked process-death helper in 33.22s",
+    "format_clippy_diff": "passed",
+    "full_repository_run": false
+  },
+  "binary_sha256": {
+    "ccb-kernel.exe": "413e19b4fe3d2f726e3fca59a2a512e44bae8d9b2814a029e0fa2319965dd1ee",
+    "ccb-native.exe": "db3bd6e3e90cc5eed72207c6a1f166ce82b2a8d93b9568452143a5d668621748"
+  },
+  "repository_bin_matches_release": true,
+  "limits": [
+    "The idle-EOF fixtures use the base interpreter to avoid a venv redirector masking actual EOF",
+    "Inherited open pipes and silent hangs need separate observation; no general hang detection is claimed",
+    "Active uncertain work still waits for verified exit before terminalization",
+    "General idle fault recovery under PID reuse and cross-session migration remains outside this checkpoint"
+  ]
+}

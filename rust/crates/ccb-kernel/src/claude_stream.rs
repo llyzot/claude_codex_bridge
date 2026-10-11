@@ -46,6 +46,7 @@ pub struct Session {
     pub closed: bool,
     pub quarantined: bool,
     forced: bool,
+    idle_shutdown: bool,
     consumed: HashSet<String>,
     active: Option<Active>,
     stdout_closed: bool,
@@ -221,6 +222,7 @@ impl Session {
             closed: false,
             quarantined: false,
             forced: false,
+            idle_shutdown: false,
             consumed,
             active: None,
             stdout_closed: false,
@@ -249,6 +251,7 @@ impl Session {
             return false;
         }
         self.ready = false;
+        self.idle_shutdown = true;
         // Closing the real writer channel delivers stdin EOF after already
         // queued writes. Drop/kill alone can race Claude's transcript flush.
         let (closed, receiver) = mpsc::sync_channel(1);
@@ -356,6 +359,11 @@ impl Session {
         Ok(())
     }
     pub fn poll(&mut self) -> Result<Option<(Value, Value)>> {
+        if self.idle_shutdown {
+            // The writer was deliberately closed for a quiescent retirement.
+            // Drain without treating late hooks or stdout EOF as new work/fault.
+            return self.poll_idle_shutdown().map(|_| None);
+        }
         if self.closed && self.active.is_none() {
             return Ok(None);
         }
@@ -380,6 +388,9 @@ impl Session {
         self.refresh_requests();
         let exit = self.child.try_wait()?;
         let tree_empty = exit.is_some() && self.child.tree_empty()?;
+        if self.stdout_closed {
+            self.ready = false;
+        }
         if exit.is_some() {
             self.ready = false;
             if self.state["process_state"] != "exited" {
@@ -436,6 +447,9 @@ impl Session {
             }
             return Ok(None);
         }
+        if !self.quarantined && !self.forced && self.stdout_closed {
+            return Err(crate::provider_fault::TransportClosed("stdout").into());
+        }
         if !self.quarantined && !self.forced && exit.is_none() && !self.stdout_closed {
             if let Some(active) = self.active.as_mut() {
                 if active.cancel.is_some()
@@ -458,7 +472,11 @@ impl Session {
         self.active.as_ref().and_then(|a| a.job["job_id"].as_str())
     }
     pub fn transport_open(&self) -> bool {
-        !self.closed && !self.quarantined && !self.forced && !self.stdout_closed
+        !self.closed
+            && !self.quarantined
+            && !self.forced
+            && !self.stdout_closed
+            && !self.idle_shutdown
     }
     pub fn pending_requests(&self) -> Value {
         self.active

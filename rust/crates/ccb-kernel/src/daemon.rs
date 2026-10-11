@@ -1267,7 +1267,8 @@ impl Daemon {
             "status":"blocked","phase":phase,"reason":if phase == "startup" { "provider_start_failed" } else { "provider_protocol_error" },
             "pid":owned["pid"],"runtime_instance_id":owned["runtime_instance_id"],"daemon_instance_id":self.state,
             "job_id":job["job_id"],"execution_instance_id":job["provider_options"]["native_execution_instance"],"observed_at":now(),
-            "io_error_kind":error.chain().find_map(|e| e.downcast_ref::<std::io::Error>()).map(|e|format!("{:?}", e.kind()))});
+            "io_error_kind":error.chain().find_map(|e| e.downcast_ref::<std::io::Error>()).map(|e|format!("{:?}", e.kind())),
+            "transport_closed":error.chain().find_map(|e|e.downcast_ref::<crate::provider_fault::TransportClosed>()).map(|e|e.0)});
         self.kernel.store.save(
             &crate::provider_fault::path(spec["provider"].as_str().unwrap(), agent),
             &row,

@@ -389,6 +389,16 @@ impl Session {
             }
             return Ok(None);
         }
+        if !self.quarantined && !self.forced && (self.stdout_closed || self.input_closed) {
+            return Err(
+                crate::provider_fault::TransportClosed(if self.stdout_closed {
+                    "stdout"
+                } else {
+                    "stdin"
+                })
+                .into(),
+            );
+        }
         if !self.quarantined
             && !self.forced
             && exit.is_none()

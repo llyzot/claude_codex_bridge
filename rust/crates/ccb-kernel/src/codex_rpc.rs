@@ -8,6 +8,7 @@ use std::{
     time::Instant,
 };
 struct Active {
+    context: Option<crate::codex_context::Control>,
     skills: Option<crate::codex_skills::Load>,
     job: Value,
     start: String,
@@ -47,6 +48,7 @@ pub struct Session {
     bind: String,
     spec: Value,
     expected: String,
+    recreate_empty: bool,
     pub runtime: String,
     pub state: Value,
     pub ready: bool,
@@ -171,15 +173,18 @@ impl Session {
         commands
             .try_send(initialize)
             .context("Codex initialization queue unavailable")?;
-        let expected =
-            if spec["resume_session"] != false && spec["thread_options"]["ephemeral"] != true {
-                saved["state"]["thread_id"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_owned()
-            } else {
-                String::new()
-            };
+        let recreate_empty = crate::context_session::may_recreate(&saved["state"], "codex")?;
+        let expected = if spec["resume_session"] != false
+            && spec["thread_options"]["ephemeral"] != true
+            && !recreate_empty
+        {
+            saved["state"]["thread_id"]
+                .as_str()
+                .unwrap_or("")
+                .to_owned()
+        } else {
+            String::new()
+        };
         Ok(Self {
             role_skills_bound: false,
             child,
@@ -189,6 +194,7 @@ impl Session {
             bind,
             spec: spec.clone(),
             expected,
+            recreate_empty,
             runtime,
             state: Value::Null,
             ready: false,
@@ -222,6 +228,15 @@ impl Session {
             self.ready && self.active.is_none(),
             "Codex session is not idle"
         );
+        if self
+            .state
+            .as_object_mut()
+            .unwrap()
+            .remove("native_empty_context")
+            .is_some()
+        {
+            self.dirty = true;
+        }
         let start = format!(
             "turn-{}",
             job["provider_options"]["native_execution_instance"]
@@ -236,7 +251,27 @@ impl Session {
         params.insert("clientUserMessageId".into(), job["job_id"].clone());
         params.insert("input".into(),json!([{"type":"text","text":format!("CCB_REQ_ID: {}\n{}",job["job_id"].as_str().unwrap_or(""),prompt)}]));
         let turn = json!({"id":start,"method":"turn/start","params":params});
-        let skills = if let Some(roots) =
+        let context = if job["provider_options"]["native_context_control"].is_object() {
+            let control = &job["provider_options"]["native_context_control"];
+            ensure!(
+                control["runtime_instance_id"] == self.runtime,
+                "Codex context runtime changed before dispatch"
+            );
+            Some(crate::codex_context::Control::new(
+                control["action"]
+                    .as_str()
+                    .context("missing context action")?,
+                &start,
+                &self.state,
+                &self.spec,
+            )?)
+        } else {
+            None
+        };
+        let skills = if let Some(control) = &context {
+            self.send(control.request())?;
+            None
+        } else if let Some(roots) =
             skill_roots.filter(|roots| !roots.is_empty() || self.role_skills_bound)
         {
             let cwd = self.spec["workspace_path"]
@@ -251,6 +286,7 @@ impl Session {
             None
         };
         self.active = Some(Active {
+            context,
             skills,
             job: job.clone(),
             start,
@@ -589,6 +625,36 @@ impl Session {
         if record["method"].is_string() && !record["id"].is_null() {
             return self.server_request(record);
         }
+        if let Some(active) = self.active.as_mut().filter(|a| a.context.is_some()) {
+            if !active.interrupt.is_empty() && record["id"] == active.interrupt {
+                active.interrupt_acknowledged =
+                    record["error"].is_null() && record["result"].is_object();
+                active.interrupt_error = record["error"].clone();
+                return Ok(());
+            }
+            let control = active.context.as_mut().unwrap();
+            let step = control.ingest(&record, active.cancel.is_some())?;
+            active.turn = control.turn.clone();
+            match step {
+                Some(crate::codex_context::Step::Send(request)) => self.send(request)?,
+                Some(crate::codex_context::Step::Finished(state, decision)) => {
+                    self.state = state;
+                    if decision["status"] == "completed"
+                        && decision["diagnostics"]["context_action"] == "clear"
+                    {
+                        self.state["native_empty_context"] =
+                            crate::context_session::marker(&active.job, &self.state["thread_id"]);
+                    }
+                    self.expected = self.state["thread_id"].as_str().unwrap().into();
+                    self.init = format!("init-{}", uuid::Uuid::new_v4());
+                    self.bind = format!("bind-{}", uuid::Uuid::new_v4());
+                    self.dirty = true;
+                    active.decision = Some(decision);
+                }
+                None => {}
+            }
+            return Ok(());
+        }
         if record["id"] == self.init {
             ensure!(
                 record["error"].is_null() && record["result"].is_object(),
@@ -624,6 +690,14 @@ impl Session {
                 "Codex resumed wrong thread"
             );
             self.state = json!({"thread_id":id,"path":thread["path"],"status":thread["status"]});
+            crate::context_session::restore_marker(
+                &mut self.state,
+                &self.saved_state,
+                "thread_id",
+                self.recreate_empty,
+            );
+            self.recreate_empty = false;
+            self.saved_state = Value::Null;
             self.ready = thread["status"]["type"] == "idle";
             self.dirty = true;
             return Ok(());

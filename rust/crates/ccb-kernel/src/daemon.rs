@@ -15,6 +15,8 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
+#[path = "daemon_context.rs"]
+mod context;
 #[path = "project_view.rs"]
 mod project_view;
 #[path = "daemon_reload.rs"]
@@ -362,6 +364,9 @@ impl Daemon {
             "reload-status" => Ok(json!({"reload":self.kernel.store.json("reload.json")?})),
             "project_restart_panes" | "restart" => self.request_restart(p),
             "restart-status" => self.restart_status(p),
+            "clear" | "project_clear_context" => self.context_control(p, "clear"),
+            "compact" | "project_compact_context" => self.context_control(p, "compact"),
+            "context-status" => self.context_status(p),
             "ping" => Ok(
                 json!({"service":"ccbd","runtime":"rust","project_id":self.config["project_id"],"pid":std::process::id(),"status":"running",
                     "startup_id":self.config["startup_id"],"config_fingerprint":crate::config::fingerprint(&self.config)?,"degraded":!self.faults.is_empty()}),
@@ -706,6 +711,10 @@ impl Daemon {
         ensure!(
             request["message_type"] != "reply_delivery",
             "reply_delivery is reserved for the native mailbox"
+        );
+        ensure!(
+            request["message_type"] != "context_control",
+            "context_control requires the native management API"
         );
         let context = json!({"request":request,"state_id":self.state,
             "agent_names":self.names(),"bureau_enabled":true,"max_callback_depth":self.config["max_callback_depth"].as_u64().unwrap_or(5)});
@@ -1378,6 +1387,22 @@ impl Daemon {
                 && job["provider"] == self.config["agents"][agent]["provider"],
             "mailbox job target/provider mismatch"
         );
+        if let Some(provider) = job["provider"]
+            .as_str()
+            .filter(|p| ["pi", "codex"].contains(p))
+        {
+            let path = format!("providers/{provider}/{agent}/session.json");
+            if let Some(mut metadata) = self.kernel.store.json(&path)? {
+                if let Some(state) = metadata["state"].as_object_mut() {
+                    if state.remove("native_empty_context").is_some() {
+                        // Commit consumption with job_started, before any new
+                        // input can reach the provider. A later crash cannot
+                        // recreate an empty context over an uncertain prompt.
+                        self.kernel.store.save(&path, &metadata)?;
+                    }
+                }
+            }
+        }
         let timestamp = now();
         job["status"] = json!("running");
         job["updated_at"] = json!(timestamp);
@@ -1411,6 +1436,13 @@ impl Daemon {
         agent: &str,
         job: &Value,
     ) -> Result<Option<crate::roles::Prepared>> {
+        if job["provider_options"]["native_context_control"].is_object() {
+            return Ok(Some(crate::roles::Prepared {
+                text: String::new(),
+                audit: Value::Null,
+                skill_roots: None,
+            }));
+        }
         let spec = self.spec(agent)?;
         let project = self.config["project_root"]
             .as_str()

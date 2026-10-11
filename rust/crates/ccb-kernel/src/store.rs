@@ -147,7 +147,8 @@ impl Store {
                     "reload.json",
                     "namespace.json",
                     "project-view.json",
-                    "runtime-controls.jsonl"
+                    "runtime-controls.jsonl",
+                    "context-operations.jsonl"
                 ]
                 .contains(&relative),
             "unowned state path"

@@ -8,6 +8,7 @@ use std::{
     time::Instant,
 };
 struct Turn {
+    context: Option<crate::pi_context::Control>,
     skills: Option<crate::pi_skills::Load>,
     job: Value,
     id: String,
@@ -47,6 +48,7 @@ pub struct Session {
     active: Option<Turn>,
     pub dirty: bool,
     expected_session: String,
+    recreate_empty: bool,
     timeout_s: f64,
 }
 impl Session {
@@ -69,7 +71,8 @@ impl Session {
         for arg in &argv[1..] {
             command.arg(arg.as_str().unwrap());
         }
-        let expected_session = if spec["resume_session"] != false {
+        let recreate_empty = crate::context_session::may_recreate(&saved["state"], "pi")?;
+        let expected_session = if spec["resume_session"] != false && !recreate_empty {
             saved["state"]["sessionId"]
                 .as_str()
                 .unwrap_or("")
@@ -192,6 +195,7 @@ impl Session {
             active: None,
             dirty: false,
             expected_session,
+            recreate_empty,
             timeout_s: spec["timeout_s"].as_f64().unwrap_or(3600.0),
         })
     }
@@ -216,6 +220,15 @@ impl Session {
             self.ready && self.active.is_none(),
             "Pi session is not idle"
         );
+        if self
+            .state
+            .as_object_mut()
+            .unwrap()
+            .remove("native_empty_context")
+            .is_some()
+        {
+            self.dirty = true;
+        }
         let id = format!(
             "prompt-{}",
             job["provider_options"]["native_execution_instance"]
@@ -232,26 +245,46 @@ impl Session {
             .as_str()
             .context("Pi session identity unavailable")?
             .to_owned();
-        let skills =
-            if let Some(roots) = skill_roots.filter(|r| !r.is_empty() || self.role_skills_bound) {
-                let bridge = self
-                    .role_bridge
-                    .clone()
-                    .context("Pi role bridge is missing")?;
-                let load = crate::pi_skills::Load::new(
-                    bridge,
-                    crate::pi_skills::generation(job)?.into(),
-                    session_id.clone(),
-                    roots,
-                    prompt,
-                );
-                self.input_closed |= !enqueue(&self.commands, load.request())?;
-                Some(load)
-            } else {
-                self.input_closed |= !enqueue(&self.commands, prompt)?;
-                None
-            };
+        let context = if job["provider_options"]["native_context_control"].is_object() {
+            let control = &job["provider_options"]["native_context_control"];
+            ensure!(
+                control["runtime_instance_id"] == self.runtime,
+                "Pi context runtime changed before dispatch"
+            );
+            Some(crate::pi_context::Control::new(
+                control["action"]
+                    .as_str()
+                    .context("missing context action")?,
+                &id,
+                &session_id,
+            )?)
+        } else {
+            None
+        };
+        let skills = if let Some(control) = &context {
+            self.input_closed |= !enqueue(&self.commands, control.request())?;
+            None
+        } else if let Some(roots) = skill_roots.filter(|r| !r.is_empty() || self.role_skills_bound)
+        {
+            let bridge = self
+                .role_bridge
+                .clone()
+                .context("Pi role bridge is missing")?;
+            let load = crate::pi_skills::Load::new(
+                bridge,
+                crate::pi_skills::generation(job)?.into(),
+                session_id.clone(),
+                roots,
+                prompt,
+            );
+            self.input_closed |= !enqueue(&self.commands, load.request())?;
+            Some(load)
+        } else {
+            self.input_closed |= !enqueue(&self.commands, prompt)?;
+            None
+        };
         self.active = Some(Turn {
+            context,
             skills,
             job: job.clone(),
             id,
@@ -428,6 +461,36 @@ impl Session {
         Ok(())
     }
     fn ingest(&mut self, record: &Value) -> Result<()> {
+        if let Some(turn) = self.active.as_mut().filter(|turn| turn.context.is_some()) {
+            match turn
+                .context
+                .as_mut()
+                .unwrap()
+                .ingest(record, turn.cancel.is_some())?
+            {
+                Some(crate::pi_context::Step::Send(request)) => {
+                    self.input_closed |= !enqueue(&self.commands, request)?;
+                }
+                Some(crate::pi_context::Step::Finished(state, decision)) => {
+                    observe_state(&mut self.state, &state);
+                    if decision["diagnostics"]["context_changed"] == true {
+                        self.state.as_object_mut().unwrap().remove("role_skills");
+                        if state["messageCount"].as_u64() == Some(0) {
+                            self.state["native_empty_context"] =
+                                crate::context_session::marker(&turn.job, &state["sessionId"]);
+                        }
+                    }
+                    self.expected_session = state["sessionId"].as_str().unwrap().into();
+                    // Invalidate any old idle-probe response, including one sent
+                    // by an extension before new_session switched the host.
+                    self.init = format!("init-{}", uuid::Uuid::new_v4());
+                    self.dirty = true;
+                    turn.decision = Some(decision);
+                }
+                None => {}
+            }
+            return Ok(());
+        }
         if record["type"] == "response" && record["id"] == self.init {
             ensure!(
                 record["command"] == "get_state" && record["success"] == true,
@@ -444,6 +507,14 @@ impl Session {
                 "Pi resumed wrong session"
             );
             self.ready = idle(&self.state);
+            crate::context_session::restore_marker(
+                &mut self.state,
+                &self.saved_state,
+                "sessionId",
+                self.recreate_empty,
+            );
+            self.recreate_empty = false;
+            self.saved_state = Value::Null;
             self.dirty = true;
             return Ok(());
         }
@@ -641,9 +712,19 @@ fn state_view(state: &Value) -> Value {
 }
 fn observe_state(current: &mut Value, observed: &Value) {
     let roles = current["role_skills"].clone();
+    let empty = if observed["sessionId"] == current["sessionId"]
+        && observed["messageCount"].as_u64() == Some(0)
+    {
+        current["native_empty_context"].clone()
+    } else {
+        Value::Null
+    };
     *current = state_view(observed);
     if !roles.is_null() {
         current["role_skills"] = roles;
+    }
+    if !empty.is_null() {
+        current["native_empty_context"] = empty;
     }
 }
 fn content(message: &Value) -> String {

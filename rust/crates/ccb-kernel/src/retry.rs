@@ -81,6 +81,8 @@ pub fn admit(kernel: &mut Kernel, args: &Value) -> Result<Value> {
         &json!({"stream":"jobs","agent_name":agent,"fields":{"job_id":original["job_id"]}}),
     )?;
     ensure!(!current.is_null(), "job not found for attempt: {id}");
+    ensure!(!current["provider_options"]["native_context_control"].is_object(),
+        "context controls cannot be replayed through retry; inspect provider state and issue a new clear or compact operation");
     let timestamp = records::string(args, "accepted_at")?;
     let pending = kernel.dispatch(
         "scheduler.has_outstanding_for",

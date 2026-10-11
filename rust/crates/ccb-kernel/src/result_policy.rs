@@ -328,6 +328,7 @@ pub fn plan(kernel: &mut Kernel, args: &Value) -> Result<Value> {
         .unwrap_or(1)
         .max(1);
     let eligible = !attempt.is_null()
+        && !job["provider_options"]["native_context_control"].is_object()
         && !message.is_null()
         && norm(&p["mode"]) == "auto"
         && retryable(&d, p, args["supports_resume"] == true);

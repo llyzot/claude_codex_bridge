@@ -133,6 +133,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native [--project <directory>] [--state-root <dir>] reload [--config <json>|--executables <manifest>] [--dry-run] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> reload-status");
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
         println!("ccb-native --state-root <dir> view [--limit <1..64>]");
+        println!("ccb-native --state-root <dir> clear|compact [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> context-status <operation-id>");
         println!("ccb-native --state-root <dir> restart [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> restart-status [operation-id]");
         return Ok(());
     }
@@ -521,7 +522,14 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         );
         return Ok(());
     }
+    if op == "clear" || op == "compact" {
+        return crate::cli_context::run(&root, &op, &args);
+    }
     let payload = match op.as_str() {
+        "context-status" => {
+            ensure!(args.len() == 1, "context-status requires an operation ID");
+            json!({"operation_id":arg(&args,0)?})
+        }
         "restart-status" => {
             ensure!(args.len() <= 1, "restart-status accepts one operation ID");
             if args.is_empty() {

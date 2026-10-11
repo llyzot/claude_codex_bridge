@@ -15,6 +15,40 @@ NODE=Path('C:/Users/user/scoop/apps/nodejs-lts/current/node.exe')
 PI=Path('C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')
 pytestmark=pytest.mark.skipif(os.environ.get('CCB_RUN_REAL_MODELS')!='1',reason='Explicit real-model opt-in required')
 
+
+@pytest.mark.parametrize('kind',['pi','codex'])
+def test_real_context_clear_without_model_or_credentials(tmp_path,kind):
+    """Only state/new-session RPCs; private empty homes, no model turn or auth copy."""
+    from test_native_restart import ready
+    from test_native_context import control,settled
+    workspace=tmp_path/'workspace';workspace.mkdir()
+    home=tmp_path/'provider-home';home.mkdir()
+    if kind=='pi':
+        config=dict(provider='pi',driver_kind='pi_rpc',profile_family='protocol_turn',
+            command=[str(NODE),str(PI),'--mode','rpc','--no-extensions','--no-skills','--no-prompt-templates',
+                     '--no-themes','--session-dir',str(home/'sessions')],workspace_path=str(workspace),
+            env={'PI_CODING_AGENT_DIR':str(home),'PI_SKIP_VERSION_CHECK':'1','PI_TELEMETRY':'0'})
+    else:
+        config=dict(provider='codex',driver_kind='codex_app_server',profile_family='protocol_turn',
+            command=[str(CODEX),'app-server','--stdio'],workspace_path=str(workspace),env={'CODEX_HOME':str(home)},
+            thread_options={'approvalPolicy':'never','sandbox':'read-only'})
+    server=Server(tmp_path/'runtime/ccbd',{'worker':config})
+    try:
+        before=ready(server)
+        result=settled(server,control(server,'clear'))
+        assert result['status']=='completed',result
+        assert ready(server)['runtime_instance_id']==before['runtime_instance_id']
+        auth=home/'auth.json'
+        # Pi initializes an empty credential store even without authentication.
+        empty_credentials=not auth.exists() or json.loads(auth.read_text())=={}
+        assert empty_credentials,'Provider unexpectedly populated the private credential store'
+    finally:server.close()
+    restored=Server(server.root,{'worker':config})
+    try:
+        assert ready(restored)
+        assert restored.rpc('context-status',{'operation_id':result['operation_id']})['context']['status']=='completed'
+    finally:restored.close()
+
 def protected_copy(source,destination):
     result=subprocess.run([str(NATIVE),'private-copy',str(source),str(destination)],capture_output=True,text=True,timeout=8)
     assert result.returncode==0,result.stderr
@@ -78,6 +112,35 @@ def test_real_pi_lead_codex_worker_automatic_callback(tmp_path):
         assert len(edges)==1 and edges[0]['state']=='done'
         metadata=json.loads((server.root/'providers/pi/lead/session.json').read_text())
         assert metadata['state']['messageCount']>=4
+    finally:server.close()
+
+
+@pytest.mark.parametrize('kind',['pi','codex'])
+def test_real_native_compaction_preserves_conversation_and_process(tmp_path,kind):
+    from test_native_restart import ready
+    from test_native_context import control,settled
+    worker,lead=configs(tmp_path)
+    provider=lead if kind=='pi' else worker
+    if kind=='pi':
+        settings=tmp_path/'pi-home/settings.json'
+        data=json.loads(settings.read_text())
+        data['compaction']={'enabled':True,'reserveTokens':1024,'keepRecentTokens':64}
+        settings.write_text(json.dumps(data))
+    server=Server(tmp_path/'state',{'worker':provider})
+    try:
+        for i in range(2):
+            receipt=submit(server,body=('This is a disposable context-control validation transcript. '*40)+
+                f'\nRemember verification word CCB_COMPACT_OK. Reply only RECEIVED_{i}. Do not call tools or edit files.')
+            row=wait_result(server,receipt['job_id'])
+            assert row['status']=='completed',row['reply']
+        before=ready(server)
+        operation=control(server,'compact')
+        result=settled(server,operation,timeout=150)
+        assert result['status']=='completed',result
+        assert ready(server)['runtime_instance_id']==before['runtime_instance_id']
+        receipt=submit(server,body='What verification word were you asked to remember? Reply only that word. Do not call tools.')
+        row=wait_result(server,receipt['job_id'])
+        assert row['status']=='completed' and 'CCB_COMPACT_OK' in row['reply'],row['reply']
     finally:server.close()
 
 

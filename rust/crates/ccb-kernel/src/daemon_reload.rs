@@ -98,7 +98,7 @@ fn latest(kernel: &mut Kernel, stream: &str, identity: &str, agent: Option<&str>
 }
 // The mailbox alone is insufficient: an idle Lead may still expect a result
 // from a running Worker, before a reply event has even been materialized.
-fn blockers(kernel: &mut Kernel, names: &[String]) -> Result<Vec<Value>> {
+pub(super) fn blockers(kernel: &mut Kernel, names: &[String]) -> Result<Vec<Value>> {
     let mut blocked = Vec::new();
     for agent in names {
         for job in latest(kernel, "jobs", "job_id", Some(agent))?

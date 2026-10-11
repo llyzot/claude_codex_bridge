@@ -19,6 +19,8 @@ use std::{
 mod context;
 #[path = "daemon_followup.rs"]
 mod followup;
+#[path = "health_view.rs"]
+mod health_view;
 #[path = "daemon_herdr.rs"]
 mod herdr;
 #[path = "mailbox_control.rs"]
@@ -445,10 +447,7 @@ impl Daemon {
             "clear" | "project_clear_context" => self.context_control(p, "clear"),
             "compact" | "project_compact_context" => self.context_control(p, "compact"),
             "context-status" => self.context_status(p),
-            "ping" => Ok(
-                json!({"service":"ccbd","runtime":"rust","project_id":self.config["project_id"],"pid":std::process::id(),"status":"running",
-                    "startup_id":self.config["startup_id"],"config_fingerprint":crate::config::fingerprint(&self.config)?,"degraded":!self.faults.is_empty()}),
-            ),
+            "ping" => self.ping_view(p),
             "provider-status" => {
                 let agent = records::string(p, "agent_name")?;
                 self.spec(agent)?;
@@ -1114,13 +1113,13 @@ impl Daemon {
             return s.view.clone();
         }
         if let Some(s) = self.pi.get(agent) {
-            return json!({"pid":s.pid(),"runtime_instance_id":s.runtime,"closed":s.closed,"ready":s.ready});
+            return json!({"pid":s.pid(),"runtime_instance_id":s.runtime,"closed":s.closed,"ready":s.ready,"transport_open":s.transport_open()});
         }
         if let Some(s) = self.codex.get(agent) {
-            return json!({"pid":s.pid(),"runtime_instance_id":s.runtime,"closed":s.closed,"ready":s.ready});
+            return json!({"pid":s.pid(),"runtime_instance_id":s.runtime,"closed":s.closed,"ready":s.ready,"transport_open":s.transport_open()});
         }
         if let Some(s) = self.claude.get(agent) {
-            return json!({"pid":s.pid(),"runtime_instance_id":s.runtime,"closed":s.closed,"ready":s.ready});
+            return json!({"pid":s.pid(),"runtime_instance_id":s.runtime,"closed":s.closed,"ready":s.ready,"transport_open":s.transport_open()});
         }
         Value::Null
     }

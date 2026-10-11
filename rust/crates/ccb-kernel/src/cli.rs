@@ -136,6 +136,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
         println!("ccb-native installation upgrade|recover|rollback --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]\nccb-native installation status --prefix <directory>");
         println!("ccb-native --state-root <dir> view [--limit <1..64>]");
+        println!("ccb-native --state-root <dir> ping [ccbd|all|agent] (passive local runtime observation)");
         println!("ccb-native --state-root <dir> queue [--detail] [agent|all]\nccb-native --state-root <dir> pend [--inbox|--queue] [--detail] <target>\nccb-native --state-root <dir> pend --watch <target> [--timeout-ms <ms>]");
         println!("ccb-native --state-root <dir> followup <job-id> --message <text> [--operation-id <uuid>] [--timeout-ms <0..60000>]\nccb-native --state-root <dir> followup-status <followup-id>");
         println!("ccb-native [--project <directory>] inbox [--detail] <agent>\nccb-native [--project <directory>] ack <agent> [inbound-event-id]");
@@ -816,7 +817,20 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             );
             json!({"schema_version":1,"comms_limit":if args.is_empty(){8}else{arg(&args,1)?.parse::<u64>()?}})
         }
-        "ping" | "stop" | "agents" | "reload-status" => {
+        "ping" => {
+            ensure!(args.len() <= 1, "ping accepts ccbd, all or one agent");
+            let target = args
+                .first()
+                .map(|a| a.to_str().context("ping target must be UTF-8"))
+                .transpose()?
+                .unwrap_or("ccbd");
+            println!(
+                "{}",
+                request_preview(&request(&root, "ping", json!({"target":target}))?)
+            );
+            return Ok(());
+        }
+        "stop" | "agents" | "reload-status" => {
             ensure!(args.is_empty(), "command takes no arguments");
             json!({})
         }

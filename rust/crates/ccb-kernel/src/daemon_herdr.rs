@@ -59,6 +59,7 @@ impl Daemon {
                     let worker = self.herdr.get_mut(agent).unwrap();
                     worker.view["pid"] = proof["identity"]["process"]["pid"].clone();
                     worker.view["runtime_instance_id"] = proof["execution_instance_id"].clone();
+                    worker.view["last_observed_at"] = json!(super::now());
                     worker.grant.send(())?;
                 }
                 Event::Completed(decision) => {
@@ -76,6 +77,8 @@ impl Daemon {
                 }
                 Event::Ready => {
                     self.herdr.get_mut(agent).unwrap().view["ready"] = json!(true);
+                    self.herdr.get_mut(agent).unwrap().view["last_observed_at"] =
+                        json!(super::now());
                 }
                 Event::Fault => {
                     self.record_provider_fault(agent, "poll", &anyhow::anyhow!("Herdr terminal observation failed; no prompt replay or process termination was performed"))?;

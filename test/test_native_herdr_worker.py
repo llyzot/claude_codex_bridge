@@ -63,6 +63,21 @@ def runtime(prepared):
 def job(server,receipt):
     return server.rpc('records.latest',{'stream':'jobs','identity':'job_id','agent_name':'worker'},version=1)['result'][-1]
 
+
+def test_ping_external_herdr_does_not_upgrade_historical_readiness_to_health(runtime):
+    r=runtime;s=r['start']()
+    first=s.rpc('ping',{'target':'worker'})
+    assert first['health']=='unknown' and first['diagnostics']['external_last_observed_at'] is None
+    assert r['prompts']()==[]
+    receipt=r['submit'](s);prompt=wait_for(lambda:r['prompts']())[-1]
+    r['finish'](prompt)
+    await_watch(s,receipt['job_id'],lambda row:row['terminal'])
+    row=wait_for(lambda:(v if (v:=s.rpc('ping',{'target':'worker'}))['diagnostics']['protocol_idle_last_observed'] is True else None))
+    assert row['health']=='unknown' and row['diagnostics']['external_last_observed_at']
+    assert row['diagnostics']['reason']=='external_provider_not_freshly_probed'
+    assert mutate_count(r['backend'],['agent','prompt'])==1
+    assert all(p.poll() is None for p in r['processes'])
+
 def test_pi_lead_yields_then_receives_herdr_result_and_continues(runtime):
     r=runtime;s=r['start']();receipt=r['submit'](s,'lead')
     prompt=wait_for(lambda:r['prompts']())[-1]

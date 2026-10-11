@@ -39,6 +39,16 @@ for line in sys.stdin.buffer:
     elif method in {'thread/start','thread/resume'}:
         if method=='thread/resume':thread_id=command['params']['threadId']
         response(command,{'thread':thread()})
+        if mode=='external-active':
+            emit({'method':'thread/status/changed','params':{'threadId':thread_id,'status':{'type':'active','activeFlags':[]}}})
+            def external_idle():
+                path=os.environ.get('CCB_EXTERNAL_IDLE_FILE')
+                if not path:return
+                while not Path(path).exists():time.sleep(.025)
+                emit({'method':'thread/status/changed','params':{'threadId':thread_id,'status':{'type':'idle'}}})
+            threading.Thread(target=external_idle,daemon=True).start()
+        if mode=='external-foreign':
+            emit({'method':'thread/status/changed','params':{'threadId':'foreign-thread','status':{'type':'active','activeFlags':[]}}})
     elif method=='skills/extraRoots/set':
         behavior=skill_behavior()
         if behavior=='bad-envelope':

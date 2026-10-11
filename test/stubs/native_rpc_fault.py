@@ -44,6 +44,15 @@ def fault_when_released():
 if first and mode == 'idle-late-fault':
     threading.Thread(target=fault_when_released, daemon=True).start()
 
+def close_output_when_released():
+    while not (directory / 'release-error').exists(): time.sleep(.025)
+    os.close(sys.stdout.fileno())
+    (directory / 'stdout-closed').touch()
+    hold()
+
+if first and mode == 'idle-eof':
+    threading.Thread(target=close_output_when_released, daemon=True).start()
+
 state = dict(sessionId='fault-session', sessionFile=None, isStreaming=False,
              isCompacting=False, pendingMessageCount=0, messageCount=0)
 thread = dict(id='fault-thread', path=None, status={'type': 'idle'}, turns=[])

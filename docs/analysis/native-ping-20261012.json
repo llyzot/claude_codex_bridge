@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "base_commit": "73c749c7",
+  "recorded_at": "2026-10-11T21:44:52.810161+00:00",
+  "commands": [
+    "ping",
+    "ping ccbd",
+    "ping all",
+    "ping <agent>"
+  ],
+  "api_operation": "ping",
+  "health_scope": "local runtime, not model/account access",
+  "real_model_inference": false,
+  "production_install_changed": false,
+  "verification": {
+    "initial_disabled_agent_failure": "Read-only ping incorrectly reused the dispatch-enabled guard; corrected to observe registered disabled agents",
+    "eof_fixture_failure": "Three venv-launcher EOF cases initially retained an open pipe; the base-executable control made pipe closure observable without changing EOF parsing",
+    "eof_fixture_control": [
+      {
+        "launcher": "venv_launcher",
+        "active_processes": 3,
+        "health": "healthy",
+        "transport_open": true,
+        "reason": "local_protocol_ready"
+      },
+      {
+        "launcher": "base_python",
+        "active_processes": 2,
+        "health": "unknown",
+        "transport_open": false,
+        "reason": "provider_transport_unavailable"
+      }
+    ],
+    "eof_control_source": "C:\\Users\\user\\AppData\\Local\\Temp\\ccb-ping-eof-control-kch9jha4\\result.json",
+    "initial_corrected_health_selection": "11 passed in 21.15s",
+    "broad_selection_before_final_untracked_activity_fix": "143 passed in 334.20s",
+    "untracked_activity_red": "Bound thread/status/changed was ignored with no active CCB turn, causing idle/healthy output",
+    "final_ping_codex_controls_host_selection": "39 passed in 72.79s",
+    "final_codex_context_selection": "11 passed, 14 deselected in 25.94s",
+    "final_rust_unit_tests": "28 passed plus parent-invoked helper in 32.86s",
+    "format_clippy_diff": "passed",
+    "full_repository_run": false
+  },
+  "binary_sha256": {
+    "ccb-kernel.exe": "2ab06597865b7aa3f7f38c19b4825b8efd0bad30fe77e21ff7d35ff6897395c8",
+    "ccb-native.exe": "07a4e8512c3337156909e081b8a8614ad19a84443d56c80ee9cef505edd75f44"
+  },
+  "repository_bin_matches_release": true,
+  "limits": [
+    "Passive protocol readiness cannot prove future responsiveness or model credentials/quota availability",
+    "External Herdr state remains explicitly historical, not freshly probed by ping",
+    "Observed busy-thread dispatch gating does not serialize every concurrent TUI action",
+    "Autonomous live-process/output-EOF fault recovery remains unverified"
+  ]
+}

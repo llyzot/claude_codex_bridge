@@ -390,7 +390,8 @@ impl Session {
                 && !self.forced
                 && exit.is_none()
                 && !self.stdout_closed
-                && !self.input_closed;
+                && !self.input_closed
+                && self.state["status"]["type"] == "idle";
             let mut decision = active.decision.clone().unwrap();
             control_diagnostics(&active, &mut decision);
             return Ok(Some((active.job, decision)));
@@ -442,6 +443,13 @@ impl Session {
     }
     pub fn active_job_id(&self) -> Option<&str> {
         self.active.as_ref().and_then(|a| a.job["job_id"].as_str())
+    }
+    pub fn transport_open(&self) -> bool {
+        !self.closed
+            && !self.quarantined
+            && !self.forced
+            && !self.stdout_closed
+            && !self.input_closed
     }
     pub fn pending_requests(&self) -> Value {
         let rows = self.active.as_ref().map(|active| active.requests.iter().map(|p|
@@ -776,6 +784,27 @@ impl Session {
             self.ready = thread["status"]["type"] == "idle";
             self.dirty = true;
             return Ok(());
+        }
+        // A hosted TUI may change the bound thread while no CCB task is active.
+        // Preserve this observation before the no-active-turn early return.
+        // An idle notification is readiness evidence, never task completion.
+        if record["method"] == "thread/status/changed"
+            && self.state["thread_id"]
+                .as_str()
+                .is_some_and(|id| !id.is_empty())
+            && record["params"]["threadId"] == self.state["thread_id"]
+        {
+            let status = &record["params"]["status"];
+            ensure!(
+                status["type"].as_str().is_some_and(|s| !s.is_empty()),
+                "Codex thread status is missing"
+            );
+            self.state["status"] = status.clone();
+            self.dirty = true;
+            if self.active.is_none() {
+                self.ready = status["type"] == "idle" && self.transport_open();
+                return Ok(());
+            }
         }
         let Some(active) = self.active.as_mut() else {
             return Ok(());

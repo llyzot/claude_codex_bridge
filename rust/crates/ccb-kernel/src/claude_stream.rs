@@ -457,6 +457,9 @@ impl Session {
     pub fn active_job_id(&self) -> Option<&str> {
         self.active.as_ref().and_then(|a| a.job["job_id"].as_str())
     }
+    pub fn transport_open(&self) -> bool {
+        !self.closed && !self.quarantined && !self.forced && !self.stdout_closed
+    }
     pub fn pending_requests(&self) -> Value {
         self.active
             .as_ref()

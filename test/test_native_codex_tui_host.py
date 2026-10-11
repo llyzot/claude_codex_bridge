@@ -37,13 +37,16 @@ def host(tmp_path):
             output.put(json.loads(line))
         output.put(None)
     threading.Thread(target=read, daemon=True).start()
-    def request(method, params, identity):
+    def request(method, params, identity, expect_error=False):
         proc.stdin.write(json.dumps(dict(id=identity, method=method, params=params))+'\n'); proc.stdin.flush()
         deadline = time.monotonic()+20
         while time.monotonic() < deadline:
             row = output.get(timeout=max(.1, deadline-time.monotonic()))
             assert row is not None, proc.stderr.read()
             if row.get('id') == identity:
+                if expect_error:
+                    assert isinstance(row.get('error'),dict), row
+                    return row['error']
                 assert 'error' not in row, row
                 return row['result']
         pytest.fail('RPC response missing')
@@ -69,6 +72,17 @@ def test_actual_protocol_thread_and_eof_retire_server(host):
     assert json.loads((p['root']/'host.json').read_text(encoding='utf-8'))['status']=='stopped'
     pid=p['state']['server_process']['pid']
     wait_for(lambda:subprocess.run([str(BIN),'process-identity',str(pid)],capture_output=True).returncode!=0)
+
+
+def test_actual_steer_rejects_unbound_turn_without_starting_a_model(host):
+    p=host
+    error=p['request']('turn/steer', {'threadId':p['state']['thread_id'], 'expectedTurnId':'ccb-nonexistent-turn',
+                                    'input':[{'type':'text','text':'MUST_NOT_START_A_MODEL'}], 'clientUserMessageId':'fup_test'},
+                       'steer-invalid-turn', expect_error=True)
+    assert error['code'] != -32601, error
+    assert 'turn' in error['message'].lower(), error
+    result=p['request']('thread/read', {'threadId':p['state']['thread_id'],'includeTurns':False}, 'read-after-steer')
+    assert result['thread']['status']['type'] == 'idle'
 
 def test_wrong_token_cannot_queue_into_host(host):
     p=host

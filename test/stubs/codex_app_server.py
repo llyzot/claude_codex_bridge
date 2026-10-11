@@ -69,6 +69,10 @@ for line in sys.stdin.buffer:
         assert len(loaded_skills)==len(skill_roots)
         turn_id=f'turn-{len(turns)+1}'
         completed=dict(id=turn_id,status='completed',items=[{'type':'agentMessage','id':'final','phase':'final_answer','text':'Codex final result'}],error=None)
+        if mode.startswith('followup-'):
+            completed['status']='inProgress';turns.append(completed)
+            response(command,{'turn':dict(id=turn_id,status='inProgress',items=[])})
+            continue
         if mode.startswith('cancel-') and not turns:
             completed['status']='inProgress';turns.append(completed)
             if mode=='cancel-late-accept':later(.6,lambda cmd=command,tid=turn_id:response(cmd,{'turn':dict(id=tid,status='inProgress',items=[])}))
@@ -81,6 +85,22 @@ for line in sys.stdin.buffer:
         emit(dict(method='turn/completed',params=dict(threadId=thread_id,turn=completed if not foreign else dict(completed,id='foreign-turn'))))
         turns.append(completed)
         if mode=='late-response':response(command,{'turn':dict(id=turn_id,status='inProgress',items=[])})
+    elif method=='turn/steer':
+        assert command['params']['threadId']==thread_id
+        assert command['params']['expectedTurnId']==turns[-1]['id']
+        assert command['params']['clientUserMessageId']
+        if mode=='followup-denied':
+            emit({'id':command['id'],'error':{'code':-1,'message':'SECRET_FOLLOWUP_ERROR'}})
+        elif mode=='followup-mismatch':response(command,{'turnId':'foreign-turn'})
+        elif mode=='followup-no-ack':pass
+        else:
+            emit({'id':'followup-foreign','result':{'turnId':turns[-1]['id']}})
+            if mode=='followup-delay':later(.4,lambda cmd=command,tid=turns[-1]['id']:response(cmd,{'turnId':tid}))
+            else:response(command,{'turnId':turns[-1]['id']})
+            if mode=='followup-finish':
+                turns[-1]['status']='completed'
+                turns[-1]['items'][0]['text']=command['params']['input'][0]['text']
+                later(.3,lambda turn=turns[-1]:emit(dict(method='turn/completed',params=dict(threadId=thread_id,turn=turn))))
     elif method=='turn/interrupt':
         assert command['params']=={'threadId':thread_id,'turnId':turns[-1]['id']}
         if mode=='cancel-denied':

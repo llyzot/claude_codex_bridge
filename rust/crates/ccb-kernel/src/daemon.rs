@@ -17,6 +17,8 @@ use std::{
 
 #[path = "daemon_context.rs"]
 mod context;
+#[path = "daemon_followup.rs"]
+mod followup;
 #[path = "daemon_herdr.rs"]
 mod herdr;
 #[path = "mailbox_control.rs"]
@@ -429,6 +431,8 @@ impl Daemon {
     }
     fn dispatch(&mut self, op: &str, p: &Value) -> Result<Value> {
         match op {
+            "followup" => self.admit_followup(p),
+            "followup-status" => self.followup_status(p),
             "project_view" => self.project_view(p),
             "project_view_dismiss_comms" => self.dismiss_comms(p),
             "reload-plan" => Ok(json!({"plan":self.reload_plan(&p["config"])?})),
@@ -1712,6 +1716,7 @@ impl Daemon {
         Ok(())
     }
     pub fn tick(&mut self, endpoint: &Value, token_path: &std::path::Path) -> Result<()> {
+        self.tick_followups()?;
         self.tick_reload()?;
         if self.heartbeat.elapsed().as_secs() >= 2 {
             crate::lifecycle::dispatch(

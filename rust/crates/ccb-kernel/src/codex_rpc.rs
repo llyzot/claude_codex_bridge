@@ -2,11 +2,14 @@
 use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
 use std::{
+    collections::BTreeMap,
     io::{BufRead, BufReader, Read, Write},
     process::{Command, Stdio},
     sync::mpsc,
     time::Instant,
 };
+#[path = "codex_followup.rs"]
+mod followup;
 struct Active {
     context: Option<crate::codex_context::Control>,
     skills: Option<crate::codex_skills::Load>,
@@ -40,6 +43,7 @@ enum StreamEvent {
     End,
 }
 pub struct Session {
+    followups: BTreeMap<String, Value>,
     tui_host: Option<std::path::PathBuf>,
     host_name: String,
     host_named: bool,
@@ -213,6 +217,7 @@ impl Session {
             String::new()
         };
         Ok(Self {
+            followups: BTreeMap::new(),
             tui_host,
             host_name: format!("CCB {agent}"),
             host_named: false,
@@ -654,6 +659,9 @@ impl Session {
         Ok(())
     }
     fn ingest(&mut self, record: Value) -> Result<()> {
+        if self.ingest_followup(&record) {
+            return Ok(());
+        }
         if record["id"] == format!("host-name-{}", self.runtime) {
             ensure!(
                 record["error"].is_null(),

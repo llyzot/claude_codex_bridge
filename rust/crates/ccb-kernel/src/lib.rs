@@ -12,6 +12,7 @@ mod claude_skills;
 mod claude_stream;
 pub mod cli;
 mod cli_context;
+mod cli_followup;
 mod cli_tasks;
 mod cli_wait;
 mod codex_context;

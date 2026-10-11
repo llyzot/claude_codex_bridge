@@ -136,6 +136,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
         println!("ccb-native installation upgrade|recover|rollback --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]\nccb-native installation status --prefix <directory>");
         println!("ccb-native --state-root <dir> view [--limit <1..64>]");
+        println!("ccb-native --state-root <dir> followup <job-id> --message <text> [--operation-id <uuid>] [--timeout-ms <0..60000>]\nccb-native --state-root <dir> followup-status <followup-id>");
         println!("ccb-native [--project <directory>] inbox [--detail] <agent>\nccb-native [--project <directory>] ack <agent> [inbound-event-id]");
         println!(
             "ccb-native [--project <directory>] resubmit <message-id> [--operation-id <uuid>]"
@@ -694,6 +695,21 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     }
     if op == "clear" || op == "compact" {
         return crate::cli_context::run(&root, &op, &args);
+    }
+    if op == "followup" {
+        return crate::cli_followup::run(&root, &args);
+    }
+    if op == "followup-status" {
+        ensure!(args.len() == 1, "followup-status requires a followup ID");
+        println!(
+            "{}",
+            request_preview(&request(
+                &root,
+                "followup-status",
+                json!({"followup_id":arg(&args,0)?})
+            )?)
+        );
+        return Ok(());
     }
     if op == "ack" {
         ensure!(

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "base_commit": "ea5b54a0",
+  "recorded_at": "2026-10-11T19:58:06.787152+00:00",
+  "commands": [
+    "followup <job-id> --message <text> [--operation-id <uuid>] [--timeout-ms <0..60000>]",
+    "followup-status <followup-id>",
+    "trace <followup-id>"
+  ],
+  "provider": "owned Codex app-server; direct or native hosted transport",
+  "installed_codex": "0.162.1",
+  "schema_observation": "Local app-server generate-json-schema confirmed TurnSteerParams expectedTurnId/threadId/input/clientUserMessageId and TurnSteerResponse turnId",
+  "real_model_inference": false,
+  "production_install_changed": false,
+  "final_release_sha256": {
+    "ccb-kernel.exe": "447c66a2ab5e694c164aad785f3306be2e3e440d6feb3f4b0de59d8f624c0409",
+    "ccb-native.exe": "be5829c3d13a3ce8f47b83d1b1dac75a785cb66d60f2c1b80fbeb1f4759c37b7"
+  },
+  "repository_bin_matches_release": true,
+  "verification": {
+    "initial_followup_suite": "8 passed in 23.60s",
+    "broader_selection_before_final_fifo_refinement": "47 passed and 1 failed in 92.43s; failure was probe use of includeTurns on an ephemeral thread, after the actual invalid steer rejection had passed",
+    "corrected_installed_probe": "1 passed in 1.01s using thread status read; no credentials copied and no model turn admitted",
+    "codex_control_recovery": "13 passed, 17 deselected in 32.09s",
+    "final_followup_trace_suite": "22 passed in 49.88s",
+    "final_rust_unit_tests": "25 passed plus parent-invoked subprocess helper in 31.97s",
+    "format_clippy_diff": "passed",
+    "full_repository_run": false
+  },
+  "limits": [
+    "Model-backed positive steering acceptance remains unverified",
+    "Pi/Claude/legacy socket steering and outbox retention are not implemented by this checkpoint",
+    "Eight-second response observation uses runtime wall-clock timestamps",
+    "Production Rust default remains unpromoted"
+  ]
+}

@@ -256,6 +256,17 @@ impl Daemon {
     }
     pub(super) fn trace(&mut self, p: &Value) -> Result<Value> {
         let target = crate::records::string(p, "target")?.trim();
+        if target.starts_with("fup_") {
+            let row = self.followup_status(&json!({"followup_id":target}))?;
+            let mut request = p.clone();
+            request["target"] = row["job_id"].clone();
+            let mut out = self.trace(&request)?;
+            out["resolved_job_kind"] = out["resolved_kind"].clone();
+            out["resolved_kind"] = json!("active_followup");
+            out["target"] = json!(target);
+            out["followup_id"] = json!(target);
+            return Ok(out);
+        }
         ensure!(
             target.len() <= 256
                 && target
@@ -560,7 +571,10 @@ impl Daemon {
             "submission":submission(&selected_submission),"message":message(&selected_message),"attempt":attempt(&selected_attempt),"reply":reply(&selected_reply),"job":self.trace_job_summary(&selected_job,&attempts,&replies),
             "message_count":selected_messages.len(),"attempt_count":selected_attempts.len(),"reply_count":selected_replies.len(),"event_count":events.len(),"job_count":job_summaries.len(),"missing_job_ids":missing,"offset":offset,"limit":limit,
             "job_role":selected_job["request"]["message_type"],"source_reply":reply(&source_reply),"delivery_event":delivery_event});
+        let followups = self.followups_for_jobs(&job_summaries)?;
+        out["active_followup_count"] = json!(followups.len());
         let groups = [
+            ("active_followups", followups),
             ("messages", selected_messages.iter().map(message).collect()),
             ("attempts", selected_attempts.iter().map(attempt).collect()),
             ("replies", selected_replies.iter().map(reply).collect()),

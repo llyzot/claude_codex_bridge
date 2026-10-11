@@ -166,29 +166,11 @@ pub fn execute(request: &Value) -> Result<Value> {
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    // Never let a parent pane, remote selector or socket override the explicit
-    // session. Keep only the account config location from inherited Herdr vars.
-    for (key, _) in std::env::vars_os() {
-        let name = key.to_string_lossy().to_ascii_uppercase();
-        if name.starts_with("HERDR_") && name != "HERDR_CONFIG_PATH" {
-            process.env_remove(key);
-        }
-    }
+    configure_env(&mut process);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         process.creation_flags(0x08000000);
-        for key in ["XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"] {
-            process.env_remove(key);
-        }
-        if std::env::var_os("HERDR_CONFIG_PATH").is_none() {
-            if let Some(home) = std::env::var_os("USERPROFILE") {
-                process.env(
-                    "HERDR_CONFIG_PATH",
-                    std::path::PathBuf::from(home).join("AppData/Roaming/herdr/config.toml"),
-                );
-            }
-        }
     }
     let started = Instant::now();
     let base = json!({"schema_version":1,"operation":operation,"session":session,"read_only":read_only,
@@ -266,6 +248,29 @@ pub fn execute(request: &Value) -> Result<Value> {
         }
     }
     Ok(reply(base, true, "", code, Some(stdout), started))
+}
+pub(crate) fn configure_env(process: &mut Command) {
+    // Explicit session selection must not inherit another pane or remote socket.
+    for (key, _) in std::env::vars_os() {
+        let name = key.to_string_lossy().to_ascii_uppercase();
+        if name.starts_with("HERDR_") && name != "HERDR_CONFIG_PATH" {
+            process.env_remove(key);
+        }
+    }
+    #[cfg(windows)]
+    {
+        for key in ["XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"] {
+            process.env_remove(key);
+        }
+        if std::env::var_os("HERDR_CONFIG_PATH").is_none() {
+            if let Some(home) = std::env::var_os("USERPROFILE") {
+                process.env(
+                    "HERDR_CONFIG_PATH",
+                    std::path::PathBuf::from(home).join("AppData/Roaming/herdr/config.toml"),
+                );
+            }
+        }
+    }
 }
 fn reply(
     mut base: Value,

@@ -12,7 +12,7 @@ use std::{
 };
 
 const MARKER: &str = ".ccb-workspace.json";
-fn portable(path: &Path) -> Result<String> {
+pub(crate) fn portable(path: &Path) -> Result<String> {
     let text = path.to_str().context("workspace path must be UTF-8")?;
     #[cfg(windows)]
     {

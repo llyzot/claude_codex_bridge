@@ -22,7 +22,13 @@ def option(name):return args[args.index(name)+1]
 def environment():return dict(args[i+1].split('=',1) for i,value in enumerate(args) if value=='--env')
 def save():
     temporary=state_file.with_suffix('.tmp');temporary.write_text(json.dumps(state),encoding='utf-8');temporary.replace(state_file)
-if args==['api','schema','--json']:result={'title':'Herdr API'}
+if args==['server']:
+    state['server_running']=True;state['server_pid']=os.getpid();save()
+    while not (root/'stop-server').exists():time.sleep(.1)
+    sys.exit(0)
+elif args==['status','server','--json']:
+    result={'server':{'running':state.get('server_running',True),'session':'native-namespace-test','compatible':state.get('server_compatible',True)}}
+elif args==['api','schema','--json']:result={'title':'Herdr API'}
 elif args==['workspace','list']:result={'workspaces':list(state['workspaces'].values())}
 elif args==['api','snapshot']:
     result={'snapshot':{'version':'0.9.0','protocol':1,'workspaces':list(state['workspaces'].values()),
@@ -41,6 +47,7 @@ elif args[:2]==['agent','start']:
     row={'name':name,'agent':kind,'agent_status':status,'pane_id':pane['pane_id'],'workspace_id':pane['workspace_id'],
          'terminal_id':pane['terminal_id'],'tab_id':pane['workspace_id']+':t1','interactive_ready':status in ['idle','done'],
          'launch_pending':False,'revision':1,'focused':False,'tokens':pane['tokens'].copy()}
+    if kind in state.get('agent_sessions',{}):row['agent_session']=state['agent_sessions'][kind]
     state.setdefault('agents',{})[name]=row;save();result={'type':'agent_started','agent':row,'argv':['DO_NOT_PERSIST_SECRET_ARGUMENT']}
 elif args[:2]==['agent','prompt']:
     assert len(args)==4 and '--wait' not in args
@@ -49,6 +56,11 @@ elif args[:2]==['agent','prompt']:
     with (root/'prompts.jsonl').open('a',encoding='utf-8') as output:
         output.write(json.dumps({'name':args[2],'body':args[3]})+'\n')
     result={'type':'agent_prompted','agent':row}
+elif args[:2]==['pane','report-agent-session']:
+    matches=[a for a in state['agents'].values() if a['pane_id']==args[2]]
+    assert len(matches)==1
+    matches[0]['agent_session']={'agent':option('--agent'),'kind':'path','value':option('--agent-session-path'),'source':option('--source')}
+    save();result={'status':'ok'}
 elif args[:2]==['pane','list']:
     workspace=option('--workspace');result={'panes':[p for p in state['panes'].values() if p['workspace_id']==workspace]}
 elif args[:2]==['workspace','create']:

@@ -1,0 +1,830 @@
+//! One resumable native entry point for Herdr topology, TUIs and the authority.
+use anyhow::{ensure, Context, Result};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::{
+    fs::{self, OpenOptions},
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    time::{Duration, Instant},
+};
+const RECORD: &str = "herdr-open.json";
+fn hash(v: &Value) -> Result<String> {
+    Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(v)?)))
+}
+fn save(root: &Path, record: &Value) -> Result<()> {
+    let mut store = crate::store::Store::open(root)?;
+    store.save(RECORD, record)?;
+    store.commit()
+}
+fn read(root: &Path, name: &str) -> Result<Option<Value>> {
+    use std::io::Read;
+    let path = root.join(name);
+    crate::herdr_namespace::unlinked(&path)?;
+    match fs::File::open(path) {
+        Ok(file) => {
+            let mut bytes = Vec::new();
+            file.take(2 * 1024 * 1024 + 1).read_to_end(&mut bytes)?;
+            ensure!(
+                bytes.len() <= 2 * 1024 * 1024,
+                "Herdr state exceeds read limit"
+            );
+            Ok(Some(serde_json::from_slice(&bytes)?))
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+fn command(options: &Value) -> Result<Vec<String>> {
+    if let Some(command) = options.get("command") {
+        return serde_json::from_value(command.clone()).context("Herdr command must be argv");
+    }
+    let mut candidates = Vec::new();
+    if let Some(exe) = std::env::var_os("CCB_HERDR_EXE") {
+        candidates.push(PathBuf::from(exe));
+    }
+    if let Some(path) = std::env::var_os("PATH") {
+        candidates.extend(std::env::split_paths(&path).map(|p| p.join("herdr.exe")));
+    }
+    for (key, tail) in [
+        ("LOCALAPPDATA", "Programs/Herdr/herdr.exe"),
+        ("ProgramFiles", "Herdr/herdr.exe"),
+    ] {
+        if let Some(root) = std::env::var_os(key) {
+            candidates.push(PathBuf::from(root).join(tail));
+        }
+    }
+    let exe = candidates
+        .into_iter()
+        .find(|p| p.is_file())
+        .context("Herdr executable not found; pass --herdr-exe or set CCB_HERDR_EXE")?;
+    Ok(vec![exe.to_string_lossy().into_owned()])
+}
+fn launch_command(request: &Value) -> Result<Command> {
+    let argv: Vec<String> = serde_json::from_value(request["command"].clone())?;
+    let mut command = Command::new(&argv[0]);
+    command.args(&argv[1..]);
+    crate::herdr_transport::configure_env(&mut command);
+    Ok(command)
+}
+fn server(request: &Value, root: &Path, record: &mut Value) -> Result<bool> {
+    let response = crate::herdr_agents::rpc(
+        request,
+        vec!["status".into(), "server".into(), "--json".into()],
+    )?;
+    let state = response.get("server").unwrap_or(&response);
+    ensure!(
+        state["session"].is_null() || state["session"] == request["session"],
+        "Herdr status belongs to another session"
+    );
+    if state["running"] == true || state["status"] == "running" {
+        ensure!(
+            state["compatible"] != false,
+            "Herdr server protocol is incompatible; no namespace changes were made"
+        );
+        return Ok(true);
+    }
+    ensure!(
+        state["running"] == false,
+        "Herdr server absence is unconfirmed; no automatic start"
+    );
+    if record["server_start_permitted"] != true {
+        record["server_start_permitted"] = json!(true);
+        save(root, record)?;
+        let mut command = launch_command(request)?;
+        command
+            .args([
+                "--session",
+                crate::records::string(request, "session")?,
+                "server",
+            ])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x08000000 | 0x00000200);
+        }
+        let child = command
+            .spawn()
+            .context("Herdr server launch failed after recorded intent; inspect before retrying")?;
+        record["server_process"] = crate::owned_process::observe_external_process(child.id())?;
+        save(root, record)?;
+    }
+    // A failed/expired observation never clears the launch permission.
+    if let Some(pid) = record["server_process"]["pid"].as_u64() {
+        ensure!(
+            crate::owned_process::observe_external_process(pid as u32)? == record["server_process"],
+            "Herdr startup process lifetime changed"
+        );
+    }
+    Ok(false)
+}
+fn path_env(spec: &mut Value, native: &Path) -> Result<()> {
+    let parent = native
+        .parent()
+        .context("native executable has no directory")?;
+    let path_keys = spec["env"]
+        .as_object()
+        .map(|env| {
+            env.keys()
+                .filter(|key| key.eq_ignore_ascii_case("PATH"))
+                .cloned()
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    ensure!(path_keys.len() <= 1, "ambiguous PATH environment override");
+    let current = path_keys
+        .first()
+        .map(|key| &spec["env"][key])
+        .unwrap_or(&Value::Null)
+        .as_str()
+        .map(std::ffi::OsString::from)
+        .unwrap_or_else(|| std::env::var_os("PATH").unwrap_or_default());
+    let mut paths = vec![parent.to_path_buf()];
+    paths.extend(std::env::split_paths(&current).filter(|p| p != parent));
+    if spec["env"].is_null() {
+        spec["env"] = json!({});
+    }
+    for key in path_keys {
+        spec["env"].as_object_mut().unwrap().remove(&key);
+    }
+    spec["env"]["PATH"] = json!(std::env::join_paths(paths)?.to_string_lossy());
+    Ok(())
+}
+fn prepare_request(project: &Path, config: &Value, options: &Value) -> Result<(Value, Value)> {
+    let mut base = config.clone();
+    let mut arguments = json!({});
+    let mut bridges = json!({});
+    let native = std::env::current_exe()?;
+    for (name, spec) in base["agents"].as_object_mut().context("missing agents")? {
+        let provider = crate::records::string(spec, "provider")?.to_owned();
+        ensure!(
+            ["pi", "codex"].contains(&provider.as_str()),
+            "native herdr open currently supports Pi/Codex terminal adapters"
+        );
+        ensure!(
+            spec["thread_options"].is_null() && spec["turn_options"].is_null(),
+            "headless protocol options require explicit terminal startup_args"
+        );
+        let mut args: Vec<String> = spec
+            .get("startup_args")
+            .map(|v| serde_json::from_value(v.clone()))
+            .transpose()?
+            .unwrap_or_default();
+        if let Some(model) = spec["model"].as_str() {
+            args.extend(["--model".into(), model.into()]);
+        }
+        if let Some(thinking) = spec["thinking"].as_str() {
+            if provider == "pi" {
+                args.extend(["--thinking".into(), thinking.into()]);
+            } else {
+                args.extend([
+                    "-c".into(),
+                    format!(
+                        "model_reasoning_effort={}",
+                        serde_json::to_string(thinking)?
+                    ),
+                ]);
+            }
+        }
+        if provider == "pi" {
+            let bridge = crate::pi_terminal::execute(
+                &json!({"schema_version":1,"project_root":project,"agent_name":name}),
+            )?;
+            args.extend(serde_json::from_value::<Vec<String>>(
+                bridge["interactive_args"].clone(),
+            )?);
+            bridges[name] = bridge["bridge"].clone();
+        }
+        spec["command"] = Value::Null;
+        spec["driver_kind"] = Value::Null;
+        path_env(spec, &native)?;
+        let runtime = crate::config::state_root(project)?;
+        for (key, value) in [
+            ("CCB_AGENT_NAME", json!(name)),
+            ("CCB_NATIVE_STATE_ROOT", json!(runtime)),
+            ("CCB_NATIVE_TOKEN_FILE", json!("")),
+            ("CCB_NATIVE_ENDPOINT", json!("")),
+        ] {
+            if let Some(existing) = spec["env"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .find(|k| k.eq_ignore_ascii_case(key))
+                .cloned()
+            {
+                ensure!(
+                    spec["env"][&existing] == value,
+                    "terminal environment overrides controller routing"
+                );
+                spec["env"].as_object_mut().unwrap().remove(&existing);
+            }
+            spec["env"][key] = value;
+        }
+        arguments[name] = json!(args);
+    }
+    let session = options["session"]
+        .as_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| {
+            format!(
+                "ccb-native-{}",
+                &config["project_id"].as_str().unwrap()[..12]
+            )
+        });
+    let request = json!({"schema_version":1,"action":"mount","session":session,"command":command(options)?,"config":base,
+        "interactive_args":arguments,"timeout_ms":options["transport_timeout_ms"].as_u64().unwrap_or(3000)});
+    crate::herdr_namespace::plan(&request)?;
+    Ok((request, bridges))
+}
+fn codex_root(spec: &Value, options: &Value, agent: &str) -> Result<PathBuf> {
+    if let Some(root) = options["history_roots"][agent].as_str() {
+        return Ok(root.into());
+    }
+    let home = spec["env"]["CODEX_HOME"]
+        .as_str()
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("CODEX_HOME").map(PathBuf::from))
+        .or_else(|| std::env::var_os("USERPROFILE").map(|p| PathBuf::from(p).join(".codex")))
+        .context("Codex home is unknown; configure history_roots")?;
+    Ok(home.join("sessions"))
+}
+fn find_codex(root: &Path, id: &str, cwd: &Path) -> Result<Option<Value>> {
+    ensure!(root.is_absolute(), "Codex history root must be absolute");
+    if !root.exists() {
+        return Ok(None);
+    }
+    let mut pending = vec![(root.to_path_buf(), 0)];
+    let mut count = 0;
+    let mut found = None;
+    while let Some((directory, depth)) = pending.pop() {
+        crate::herdr_namespace::unlinked(&directory)?;
+        for item in fs::read_dir(directory)? {
+            count += 1;
+            ensure!(
+                count <= 20000,
+                "Codex history discovery limit exceeded; provide an explicit binding"
+            );
+            let item = item?;
+            let kind = item.file_type()?;
+            if kind.is_symlink() {
+                continue;
+            }
+            if kind.is_dir() && depth < 4 {
+                pending.push((item.path(), depth + 1));
+            }
+            if kind.is_file()
+                && item
+                    .file_name()
+                    .to_string_lossy()
+                    .ends_with(&format!("{id}.jsonl"))
+            {
+                let binding = crate::terminal_history::Binding {
+                    root: root.into(),
+                    path: item.path(),
+                    session_id: id.into(),
+                    cwd: cwd.into(),
+                };
+                let baseline = crate::terminal_history::baseline(&binding)?;
+                ensure!(
+                    baseline.producer.is_none(),
+                    "Codex discovery found another provider's history"
+                );
+                ensure!(
+                    found.is_none(),
+                    "multiple Codex histories match the exact native session"
+                );
+                found = Some(serde_json::to_value(binding)?);
+            }
+        }
+    }
+    Ok(found)
+}
+fn binding(
+    request: &Value,
+    bridges: &Value,
+    options: &Value,
+    agent: &str,
+    journal: &Path,
+    record: &mut Value,
+) -> Result<Option<Value>> {
+    let mut live = crate::herdr_agents::bound(request, agent)?;
+    let spec = &request["config"]["agents"][agent];
+    if spec["provider"] == "pi" {
+        use std::io::Read;
+        let bridge = &bridges[agent];
+        let root = PathBuf::from(crate::records::string(bridge, "event_root")?);
+        let current = root.join("current.json");
+        crate::herdr_namespace::unlinked(&current)?;
+        let mut bytes = Vec::new();
+        match fs::File::open(&current) {
+            Ok(file) => {
+                file.take(65537).read_to_end(&mut bytes)?;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(e.into()),
+        }
+        ensure!(bytes.len() <= 65536, "Pi binding state exceeds limit");
+        let state: Value = serde_json::from_slice(&bytes)?;
+        let configured = crate::terminal_history::Binding {
+            root,
+            path: current,
+            session_id: crate::records::string(&state, "session_id")?.into(),
+            cwd: PathBuf::from(crate::records::string(spec, "workspace_path")?),
+        };
+        let (resolved, producer) = crate::pi_terminal::resolve(
+            &configured,
+            crate::records::string(bridge, "owner")?,
+            agent,
+        )?;
+        ensure!(
+            producer["process"] == live["identity"]["process"],
+            "Pi session belongs to another process lifetime"
+        );
+        if live["agent_session"].is_null() {
+            let proof = json!({"identity":live["identity"],"owner":bridge["owner"],"path":producer["session_path"],"sent":true});
+            if record["session_reports"].is_null() {
+                record["session_reports"] = json!({});
+            }
+            if record["session_reports"][agent].is_null() {
+                record["session_reports"][agent] = proof.clone();
+                save(journal, record)?;
+                let _ = crate::herdr_transport::execute(
+                    &json!({"schema_version":1,"operation":"pi_session_report","command":request["command"],"session":request["session"],
+                    "args":["pane","report-agent-session",live["identity"]["pane_id"],"--source","ccb-native","--agent","pi","--agent-session-path",producer["session_path"]],
+                    "expect_json":false,"timeout_ms":request["timeout_ms"]}),
+                );
+            } else {
+                ensure!(
+                    record["session_reports"][agent] == proof,
+                    "Pi session reporting identity changed"
+                );
+            }
+            let refreshed = crate::herdr_agents::bound(request, agent)?;
+            ensure!(
+                refreshed["identity"] == live["identity"],
+                "Pi process changed during session reporting"
+            );
+            live = refreshed;
+            if live["agent_session"].is_null() {
+                return Ok(None);
+            }
+        }
+        ensure!(
+            live["agent_session"]["agent"] == "pi"
+                && (live["agent_session"]["kind"] == "id"
+                    && live["agent_session"]["value"] == resolved.session_id
+                    || live["agent_session"]["kind"] == "path"
+                        && crate::pi_terminal::same_session_path(
+                            &live["agent_session"]["value"],
+                            &producer["session_path"]
+                        )),
+            "Pi native session is not independently reported by Herdr"
+        );
+        return Ok(Some(
+            json!({"history":configured,"pi_bridge_owner":bridge["owner"]}),
+        ));
+    }
+    let native = &live["agent_session"];
+    if native["agent"] != "codex" || native["kind"] != "id" {
+        return Ok(None);
+    }
+    let id = crate::records::string(native, "value")?;
+    uuid::Uuid::parse_str(id).context("Herdr did not report a native Codex session UUID")?;
+    let cwd = Path::new(crate::records::string(spec, "workspace_path")?);
+    if let Some(explicit) = options["bindings"].get(agent) {
+        let binding: crate::terminal_history::Binding = serde_json::from_value(explicit.clone())?;
+        ensure!(
+            binding.session_id == id && binding.cwd == cwd,
+            "explicit Codex history does not match live session/workspace"
+        );
+        crate::terminal_history::baseline(&binding)?;
+        return Ok(Some(json!({"history":binding})));
+    }
+    Ok(find_codex(&codex_root(spec, options, agent)?, id, cwd)?
+        .map(|history| json!({"history":history})))
+}
+pub(crate) fn open(
+    project: &Path,
+    mut config: Value,
+    options: &Value,
+    wait: Duration,
+) -> Result<Value> {
+    ensure!(
+        cfg!(windows),
+        "native Herdr open currently requires Windows"
+    );
+    ensure!(
+        config["project_id"] == crate::config::project_id(project)?
+            && Path::new(crate::records::string(&config, "project_root")?).canonicalize()?
+                == project.canonicalize()?,
+        "Herdr open project/config mismatch"
+    );
+    // Headless argv is deliberately not reused for terminal launch.
+    for spec in config["agents"]
+        .as_object_mut()
+        .context("missing agents")?
+        .values_mut()
+    {
+        if spec["driver_kind"] == "codex_app_server" {
+            if spec["thread_options"]
+                .as_object()
+                .is_some_and(|v| v.keys().all(|k| k == "model"))
+            {
+                spec.as_object_mut().unwrap().remove("thread_options");
+            }
+            if spec["turn_options"]
+                .as_object()
+                .is_some_and(|v| v.keys().all(|k| k == "effort"))
+            {
+                spec.as_object_mut().unwrap().remove("turn_options");
+            }
+        }
+    }
+    config["project_root"] = json!(project);
+    crate::workspaces::validate(&config)?;
+    for spec in config["agents"].as_object().unwrap().values() {
+        ensure!(
+            ["pi", "codex"].contains(&spec["provider"].as_str().unwrap_or("")),
+            "native herdr open currently supports Pi/Codex terminal adapters"
+        );
+        ensure!(
+            spec["thread_options"].is_null() && spec["turn_options"].is_null(),
+            "headless protocol options require explicit terminal startup_args"
+        );
+    }
+    let runtime = crate::config::state_root(project)?;
+    let root = runtime.join("herdr");
+    if options["dry_run"] == true {
+        let agents=config["agents"].as_object().unwrap().iter().map(|(name,spec)|json!({"name":name,"provider":spec["provider"],"workspace_path":spec["workspace_path"]})).collect::<Vec<_>>();
+        return Ok(
+            json!({"status":"planned","project_id":config["project_id"],"agents":agents,"mutations":false}),
+        );
+    }
+    crate::herdr_namespace::unlinked(&runtime)?;
+    crate::herdr_namespace::unlinked(&root)?;
+    fs::create_dir_all(&root)?;
+    let lock_path = root.join("native-open.lock");
+    crate::herdr_namespace::unlinked(&lock_path)?;
+    let lock = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(lock_path)?;
+    ensure!(
+        lock.try_lock().is_ok(),
+        "native Herdr open is already in progress"
+    );
+    let mut record = crate::store::Store::open(&root)?
+        .json(RECORD)?
+        .unwrap_or(Value::Null);
+    if record.is_null() {
+        crate::daemon::verify_owner(&runtime)?;
+    } else if let Some(lease) = read(&runtime, "lease.json")? {
+        if lease["mount_state"] != "unmounted" {
+            let pid = lease["ccbd_pid"]
+                .as_u64()
+                .filter(|p| *p > 0 && *p <= u32::MAX as u64)
+                .context("invalid existing daemon ownership")? as u32;
+            if !crate::daemon::owner_stopped(pid) {
+                let ping = crate::cli::request(&runtime, "ping", json!({}))?;
+                ensure!(record["daemon_fingerprint"].is_string() && ping["runtime"]=="rust" && ping["project_id"]==config["project_id"]
+                    && ping["config_fingerprint"]==record["daemon_fingerprint"],"existing daemon does not match this Herdr workflow; explicit migration is required");
+            }
+        }
+    }
+    let (request, bridges) = prepare_request(project, &config, options)?;
+    let signature = hash(&json!([
+        request,
+        options["history_roots"],
+        options["bindings"]
+    ]))?;
+    if record.is_null() {
+        record = json!({"schema_version":1,"project_id":config["project_id"],"request_hash":signature,"session":request["session"],"phase":"opening","bindings":{}});
+        save(&root, &record)?;
+    }
+    ensure!(
+        record["schema_version"] == 1
+            && record["project_id"] == config["project_id"]
+            && record["request_hash"] == signature,
+        "Herdr open configuration changed; explicit migration is required"
+    );
+    if record["observer_instance"] != options["opener_instance"] {
+        record["observer_instance"] = options["opener_instance"].clone();
+        record["phase"] = json!("opening");
+        save(&root, &record)?;
+    }
+    let deadline = Instant::now() + wait;
+    loop {
+        if !server(&request, &root, &mut record)? {
+            record["phase"] = json!("server_starting");
+        } else {
+            crate::workspaces::materialize(&request["config"])?;
+            let mut prepare = request.clone();
+            prepare["action"] = json!("prepare");
+            let namespace = crate::herdr_namespace::execute(&prepare)?["namespace"].clone();
+            record["workspace_id"] = namespace["workspace_id"].clone();
+            record["phase"] = json!("agents_starting");
+            save(&root, &record)?;
+            if namespace["status"] != "prepared" {
+                record["phase"] = json!("namespace_uncertain");
+            } else {
+                let mounted = crate::herdr_agents::execute(&request)?["mount"].clone();
+                record["phase"] = json!(if mounted["status"] == "ready" {
+                    "binding_sessions"
+                } else {
+                    "agents_starting"
+                });
+                if mounted["status"] == "ready"
+                    || record["bindings"].as_object().unwrap().len()
+                        == request["config"]["agents"].as_object().unwrap().len()
+                {
+                    for name in request["config"]["agents"].as_object().unwrap().keys() {
+                        if record["bindings"][name].is_null() {
+                            if let Some(bound) =
+                                binding(&request, &bridges, options, name, &root, &mut record)?
+                            {
+                                record["bindings"][name] = bound;
+                                save(&root, &record)?;
+                            }
+                        } else {
+                            let saved = &record["bindings"][name];
+                            let live = crate::herdr_agents::bound(&request, name)?;
+                            if request["config"]["agents"][name]["provider"] == "pi" {
+                                let configured: crate::terminal_history::Binding =
+                                    serde_json::from_value(saved["history"].clone())?;
+                                let (_, producer) = crate::pi_terminal::resolve(
+                                    &configured,
+                                    crate::records::string(saved, "pi_bridge_owner")?,
+                                    name,
+                                )?;
+                                ensure!(
+                                    producer["process"] == live["identity"]["process"],
+                                    "cached Pi binding process changed"
+                                );
+                                ensure!(
+                                    live["agent_session"]["agent"] == "pi"
+                                        && (live["agent_session"]["kind"] == "id"
+                                            && live["agent_session"]["value"]
+                                                == configured.session_id
+                                            || live["agent_session"]["kind"] == "path"
+                                                && crate::pi_terminal::same_session_path(
+                                                    &live["agent_session"]["value"],
+                                                    &producer["session_path"]
+                                                )),
+                                    "cached Pi session changed"
+                                );
+                            } else {
+                                ensure!(
+                                    live["agent_session"]["agent"] == "codex"
+                                        && live["agent_session"]["kind"] == "id"
+                                        && live["agent_session"]["value"]
+                                            == saved["history"]["session_id"],
+                                    "cached Codex session changed"
+                                );
+                            }
+                        }
+                    }
+                    if record["bindings"].as_object().unwrap().len()
+                        == request["config"]["agents"].as_object().unwrap().len()
+                    {
+                        let mut daemon = request["config"].clone();
+                        daemon["herdr"] = request.clone();
+                        for (name, spec) in daemon["agents"].as_object_mut().unwrap() {
+                            spec["driver_kind"] = json!("herdr_tui");
+                            spec["profile_family"] = json!("protocol_turn");
+                            spec["herdr_history"] = record["bindings"][name]["history"].clone();
+                            if spec["provider"] == "pi" {
+                                spec["pi_bridge_owner"] =
+                                    record["bindings"][name]["pi_bridge_owner"].clone();
+                            }
+                        }
+                        record["daemon_fingerprint"] = json!(crate::config::fingerprint(&daemon)?);
+                        save(&root, &record)?;
+                        let started = crate::startup::start(
+                            &runtime,
+                            daemon,
+                            deadline.saturating_duration_since(Instant::now()),
+                        )?;
+                        record["phase"] = json!(if started["status"] == "running" {
+                            "running"
+                        } else {
+                            "daemon_starting"
+                        });
+                        record["daemon"] = started;
+                    }
+                }
+            }
+        }
+        save(&root, &record)?;
+        if record["phase"] == "running"
+            || record["phase"] == "namespace_uncertain"
+            || Instant::now() >= deadline
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    Ok(
+        json!({"status":record["phase"],"project_id":record["project_id"],"session":record["session"],"workspace_id":record["workspace_id"],"state_root":runtime,"daemon":record["daemon"],"observation_expired":record["phase"]!="running"}),
+    )
+}
+pub(crate) fn launch(
+    project: &Path,
+    config: Value,
+    options: &Value,
+    timeout: Duration,
+) -> Result<Value> {
+    use std::io::Write;
+    ensure!(options.is_object(), "Herdr options must be an object");
+    for (key, valid) in [
+        ("dry_run", options["dry_run"].is_boolean()),
+        ("session", options["session"].is_string()),
+        (
+            "transport_timeout_ms",
+            options["transport_timeout_ms"].is_u64(),
+        ),
+        ("config", options["config"].is_object()),
+        ("history_roots", options["history_roots"].is_object()),
+        ("bindings", options["bindings"].is_object()),
+    ] {
+        ensure!(
+            options[key].is_null() || valid,
+            "invalid Herdr option type: {key}"
+        );
+    }
+    if options["dry_run"] == true {
+        return open(project, config, options, Duration::ZERO);
+    }
+    let runtime = crate::config::state_root(project)?;
+    let root = runtime.join("herdr");
+    for path in root.ancestors() {
+        crate::herdr_namespace::unlinked(path)?;
+    }
+    fs::create_dir_all(&root)?;
+    let lock_path = root.join("native-open-launch.lock");
+    crate::herdr_namespace::unlinked(&lock_path)?;
+    let lock = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(lock_path)?;
+    ensure!(
+        lock.try_lock().is_ok(),
+        "another Herdr launch request is being recorded"
+    );
+    let request_hash = hash(&json!([project, config, options]))?;
+    let prior = read(&root, "herdr-open-start.json")?.unwrap_or(Value::Null);
+    let process = prior["process"].clone();
+    let live = process["pid"]
+        .as_u64()
+        .filter(|p| *p > 0 && *p <= u32::MAX as u64)
+        .map(|p| crate::owned_process::observe_external_process(p as u32));
+    let reusable = match live {
+        Some(Ok(observed)) => {
+            ensure!(
+                observed == process,
+                "Herdr opener PID belongs to another process lifetime"
+            );
+            true
+        }
+        Some(Err(_)) => {
+            ensure!(
+                crate::daemon::owner_stopped(process["pid"].as_u64().unwrap() as u32),
+                "Herdr opener ownership is uncertain"
+            );
+            false
+        }
+        None => false,
+    };
+    let intent = if reusable {
+        ensure!(
+            prior["request_hash"] == request_hash,
+            "a live Herdr opener has another configuration"
+        );
+        prior
+    } else {
+        let instance = uuid::Uuid::new_v4().to_string();
+        let envelope =
+            json!({"project_root":project,"config":config,"options":options,"instance":instance});
+        let mut bytes = serde_json::to_vec(&envelope)?;
+        ensure!(
+            bytes.len() < 1024 * 1024,
+            "Herdr opener request exceeds limit"
+        );
+        bytes.push(b'\n');
+        let mut child = Command::new(std::env::current_exe()?);
+        child
+            .arg("--herdr-open-worker")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            child.creation_flags(0x08000000 | 0x00000200);
+        }
+        #[cfg(windows)]
+        let guard = crate::startup::StandardHandles::guard()?;
+        let mut child = child.spawn()?;
+        #[cfg(windows)]
+        drop(guard);
+        let intent = json!({"schema_version":1,"instance":instance,"request_hash":request_hash,"process":crate::owned_process::observe_external_process(child.id())?,"status":"opening"});
+        let mut store = crate::store::Store::open(&root)?;
+        store.save("herdr-open-start.json", &intent)?;
+        store.commit()?;
+        drop(store);
+        child
+            .stdin
+            .take()
+            .context("missing opener bootstrap input")?
+            .write_all(&bytes)?;
+        intent
+    };
+    drop(lock);
+    let deadline = Instant::now() + timeout;
+    loop {
+        let state =
+            read(&root, "herdr-open-start.json")?.context("Herdr open observation disappeared")?;
+        ensure!(
+            state["instance"] == intent["instance"],
+            "Herdr open observation generation changed"
+        );
+        if state["result"].is_object() {
+            return Ok(state["result"].clone());
+        }
+        if state["status"] == "failed" {
+            anyhow::bail!(
+                "Herdr open failed: {}",
+                state["error"].as_str().unwrap_or("unknown stage")
+            );
+        }
+        if Instant::now() >= deadline {
+            let record = read(&root, RECORD)?
+                .filter(|r| r["observer_instance"] == intent["instance"])
+                .unwrap_or(Value::Null);
+            return Ok(
+                json!({"status":record["phase"].as_str().unwrap_or("opening"),"session":record["session"],"workspace_id":record["workspace_id"],"state_root":runtime,"opener":intent["process"],"observation_expired":true}),
+            );
+        }
+        if crate::daemon::owner_stopped(intent["process"]["pid"].as_u64().unwrap() as u32) {
+            anyhow::bail!(
+                "Herdr opener exited without a recorded result; repeat open to resume its journals"
+            );
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+pub(crate) fn worker(envelope: &Value) -> Result<()> {
+    let project = Path::new(crate::records::string(envelope, "project_root")?);
+    let root = crate::config::state_root(project)?.join("herdr");
+    let mut options = envelope["options"].clone();
+    options["opener_instance"] = envelope["instance"].clone();
+    let outcome = open(
+        project,
+        envelope["config"].clone(),
+        &options,
+        Duration::from_secs(60),
+    );
+    let mut store = crate::store::Store::open(&root)?;
+    let mut state = store
+        .json("herdr-open-start.json")?
+        .context("missing opener intent")?;
+    ensure!(
+        state["instance"] == envelope["instance"] && state["process"]["pid"] == std::process::id(),
+        "opener result ownership changed"
+    );
+    match outcome {
+        Ok(result) => {
+            state["status"] = json!("finished");
+            state["result"] = result;
+        }
+        Err(error) => {
+            state["status"] = json!("failed");
+            state["error"] = json!(error.to_string());
+        }
+    }
+    store.save("herdr-open-start.json", &state)?;
+    store.commit()
+}
+pub(crate) fn attach(options: &Value, result: &Value) -> Result<()> {
+    let request = json!({"command":command(options)?,"session":result["session"]});
+    let focused = crate::herdr_transport::execute(
+        &json!({"schema_version":1,"operation":"attach_focus","command":request["command"],"session":request["session"],
+        "args":["workspace","focus",crate::records::string(result,"workspace_id")?],"expect_json":false,"timeout_ms":10000}),
+    )?;
+    ensure!(focused["ok"] == true, "Herdr workspace focus failed");
+    let status = launch_command(&request)?
+        .args([
+            "session",
+            "attach",
+            crate::records::string(result, "session")?,
+        ])
+        .status()?;
+    ensure!(status.success(), "Herdr foreground attach failed");
+    Ok(())
+}

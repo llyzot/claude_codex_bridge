@@ -196,8 +196,12 @@ pub(crate) fn execute(request: &Value) -> Result<Value> {
     );
     let path = store.owned_path(&script)?;
     let record = json!({"schema_version":1,"owner":owner,"agent_name":agent,"event_root":events,"extension":path});
-    store.save_bytes(&script, source.as_bytes())?;
-    store.save(&manifest, &record)?;
+    if store.bytes(&script)?.as_deref() != Some(source.as_bytes()) {
+        store.save_bytes(&script, source.as_bytes())?;
+    }
+    if old != record {
+        store.save(&manifest, &record)?;
+    }
     store.commit()?;
     Ok(json!({"bridge":record,"interactive_args":["-e",path],"provider_started":false}))
 }

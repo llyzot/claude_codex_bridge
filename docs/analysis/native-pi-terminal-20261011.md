@@ -40,13 +40,18 @@ Configure a mounted Pi Agent with `provider: "pi"`, `driver_kind: "herdr_tui"`,
 `herdr_history` object contains the event root, the absolute `current.json` path,
 the exact native session ID and workspace cwd. As for Codex, global `config.herdr`
 is the original mount/namespace request, not the mixed daemon configuration.
-Herdr must independently report either the matching native session ID or native
+Herdr must report either the matching native session ID or native
 session file path. On session start/switch the extension calls the read-only native
 `process-identity <pid>` helper, with no shell or visible window. Rust requires its
 PID, creation time and Windows session ID to match the saved Herdr process lifetime;
 PID reuse cannot substitute another process. A manifest alone is insufficient to
 adopt an Agent. Unload publishes `ready: false`, so a failed reload cannot keep
 dispatching through an old ready manifest.
+
+The subsequent [native open coordinator](native-herdr-open-20261011.md) can
+publish a missing Pi session reference after verifying the exact mounted process
+against this SDK state. That reference is cooperative metadata, not independent
+authentication of the event producer.
 
 Each new task resolves the small current-state file to one UUID-named log inside
 the declared root. The durable prompt permit saves both the configured selector

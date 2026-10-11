@@ -28,6 +28,7 @@ mod finalization;
 pub mod git_observation;
 mod herdr_agents;
 mod herdr_namespace;
+mod herdr_open;
 mod herdr_transport;
 mod herdr_worker;
 mod installation;

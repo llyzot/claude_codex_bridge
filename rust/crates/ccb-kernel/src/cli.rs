@@ -111,7 +111,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             "{}",
             json!({"schema_version":1,"service":"ccb-native","runtime":"rust",
             "version":crate::installation::version(),"core_version":env!("CARGO_PKG_VERSION"),
-            "public_api_version":2,"native_prefix_installation":{"schema_version":1,
+            "public_api_version":2,"herdr_open":{"experimental":true,"supported":cfg!(windows),"terminal_providers":["pi","codex"],"background_startup":true},"native_prefix_installation":{"schema_version":1,
                 "supported":cfg!(all(windows,target_arch="x86_64")),"commands":["ccb","ask","ccb-native"],
                 "modifies_account_settings":false,"in_place_upgrade":true,"upgrade_requires_stopped_commands":true,
                 "upgrade_recovery":true,"program_file_rollback":true,"runtime_state_rollback":false}})
@@ -135,6 +135,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
         println!("ccb-native installation upgrade|recover|rollback --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]\nccb-native installation status --prefix <directory>");
         println!("ccb-native --state-root <dir> view [--limit <1..64>]");
+        println!("ccb-native [--project <directory>] herdr open [--herdr-exe <path>] [--session <name>] [--options <json>] [--no-attach] [--timeout-ms <0..60000>] [--dry-run]");
         println!("ccb-native --state-root <dir> clear|compact [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> context-status <operation-id>");
         println!("ccb-native --state-root <dir> restart [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> restart-status [operation-id]");
         return Ok(());
@@ -229,6 +230,19 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         return Ok(());
     }
     crate::installation::check_command_installation()?;
+    if args.first().is_some_and(|s| s == "--herdr-open-worker") {
+        ensure!(args.len() == 1, "invalid Herdr worker arguments");
+        let mut bytes = Vec::new();
+        std::io::stdin()
+            .lock()
+            .take(1024 * 1024 + 1)
+            .read_until(b'\n', &mut bytes)?;
+        ensure!(
+            bytes.len() <= 1024 * 1024 && bytes.last() == Some(&b'\n'),
+            "invalid Herdr worker bootstrap frame"
+        );
+        return crate::herdr_open::worker(&serde_json::from_slice(&bytes)?);
+    }
     if args.is_empty() {
         args.push("start".into());
     }
@@ -349,13 +363,20 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         args.drain(..2);
     }
     let inherited_root = if explicit_root.is_none() && project.is_none() {
-        std::env::var_os("CCB_NATIVE_TOKEN_FILE").and_then(|token| {
-            let token = PathBuf::from(token);
-            let kernel = token.parent()?;
-            (token.is_absolute() && kernel.file_name()? == "kernel")
-                .then(|| kernel.parent().map(Path::to_path_buf))
-                .flatten()
-        })
+        std::env::var_os("CCB_NATIVE_TOKEN_FILE")
+            .and_then(|token| {
+                let token = PathBuf::from(token);
+                let kernel = token.parent()?;
+                (token.is_absolute() && kernel.file_name()? == "kernel")
+                    .then(|| kernel.parent().map(Path::to_path_buf))
+                    .flatten()
+            })
+            .or_else(|| {
+                std::env::var_os("CCB_NATIVE_STATE_ROOT")
+                    .filter(|p| !p.is_empty())
+                    .map(PathBuf::from)
+                    .filter(|p| p.is_absolute())
+            })
     } else {
         None
     };
@@ -388,6 +409,75 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         } else {
             "cancel".into()
         };
+    }
+    if op == "herdr" {
+        use std::io::IsTerminal;
+        ensure!(
+            args.first().is_some_and(|v| v == "open"),
+            "native herdr requires open"
+        );
+        let project = project
+            .as_deref()
+            .context("herdr open requires a project, not an alternate --state-root")?;
+        let project_path = PathBuf::from(crate::workspaces::portable(project)?);
+        let project = project_path.as_path();
+        let mut options = json!({});
+        let mut no_attach = false;
+        let mut timeout = 10000;
+        let mut index = 1;
+        while index < args.len() {
+            match args[index].to_str().context("invalid Herdr option")? {
+                "--options" => {
+                    index += 1;
+                    options = serde_json::from_slice(&std::fs::read(Path::new(
+                        args.get(index).context("--options requires a JSON file")?,
+                    ))?)?;
+                    ensure!(options.is_object(), "Herdr options must be an object");
+                }
+                "--herdr-exe" => {
+                    index += 1;
+                    options["command"] = json!([arg(&args, index)?]);
+                }
+                "--session" | "--herdr-session" => {
+                    index += 1;
+                    options["session"] = json!(arg(&args, index)?);
+                }
+                "--timeout-ms" => {
+                    index += 1;
+                    timeout = arg(&args, index)?.parse()?;
+                }
+                "--no-attach" => no_attach = true,
+                "--dry-run" => options["dry_run"] = json!(true),
+                other => bail!("unknown herdr open option: {other}"),
+            }
+            index += 1;
+        }
+        ensure!(timeout <= 60000, "Herdr open observation limit is 60000ms");
+        let config = if let Some(config) = options.get("config") {
+            config.clone()
+        } else {
+            let source = crate::config::parse_at(
+                &std::fs::read_to_string(project.join(".ccb/ccb.config"))?,
+                Some(project),
+            )?;
+            crate::config::compile(
+                project,
+                source,
+                &json!({"pi":["pi"],"codex":["codex"],"claude":["claude"]}),
+            )?
+        };
+        let result =
+            crate::herdr_open::launch(project, config, &options, Duration::from_millis(timeout))?;
+        println!("{result}");
+        if !no_attach
+            && options["dry_run"] != true
+            && result["workspace_id"].is_string()
+            && std::io::stdin().is_terminal()
+            && std::io::stdout().is_terminal()
+        {
+            crate::herdr_open::attach(&options, &result)?;
+        }
+        return Ok(());
     }
     if op == "daemon" {
         let config = if args.len() == 1 && args[0] == "--config-stdin" {

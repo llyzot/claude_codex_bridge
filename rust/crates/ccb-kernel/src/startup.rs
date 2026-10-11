@@ -9,10 +9,10 @@ use std::{
     time::{Duration, Instant},
 };
 #[cfg(windows)]
-struct StandardHandles(Vec<(windows_sys::Win32::Foundation::HANDLE, u32)>);
+pub(crate) struct StandardHandles(Vec<(windows_sys::Win32::Foundation::HANDLE, u32)>);
 #[cfg(windows)]
 impl StandardHandles {
-    fn guard() -> Result<Self> {
+    pub(crate) fn guard() -> Result<Self> {
         use windows_sys::Win32::{Foundation::*, System::Console::*};
         let mut guard = Self(Vec::new());
         for kind in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {

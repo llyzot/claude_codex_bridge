@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "base_commit": "e6553196",
+  "recorded_at": "2026-10-11T21:08:00.662060+00:00",
+  "commands": [
+    "pend <agent|job-id> [legacy-count]",
+    "pend --inbox|--queue [--detail] <agent>",
+    "pend --watch <target> [--timeout-ms <ms>]",
+    "queue [--detail] [agent|all]"
+  ],
+  "api_operations": [
+    "pend",
+    "queue"
+  ],
+  "legacy_sources": [
+    "lib/cli/services/pend.py",
+    "lib/message_bureau/control_queue_runtime/views_runtime/summary.py",
+    "lib/cli/parser_runtime/commands.py"
+  ],
+  "back_is_command": false,
+  "real_models": false,
+  "production_install_changed": false,
+  "verification": {
+    "initial_observation_suite": "6 passed in 9.20s",
+    "broader_selection_before_nullable_option_refinement": "75 passed and one metrics assertion failed in 103.88s; history_reads/history_rows did not grow, newly added signature_reads did",
+    "final_observation_mailbox_view_security_selection": "46 passed in 59.22s",
+    "rust_unit_tests": "28 passed plus parent-invoked helper in 33.83s",
+    "format_clippy_diff": "passed",
+    "full_repository_run": false
+  },
+  "binary_sha256": {
+    "ccb-kernel.exe": "39a89124401c2baf77659ae091d3d2af3be341c7af7a4de97e35cbc590199705",
+    "ccb-native.exe": "a2898c85d5bde34220d9a866a62139335e615b9b600292176de1a5dbd65f82b4"
+  },
+  "repository_bin_matches_release": true,
+  "limits": [
+    "queue all remains cached summary even with --detail, matching legacy behavior",
+    "legacy pend count is syntax compatibility and does not select N history entries",
+    "mailbox_reply_ready is not proof of delivery completion or manual ack eligibility",
+    "other native command/API and production default parity remain open"
+  ]
+}

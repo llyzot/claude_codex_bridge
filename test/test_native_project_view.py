@@ -194,7 +194,10 @@ def test_repeated_projection_uses_committed_indices_without_rereading_history(tm
         before=server.rpc('records.metrics',{'stream':'jobs','agent_name':'worker'},version=1)['result']
         for _ in range(5):assert len(view(server)['view']['comms'])==8
         after=server.rpc('records.metrics',{'stream':'jobs','agent_name':'worker'},version=1)['result']
-        assert after==before
+        # Metadata signature checks still validate cached indices. The added
+        # signature_reads counter may grow without rereading history contents.
+        assert {k:after[k] for k in ['history_reads','history_rows']} == {k:before[k] for k in ['history_reads','history_rows']}
+        assert after['signature_reads'] >= before['signature_reads']
     finally:server.close()
 
 

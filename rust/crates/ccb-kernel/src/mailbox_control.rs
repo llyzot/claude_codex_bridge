@@ -74,16 +74,30 @@ impl Daemon {
     }
     pub(super) fn inbox_view(&mut self, p: &Value) -> Result<Value> {
         let agent = crate::records::string(p, "agent_name")?;
-        self.spec(agent)?;
         ensure!(
-            p.get("detail").is_none_or(Value::is_boolean),
+            p["detail"].is_null() || p["detail"].is_boolean(),
             "detail must be boolean"
         );
+        self.mailbox_observation(agent, p["detail"] == true)
+    }
+    pub(super) fn read_mailbox_summary(&mut self, agent: &str) -> Result<Value> {
+        self.kernel
+            .dispatch("mailbox.load", &json!({"agent_name":agent}))
+            .and_then(|v| {
+                if !v.is_null() {
+                    crate::validate_mailbox(&v)?;
+                    ensure!(v["agent_name"] == agent, "mailbox owner mismatch");
+                }
+                Ok(v)
+            })
+    }
+    pub(super) fn mailbox_observation(&mut self, agent: &str, detail: bool) -> Result<Value> {
+        self.spec(agent)?;
         let args = json!({"agent_name":agent});
         let events = self.kernel.dispatch("latest_events", &args)?;
         let rows = events.as_array().context("invalid inbox events")?;
         let pending_rows = rows.iter().filter(|e| pending(e)).collect::<Vec<_>>();
-        let cached = self.kernel.dispatch("mailbox.load", &args);
+        let cached = self.read_mailbox_summary(agent);
         let (summary, error) = match cached {
             Ok(v) => (v, Value::Null),
             Err(e) => (Value::Null, json!(e.to_string())),
@@ -128,7 +142,7 @@ impl Daemon {
             .map(|e| self.inbox_item(e, 1))
             .transpose()?
             .unwrap_or(Value::Null);
-        let items = if p["detail"] == true {
+        let items = if detail {
             pending_rows
                 .iter()
                 .enumerate()

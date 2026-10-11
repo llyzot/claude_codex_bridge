@@ -23,6 +23,8 @@ mod followup;
 mod herdr;
 #[path = "mailbox_control.rs"]
 mod mailbox_control;
+#[path = "observation.rs"]
+mod observation;
 #[path = "project_view.rs"]
 mod project_view;
 #[path = "daemon_reload.rs"]
@@ -488,23 +490,10 @@ impl Daemon {
             "submit" => self.submit(p),
             "resubmit" => self.resubmit(p),
             "watch" => self.watch(p),
+            "pend" => self.pend_view(p),
             "trace" => self.trace(p),
             "wait-summary" => self.wait_summary(p),
-            "queue" => {
-                let target = p["target"].as_str().unwrap_or("all");
-                let mut queues = Vec::new();
-                for agent in self
-                    .names()
-                    .into_iter()
-                    .filter(|a| target == "all" || a == target)
-                {
-                    let slot =
-                        json!({"state_id":self.state,"target_kind":"agent","target_name":agent});
-                    queues.push(json!({"agent_name":agent,"target_kind":"agent","target_name":agent,"active_job_id":self.kernel.dispatch("scheduler.active_job_for",&slot)?,"queued_job_ids":self.kernel.dispatch("scheduler.queued_items_for",&slot)?}));
-                }
-                ensure!(!queues.is_empty(), "unknown queue target");
-                Ok(json!({"target":target,"queues":queues}))
-            }
+            "queue" => self.queue_view(p),
             "provider-requests" => {
                 let agent = records::string(p, "agent_name")?;
                 let driver = self.spec(agent)?["driver_kind"].clone();

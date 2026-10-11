@@ -136,6 +136,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
         println!("ccb-native installation upgrade|recover|rollback --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]\nccb-native installation status --prefix <directory>");
         println!("ccb-native --state-root <dir> view [--limit <1..64>]");
+        println!("ccb-native --state-root <dir> queue [--detail] [agent|all]\nccb-native --state-root <dir> pend [--inbox|--queue] [--detail] <target>\nccb-native --state-root <dir> pend --watch <target> [--timeout-ms <ms>]");
         println!("ccb-native --state-root <dir> followup <job-id> --message <text> [--operation-id <uuid>] [--timeout-ms <0..60000>]\nccb-native --state-root <dir> followup-status <followup-id>");
         println!("ccb-native [--project <directory>] inbox [--detail] <agent>\nccb-native [--project <directory>] ack <agent> [inbound-event-id]");
         println!(
@@ -696,6 +697,9 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     if op == "clear" || op == "compact" {
         return crate::cli_context::run(&root, &op, &args);
     }
+    if op == "pend" || op == "queue" {
+        return crate::cli_observation::run(&root, &op, &args);
+    }
     if op == "followup" {
         return crate::cli_followup::run(&root, &args);
     }
@@ -816,7 +820,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             ensure!(args.is_empty(), "command takes no arguments");
             json!({})
         }
-        "watch" | "get" | "pend" => {
+        "watch" | "get" => {
             return crate::cli_tasks::watch(&root, &args);
         }
         "cancel" => {
@@ -834,7 +838,6 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             ensure!(args.len() == 1, "job recovery requires a target Job");
             json!({"target":arg(&args,0)?})
         }
-        "queue" => json!({"target":args.first().and_then(|s|s.to_str()).unwrap_or("all")}),
         "provider-status" => {
             ensure!(args.len() == 1, "provider-status requires an agent");
             json!({"agent_name":arg(&args,0)?})

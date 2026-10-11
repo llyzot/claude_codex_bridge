@@ -207,12 +207,12 @@ pub fn watch(root: &Path, args: &[OsString]) -> Result<()> {
             .as_u64()
             .context("watch response has no cursor")?;
         if !wait || row["terminal"] == true {
-            println!("{row}");
+            println!("{}", crate::cli::request_preview(&row));
             return Ok(());
         }
         if start.elapsed() >= Duration::from_millis(timeout) {
             row["observation_timed_out"] = json!(true);
-            println!("{row}");
+            println!("{}", crate::cli::request_preview(&row));
             bail!("watch observation timed out; the Job remains available under its existing identity");
         }
         std::thread::sleep(

@@ -111,7 +111,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             "{}",
             json!({"schema_version":1,"service":"ccb-native","runtime":"rust",
             "version":crate::installation::version(),"core_version":env!("CARGO_PKG_VERSION"),
-            "public_api_version":2,"herdr_open":{"experimental":true,"supported":cfg!(windows),"terminal_providers":["pi","codex"],"background_startup":true},"native_prefix_installation":{"schema_version":1,
+            "public_api_version":2,"herdr_open":{"experimental":true,"supported":cfg!(windows),"terminal_providers":["pi","codex"],"background_startup":true,"quiescent_stopped_recovery":true},"native_prefix_installation":{"schema_version":1,
                 "supported":cfg!(all(windows,target_arch="x86_64")),"commands":["ccb","ask","ccb-native"],
                 "modifies_account_settings":false,"in_place_upgrade":true,"upgrade_requires_stopped_commands":true,
                 "upgrade_recovery":true,"program_file_rollback":true,"runtime_state_rollback":false}})
@@ -135,7 +135,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
         println!("ccb-native installation upgrade|recover|rollback --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]\nccb-native installation status --prefix <directory>");
         println!("ccb-native --state-root <dir> view [--limit <1..64>]");
-        println!("ccb-native [--project <directory>] herdr open [--herdr-exe <path>] [--session <name>] [--options <json>] [--no-attach] [--timeout-ms <0..60000>] [--dry-run]");
+        println!("ccb-native [--project <directory>] herdr open [--herdr-exe <path>] [--session <name>] [--options <json>] [--no-attach] [--timeout-ms <0..60000>] [--dry-run] [--recover-stopped]");
         println!("ccb-native --state-root <dir> clear|compact [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> context-status <operation-id>");
         println!("ccb-native --state-root <dir> restart [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> restart-status [operation-id]");
         return Ok(());
@@ -447,6 +447,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
                     timeout = arg(&args, index)?.parse()?;
                 }
                 "--no-attach" => no_attach = true,
+                "--recover-stopped" => options["recover_stopped"] = json!(true),
                 "--dry-run" => options["dry_run"] = json!(true),
                 other => bail!("unknown herdr open option: {other}"),
             }

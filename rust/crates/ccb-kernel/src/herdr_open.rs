@@ -9,6 +9,8 @@ use std::{
     time::{Duration, Instant},
 };
 const RECORD: &str = "herdr-open.json";
+#[path = "herdr_recovery.rs"]
+mod recovery;
 fn hash(v: &Value) -> Result<String> {
     Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(v)?)))
 }
@@ -153,7 +155,12 @@ fn path_env(spec: &mut Value, native: &Path) -> Result<()> {
     spec["env"]["PATH"] = json!(std::env::join_paths(paths)?.to_string_lossy());
     Ok(())
 }
-fn prepare_request(project: &Path, config: &Value, options: &Value) -> Result<(Value, Value)> {
+fn prepare_request(
+    project: &Path,
+    config: &Value,
+    options: &Value,
+    resume: &Value,
+) -> Result<(Value, Value)> {
     let mut base = config.clone();
     let mut arguments = json!({});
     let mut bridges = json!({});
@@ -197,6 +204,9 @@ fn prepare_request(project: &Path, config: &Value, options: &Value) -> Result<(V
                 bridge["interactive_args"].clone(),
             )?);
             bridges[name] = bridge["bridge"].clone();
+        }
+        if let Some(extra) = resume.get(name) {
+            args.extend(serde_json::from_value::<Vec<String>>(extra.clone())?);
         }
         spec["command"] = Value::Null;
         spec["driver_kind"] = Value::Null;
@@ -515,7 +525,8 @@ pub(crate) fn open(
             }
         }
     }
-    let (request, bridges) = prepare_request(project, &config, options)?;
+    let (mut request, mut bridges) =
+        prepare_request(project, &config, options, &record["resume_args"])?;
     let signature = hash(&json!([
         request,
         options["history_roots"],
@@ -538,6 +549,22 @@ pub(crate) fn open(
     }
     let deadline = Instant::now() + wait;
     loop {
+        if !recovery::step(
+            project,
+            &config,
+            options,
+            &root,
+            &mut record,
+            &mut request,
+            &mut bridges,
+        )? {
+            save(&root, &record)?;
+            if Instant::now() >= deadline {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(250));
+            continue;
+        }
         if !server(&request, &root, &mut record)? {
             record["phase"] = json!("server_starting");
         } else {
@@ -653,6 +680,9 @@ pub(crate) fn open(
             }
         }
         save(&root, &record)?;
+        if record["phase"] == "running" {
+            recovery::finish(&root, &record)?;
+        }
         if record["phase"] == "running"
             || record["phase"] == "namespace_uncertain"
             || Instant::now() >= deadline
@@ -675,6 +705,7 @@ pub(crate) fn launch(
     ensure!(options.is_object(), "Herdr options must be an object");
     for (key, valid) in [
         ("dry_run", options["dry_run"].is_boolean()),
+        ("recover_stopped", options["recover_stopped"].is_boolean()),
         ("session", options["session"].is_string()),
         (
             "transport_timeout_ms",

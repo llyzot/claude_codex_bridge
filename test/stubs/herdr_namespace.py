@@ -23,6 +23,9 @@ def environment():return dict(args[i+1].split('=',1) for i,value in enumerate(ar
 def save():
     temporary=state_file.with_suffix('.tmp');temporary.write_text(json.dumps(state),encoding='utf-8');temporary.replace(state_file)
 if args==['server']:
+    if state.get('restore_without_tokens'):
+        for row in state['workspaces'].values():row.pop('tokens',None)
+        for row in state['panes'].values():row.pop('tokens',None);row['terminal_id']=str(uuid.uuid4())
     state['server_running']=True;state['server_pid']=os.getpid();save()
     while not (root/'stop-server').exists():time.sleep(.1)
     sys.exit(0)
@@ -77,6 +80,12 @@ elif args[:2]==['workspace','create']:
     pane={'pane_id':pid,'workspace_id':wid,'tokens':{},'cwd':option('--cwd'),'terminal_id':str(uuid.uuid4()),'env':environment()}
     state['workspaces'][wid]=workspace;state['panes'][pid]=pane;save()
     result={'workspace':workspace,'root_pane':pane}
+elif args[:2]==['workspace','close']:
+    wid=args[2];assert '--group' not in args
+    del state['workspaces'][wid]
+    state['panes']={k:v for k,v in state['panes'].items() if v['workspace_id']!=wid}
+    state['agents']={k:v for k,v in state.get('agents',{}).items() if v['workspace_id']!=wid}
+    save();result={'status':'ok'}
 elif args[:2]==['pane','split']:
     assert '--no-focus' in args and '--focus' not in args
     parent=state['panes'][args[2]];wid=parent['workspace_id']

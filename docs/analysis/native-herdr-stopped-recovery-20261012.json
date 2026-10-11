@@ -1,0 +1,269 @@
+{
+  "schema_version": 1,
+  "base_commit": "fcf2f519",
+  "recorded_at": "2026-10-11T16:48:09.744611+00:00",
+  "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-rust-foreground-c43bdcf5",
+  "session": "ccb-rust-foreground-c43bdcf5",
+  "recovery": {
+    "phase": "complete",
+    "operation_id": "546cc1f2-fe14-4636-9ec3-02d109f3d257",
+    "old_workspace_id": "w1",
+    "new_workspace_id": "w2",
+    "sessions": {
+      "lead": {
+        "args": [
+          "--session",
+          "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-rust-foreground-c43bdcf5-project--\\2026-10-11T15-34-21-442Z_01a12b99-ca02-774f-8690-bbf38c3f0bd3.jsonl"
+        ],
+        "path": "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-rust-foreground-c43bdcf5-project--\\2026-10-11T15-34-21-442Z_01a12b99-ca02-774f-8690-bbf38c3f0bd3.jsonl",
+        "provider": "pi",
+        "session_id": "01a12b99-ca02-774f-8690-bbf38c3f0bd3"
+      },
+      "worker": {
+        "args": [],
+        "fresh": true,
+        "provider": "codex"
+      }
+    }
+  },
+  "processes": {
+    "server": {
+      "created": "134362105506483760",
+      "pid": 57532,
+      "windows_session": 1
+    },
+    "agents": {
+      "lead": {
+        "created": "134362105531621815",
+        "pid": 31332,
+        "windows_session": 1
+      },
+      "worker": {
+        "created": "134362105565406856",
+        "pid": 56212,
+        "windows_session": 1
+      }
+    },
+    "daemon_pid": 59284
+  },
+  "jobs": [
+    {
+      "job_id": "job_48f710c40837",
+      "agent": "lead",
+      "status": "completed",
+      "created_at": "2026-10-11T15:54:07.885065700Z",
+      "updated_at": "2026-10-11T15:54:13.099231700Z",
+      "terminal_decision": {
+        "anchor_seen": true,
+        "confidence": "exact",
+        "diagnostics": {
+          "completion_authority": "pi_extension_agent_settled",
+          "native_execution_instance": "f06b9a0f-abec-4711-b792-97c9ec0de767",
+          "pi_bridge": {
+            "instance": "25085a33-d24d-48ca-a31e-388fd44a823e",
+            "owner": "b2eb9319-2726-4b3a-ad89-9da696295c29",
+            "process": {
+              "created": "134362064612439217",
+              "pid": 25812,
+              "windows_session": 1
+            },
+            "schema_version": 1,
+            "session_path": "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-rust-foreground-c43bdcf5-project--\\2026-10-11T15-34-21-442Z_01a12b99-ca02-774f-8690-bbf38c3f0bd3.jsonl"
+          },
+          "request_anchor": "job_48f710c40837:f06b9a0f-abec-4711-b792-97c9ec0de767",
+          "session_id": "01a12b99-ca02-774f-8690-bbf38c3f0bd3",
+          "turn_id": "db4ea3d7-cba6-436f-a2e3-f006005f9534"
+        },
+        "finished_at": "2026-10-11T15:54:13.099231700Z",
+        "provider_turn_ref": "db4ea3d7-cba6-436f-a2e3-f006005f9534",
+        "reason": "pi_agent_settled",
+        "record_type": "completion_decision",
+        "reply": "§2§ FOREGROUND_READY_OK",
+        "reply_stable": true,
+        "reply_started": true,
+        "schema_version": 2,
+        "source_cursor": {
+          "event_seq": null,
+          "line_no": null,
+          "offset": 2898,
+          "opaque_cursor": null,
+          "record_type": "completion_cursor",
+          "schema_version": 2,
+          "session_path": "C:\\Users\\user\\Desktop\\work\\ccb-rust-foreground-c43bdcf5\\project\\.ccb/ccbd\\pi-terminal-events\\lead\\25085a33-d24d-48ca-a31e-388fd44a823e.jsonl",
+          "source_kind": "session_event_log",
+          "updated_at": "2026-10-11T15:54:13.099227300Z"
+        },
+        "status": "completed",
+        "terminal": true
+      }
+    },
+    {
+      "job_id": "job_f8ea871c9d94",
+      "agent": "lead",
+      "status": "completed",
+      "created_at": "2026-10-11T16:45:20.301478300Z",
+      "updated_at": "2026-10-11T16:45:25.629571700Z",
+      "terminal_decision": {
+        "anchor_seen": true,
+        "confidence": "exact",
+        "diagnostics": {
+          "completion_authority": "pi_extension_agent_settled",
+          "native_execution_instance": "0cc67a8a-d330-4003-a3d6-c5dcb9a51c8d",
+          "pi_bridge": {
+            "instance": "e18f8d7a-ed97-4001-8b6b-c263705dca5c",
+            "owner": "b2eb9319-2726-4b3a-ad89-9da696295c29",
+            "process": {
+              "created": "134362105531621815",
+              "pid": 31332,
+              "windows_session": 1
+            },
+            "schema_version": 1,
+            "session_path": "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-rust-foreground-c43bdcf5-project--\\2026-10-11T15-34-21-442Z_01a12b99-ca02-774f-8690-bbf38c3f0bd3.jsonl"
+          },
+          "request_anchor": "job_f8ea871c9d94:0cc67a8a-d330-4003-a3d6-c5dcb9a51c8d",
+          "session_id": "01a12b99-ca02-774f-8690-bbf38c3f0bd3",
+          "turn_id": "949ae98e-a1c6-48d6-8a56-75efa21eb005"
+        },
+        "finished_at": "2026-10-11T16:45:25.629571700Z",
+        "provider_turn_ref": "949ae98e-a1c6-48d6-8a56-75efa21eb005",
+        "reason": "pi_agent_settled",
+        "record_type": "completion_decision",
+        "reply": "§4§ FOREGROUND_READY_OK RECOVERY_MEMORY_OK",
+        "reply_stable": true,
+        "reply_started": true,
+        "schema_version": 2,
+        "source_cursor": {
+          "event_seq": null,
+          "line_no": null,
+          "offset": 2917,
+          "opaque_cursor": null,
+          "record_type": "completion_cursor",
+          "schema_version": 2,
+          "session_path": "C:\\Users\\user\\Desktop\\work\\ccb-rust-foreground-c43bdcf5\\project\\.ccb/ccbd\\pi-terminal-events\\lead\\e18f8d7a-ed97-4001-8b6b-c263705dca5c.jsonl",
+          "source_kind": "session_event_log",
+          "updated_at": "2026-10-11T16:45:25.629570Z"
+        },
+        "status": "completed",
+        "terminal": true
+      }
+    },
+    {
+      "job_id": "job_87c848f258ce",
+      "agent": "lead",
+      "status": "completed",
+      "created_at": "2026-10-11T16:45:48.507184400Z",
+      "updated_at": "2026-10-11T16:46:02.510802200Z",
+      "terminal_decision": {
+        "anchor_seen": true,
+        "chain_child_job_id": "job_64d11c5dca68",
+        "chain_edge_id": "cb_f7d9861b373c",
+        "confidence": "exact",
+        "delegated": true,
+        "diagnostics": {
+          "completion_authority": "pi_extension_agent_settled",
+          "native_execution_instance": "e365d30d-e009-4a9a-8544-e794ae02d85a",
+          "pi_bridge": {
+            "instance": "e18f8d7a-ed97-4001-8b6b-c263705dca5c",
+            "owner": "b2eb9319-2726-4b3a-ad89-9da696295c29",
+            "process": {
+              "created": "134362105531621815",
+              "pid": 31332,
+              "windows_session": 1
+            },
+            "schema_version": 1,
+            "session_path": "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-rust-foreground-c43bdcf5-project--\\2026-10-11T15-34-21-442Z_01a12b99-ca02-774f-8690-bbf38c3f0bd3.jsonl"
+          },
+          "request_anchor": "job_87c848f258ce:e365d30d-e009-4a9a-8544-e794ae02d85a",
+          "session_id": "01a12b99-ca02-774f-8690-bbf38c3f0bd3",
+          "turn_id": "bbc1087a-c3b7-4c27-89b4-11ec655f4cae"
+        },
+        "finished_at": "2026-10-11T16:46:02.510802200Z",
+        "provider_turn_ref": "bbc1087a-c3b7-4c27-89b4-11ec655f4cae",
+        "reason": "pi_agent_settled",
+        "record_type": "completion_decision",
+        "reply": "§8§ Submitted to worker using native `ask --chain`.",
+        "reply_stable": true,
+        "reply_started": true,
+        "schema_version": 2,
+        "source_cursor": {
+          "event_seq": null,
+          "line_no": null,
+          "offset": 5252,
+          "opaque_cursor": null,
+          "record_type": "completion_cursor",
+          "schema_version": 2,
+          "session_path": "C:\\Users\\user\\Desktop\\work\\ccb-rust-foreground-c43bdcf5\\project\\.ccb/ccbd\\pi-terminal-events\\lead\\e18f8d7a-ed97-4001-8b6b-c263705dca5c.jsonl",
+          "source_kind": "session_event_log",
+          "updated_at": "2026-10-11T16:46:02.510800200Z"
+        },
+        "status": "completed",
+        "suppress_reply": true,
+        "terminal": true
+      }
+    },
+    {
+      "job_id": "job_64d11c5dca68",
+      "agent": "worker",
+      "status": "running",
+      "created_at": "2026-10-11T16:45:57.368473100Z",
+      "updated_at": "2026-10-11T16:45:57.384264400Z",
+      "terminal_decision": null
+    }
+  ],
+  "worker_fault": {
+    "agent_name": "worker",
+    "daemon_instance_id": "daemon-70650180eb33406eadc43236cbcd34d4",
+    "execution_instance_id": "28a6cd04-ba36-4e26-b583-2cb73f8c11b1",
+    "fault_id": "3bcce357-0c76-48f2-9ece-66e5838d03e3",
+    "io_error_kind": null,
+    "job_id": "job_64d11c5dca68",
+    "observed_at": "2026-10-11T16:45:58.385015200Z",
+    "phase": "poll",
+    "pid": 56212,
+    "project_id": "a8d99528d7105191e6935a6ec5b8d07c3c3cf6eabd790da8c035cc508f392ca8",
+    "provider": "codex",
+    "reason": "provider_protocol_error",
+    "record_type": "native_provider_fault",
+    "runtime_instance_id": "28a6cd04-ba36-4e26-b583-2cb73f8c11b1",
+    "schema_version": 1,
+    "status": "blocked"
+  },
+  "memory_continuity": "Pi recalled FOREGROUND_READY_OK without files/tools and returned RECOVERY_MEMORY_OK in the original native session.",
+  "chain_result": "Not passed: Codex process exited and request text reached pwsh; no matching Codex rollout found. Rust quarantined the execution without replay. Cause of Codex exit is unconfirmed.",
+  "configuration_limit": "Open request identity includes synthesized PATH. Calling from a different shell environment was refused; original Windows Terminal/pwsh context recovered successfully.",
+  "production_install_changed": false,
+  "cleanup": {
+    "pending": false,
+    "named_test_server_stopped": true,
+    "native_daemon_stopped": true,
+    "recorded_pids_no_longer_observable": {
+      "57532": true,
+      "59284": true,
+      "31332": true,
+      "56212": true
+    },
+    "unfinished_job_retained": true,
+    "process_observations": {
+      "57532": {
+        "exit_code": 1,
+        "detail": "ccb-native: 参数错误。 (os error 87)"
+      },
+      "59284": {
+        "exit_code": 1,
+        "detail": "ccb-native: 参数错误。 (os error 87)"
+      },
+      "31332": {
+        "exit_code": 1,
+        "detail": "ccb-native: 参数错误。 (os error 87)"
+      },
+      "56212": {
+        "exit_code": 1,
+        "detail": "ccb-native: 参数错误。 (os error 87)"
+      }
+    }
+  },
+  "release_sha256": {
+    "ccb-kernel.exe": "b27e8b2272b3408102220e81dc429aae185c414ac84594926e1e8448d2542d4a",
+    "ccb-native.exe": "47401c8fe51034e46b9d2c21609cac3752d43a09df53c27ba8ee8dcbb05de85c"
+  }
+}

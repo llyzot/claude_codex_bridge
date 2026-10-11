@@ -27,6 +27,9 @@ mod reload;
 pub fn validate_startup(kernel: &mut Kernel, config: &Value) -> Result<()> {
     reload::startup_guard(kernel, config)
 }
+pub(crate) fn recovery_blockers(kernel: &mut Kernel, names: &[String]) -> Result<Vec<Value>> {
+    reload::blockers(kernel, names)
+}
 
 pub fn now() -> String {
     let time = SystemTime::now()

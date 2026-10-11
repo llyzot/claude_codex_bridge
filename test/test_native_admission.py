@@ -21,6 +21,7 @@ from storage.paths import PathLayout
 
 ROOT = Path(__file__).resolve().parents[1]
 BIN = ROOT/'rust'/'target'/'debug'/('ccb-kernel.exe' if os.name == 'nt' else 'ccb-kernel')
+BIN = Path(os.environ.get('CCB_TEST_KERNEL_BIN') or BIN)
 NOW = '2026-10-11T10:00:00Z'
 NAMES = ['pi_lead', 'codex_worker', 'claude_reviewer']
 

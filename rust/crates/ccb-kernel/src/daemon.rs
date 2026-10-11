@@ -444,8 +444,10 @@ impl Daemon {
                     "native cancel requires a running owned provider task"
                 );
                 let agent = records::string(&job, "agent_name")?.to_owned();
-                if let Some(session) = self.pi.get_mut(&agent) {
-                    session.abort(id, p["record_reply"] != false)?;
+                if let Some(session) = self.pi.get(&agent) {
+                    let record_reply = p["record_reply"] != false;
+                    session.validate_interrupt(id, record_reply)?;
+                    self.mark_provider_cancel(job, record_reply, false)?;
                 } else if let Some(session) = self.codex.get(&agent) {
                     let record_reply = p["record_reply"] != false;
                     session.validate_interrupt(id, record_reply)?;
@@ -680,6 +682,22 @@ impl Daemon {
             &json!({"state_id":self.state,"jobs":[job]}),
         )?;
         Ok(job)
+    }
+    fn has_dispatchable_work(&mut self, agent: &str) -> Result<bool> {
+        let slot = json!({"state_id":self.state,"target_kind":"agent","target_name":agent});
+        if !self
+            .kernel
+            .dispatch("scheduler.active_job_for", &slot)?
+            .is_null()
+        {
+            return Ok(false);
+        }
+        // Replies materialize their receiver Job only when execution starts.
+        // Queue depth alone therefore misses a closed Lead's pending inbox.
+        Ok(!self
+            .kernel
+            .dispatch("peek_next", &json!({"agent_name":agent}))?
+            .is_null())
     }
     fn start(&mut self, agent: &str) -> Result<Value> {
         let slot = json!({"state_id":self.state,"target_kind":"agent","target_name":agent});
@@ -923,6 +941,11 @@ impl Daemon {
             }
             let spec = self.spec(&agent)?;
             if spec["driver_kind"] == "pi_rpc" {
+                if self.pi.get(&agent).is_some_and(|session| session.closed)
+                    && self.has_dispatchable_work(&agent)?
+                {
+                    self.pi.remove(&agent);
+                }
                 if !self.pi.contains_key(&agent) {
                     let saved = self
                         .kernel
@@ -939,6 +962,10 @@ impl Daemon {
                     let session =
                         crate::pi_rpc::Session::spawn(&agent, &spec, endpoint, token_path, &saved)?;
                     self.pi.insert(agent.clone(), session);
+                }
+                if let Some(id) = self.pi[&agent].active_job_id().map(str::to_owned) {
+                    let job = self.get_job(&id)?;
+                    self.pi.get_mut(&agent).unwrap().sync_job(&job)?;
                 }
                 let (completion, metadata, ready) = {
                     let session = self.pi.get_mut(&agent).unwrap();
@@ -967,6 +994,12 @@ impl Daemon {
                         return Err(error);
                     }
                     self.kernel.store.commit()?;
+                } else if self.pi[&agent].deadline_due() {
+                    let id = self.pi[&agent].active_job_id().unwrap().to_owned();
+                    let job = self.get_job(&id)?;
+                    let marked = self.mark_provider_cancel(job, true, true)?;
+                    self.kernel.store.commit()?;
+                    self.pi.get_mut(&agent).unwrap().sync_job(&marked)?;
                 }
                 if ready {
                     let checkpoint = self.kernel.memory_checkpoint();
@@ -988,6 +1021,11 @@ impl Daemon {
                 continue;
             }
             if spec["driver_kind"] == "codex_app_server" {
+                if self.codex.get(&agent).is_some_and(|session| session.closed)
+                    && self.has_dispatchable_work(&agent)?
+                {
+                    self.codex.remove(&agent);
+                }
                 if !self.codex.contains_key(&agent) {
                     let saved = self
                         .kernel
@@ -1062,14 +1100,9 @@ impl Daemon {
                     .claude
                     .get(&agent)
                     .is_some_and(|session| session.closed)
+                    && self.has_dispatchable_work(&agent)?
                 {
-                    let depth = self.kernel.dispatch(
-                        "scheduler.queue_depth_for",
-                        &json!({"state_id":self.state,"target_kind":"agent","target_name":agent}),
-                    )?;
-                    if depth.as_u64().unwrap_or(0) > 0 {
-                        self.claude.remove(&agent);
-                    }
+                    self.claude.remove(&agent);
                 }
                 if !self.claude.contains_key(&agent) {
                     let saved = self

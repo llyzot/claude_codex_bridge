@@ -14,6 +14,7 @@ from native_kernel import KernelClient
 
 ROOT=Path(__file__).resolve().parents[1]
 BIN=ROOT/'rust'/'target'/'debug'/('ccb-kernel.exe' if os.name=='nt' else 'ccb-kernel')
+BIN=Path(os.environ.get('CCB_TEST_KERNEL_BIN') or BIN)
 
 @pytest.fixture
 def server(tmp_path,monkeypatch):

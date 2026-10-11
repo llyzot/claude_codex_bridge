@@ -97,10 +97,13 @@
     "Installed Claude Code 2.1.296 accepted private no-model initialize/idle-interrupt and direct idle-interrupt controls without user prompts or login changes",
     "Native CLI discovers project configuration and existing Pi/Codex/Claude executables, infers normal ask project/sender context and follows project/runtime-home/reference state placement",
     "Background native startup uses a private configuration pipe, cross-process launch lock, durable startup UUID/PID/config fingerprint and authenticated readiness; matching live daemons are reused and observation expiry does not restart them",
-    "Windows startup fences caller standard handle inheritance, preserves background lifetime, rejects invalid configuration before runtime writes and protects live foreign or changed-config owners"
+    "Windows startup fences caller standard handle inheritance, preserves background lifetime, rejects invalid configuration before runtime writes and protects live foreign or changed-config owners",
+    "Owned Pi/Codex process exit leaves the daemon and other Agents available, preserves buffered verified results, and waits for observed exit plus drained output before missing-result fallback or process replacement",
+    "Mailbox-aware dispatch restarts closed Pi/Codex/Claude sessions for ordinary reply delivery as well as queued tasks, while old running executions and live or uncertain transport failures remain fenced",
+    "Pi cancellation/deadlines commit Job/Event intent before abort IO, synchronize immutable execution identity, send abort once, preserve silent policy on provider exit and retain intent across daemon death without uncertain-task replay"
   ],
   "remaining": [
-    "Finish ordinary terminal-result recovery and explicit cancellation/termination orchestration; reconcile uncertain running executions after daemon restart",
+    "Finish ordinary terminal-result recovery, provider startup/protocol-error isolation and explicit cancellation/forced-termination orchestration; reconcile uncertain running executions after daemon restart",
     "Migrate Git tree observation, provider completion/control adapters and remaining failure-notice orchestration",
     "Complete public API-2/CLI/config-schema/worktree/role parity and full Keeper/reload integration; verify non-Windows process lifetime and default native routing",
     "Finish native CLI/provider command composition and installer integration after interface parity",
@@ -108,9 +111,14 @@
     "Verify actual Claude Lead callback with credentials and actual Herdr-integrated Pi/Codex execution in isolated Windows projects",
     "Measure startup, idle CPU/RSS, receipt and callback p50/p95 against Python baseline",
     "Validate state compatibility, crash points, rollback and default Rust ownership",
-    "Remove transitional Python core dependencies after native runtime parity is proven"
+    "Remove transitional Python core dependencies after native runtime parity is proven",
+    "Reconcile legacy Python provider test assumptions with the user-approved live-resource behavior and Windows fixtures; wider repository regression is not yet green"
   ],
   "verification": {
+    "native_provider_lifetime": "18 final-release fixture cases passed: idle/active Pi and Codex exits isolate the daemon and continue FIFO on a new owned process, buffered correlated completion survives exit and bounded reader batches, explicit stdout-holder release fences fallback, Pi silent/idempotent cancellation and deadlines read committed intent/events at abort IO, daemon death retains cancellation without replay, failed Workers automatically resume a persistent Pi Lead, and ordinary mailbox replies wake closed Pi/Codex/Claude Leads",
+    "native_lifetime_current_suite": "All 224 selected Rust kernel/CLI contract cases passed against final release artifacts in 335.73s; Rust tests 7 passed, fmt check and clippy all-targets with warnings denied passed. Repository bin hashes match release builds; production installation and existing agents were unchanged",
+    "native_test_artifact_selection": "Six older admission/completion/control-plane/kernel/lifecycle/record harnesses now honor CCB_TEST_KERNEL_BIN. A preceding focused release run passed 81 cases; the final 224-case run covers all selected contracts after the mailbox wake fix",
+    "native_prefix_exploratory_suite": "Exploratory broad test_native prefix selection collected 360 cases: 295 passed and 65 failed, all failures in the older Python test_native_cli_provider_execution.py and test_native_cli_providers.py. Failures include Windows symlink privileges, missing POSIX executable fixtures, historical Pi snapshot assertions and legacy home/env expectations. This is not a green whole-repository claim or proof of baseline compatibility; these files and production Python code were not changed by this checkpoint",
     "native_project_startup": "12 final-release startup cases passed: parent/captured-pipe return and background lifetime, inferred project ask, idempotent start, config/foreign-owner rejection, zero-observation reuse of same startup PID/UUID, compact nested project config, both state relocations, discovery without execution, invalid preflight without writes, concurrent start and Agent environment context",
     "startup_current_suite": "Release suite 206 cases: 205 passed and one Windows metadata-open sharing transient in the test observer. Observer now retries the same confirmed-live process; all 26 startup/Claude-control cases passed after repair. Rust tests 7 and clippy warnings denied; Windows launcher Rust 3 and entry/packaging tests 14 passed",
     "native_installed_discovery": "Read-only config compilation in a new temp project resolved existing Node + earendil Pi entry, native Codex vendor exe and local Claude exe without a manifest; no provider or model launched",
@@ -138,7 +146,7 @@
     "result_policy_differential": "14 retry/notice cases match the existing Python oracle, including boolean policy opt-out and structured permission code precedence over auth message text",
     "result_policy_integration": "56 existing retry/empty-result/callback/finalization cases passed in native mode",
     "daemon_scope": "Real model-backed Pi Lead/Codex Worker automatic callback verified; native Claude protocol and actual unauthenticated failure verified, but successful Claude inference and Herdr execution remain unverified. Unknown prior running executions remain fenced, not automatically replayed",
-    "native_contract_tests": 206,
+    "native_contract_tests": 224,
     "native_claude_release": "All 6 Claude stream contracts passed on final release; complete debug contract suite 130 passed; Rust tests 5 passed and clippy warnings denied",
     "native_provider_suite": "Complete debug suite 123 passed before adding delayed-idle case; all 15 final Pi/Codex provider contracts passed on final release; Rust 5 passed and clippy warnings denied",
     "native_cli_pi_release": "8 CLI/security/Pi RPC cases passed on final release executables, including installed Pi get_state handshake; final debug contract suite 114 passed",

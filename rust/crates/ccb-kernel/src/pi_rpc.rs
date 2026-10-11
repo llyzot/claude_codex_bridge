@@ -18,17 +18,26 @@ struct Turn {
     decision: Option<Value>,
     session_id: String,
     cancel: Option<bool>,
+    abort_sent: bool,
     started: Instant,
     deadline_triggered: bool,
+}
+enum StreamEvent {
+    Record(Value),
+    End,
 }
 pub struct Session {
     child: Child,
     commands: mpsc::SyncSender<Value>,
-    events: mpsc::Receiver<Value>,
+    events: mpsc::Receiver<StreamEvent>,
     init: String,
     pub runtime: String,
     pub state: Value,
     pub ready: bool,
+    pub closed: bool,
+    stdout_closed: bool,
+    input_closed: bool,
+    saved_state: Value,
     active: Option<Turn>,
     pub dirty: bool,
     expected_session: String,
@@ -129,7 +138,7 @@ impl Session {
                     Ok(0) => break,
                     Ok(_) if line.len() <= 8 * 1024 * 1024 => {
                         if let Ok(record) = serde_json::from_slice::<Value>(&line) {
-                            if sender.send(record).is_err() {
+                            if sender.send(StreamEvent::Record(record)).is_err() {
                                 break;
                             }
                         }
@@ -137,6 +146,7 @@ impl Session {
                     _ => break,
                 }
             }
+            let _ = sender.send(StreamEvent::End);
         });
         let runtime = uuid::Uuid::new_v4().to_string();
         let init = format!("init-{runtime}");
@@ -151,6 +161,10 @@ impl Session {
             runtime,
             state: Value::Null,
             ready: false,
+            closed: false,
+            stdout_closed: false,
+            input_closed: false,
+            saved_state: saved["state"].clone(),
             active: None,
             dirty: false,
             expected_session,
@@ -175,9 +189,10 @@ impl Session {
                 .as_str()
                 .context("missing Pi prompt")?
         );
-        self.commands
-            .try_send(json!({"id":id,"type":"prompt","message":message}))
-            .context("Pi prompt queue unavailable")?;
+        self.input_closed |= !enqueue(
+            &self.commands,
+            json!({"id":id,"type":"prompt","message":message}),
+        )?;
         self.active = Some(Turn {
             job: job.clone(),
             id,
@@ -192,6 +207,7 @@ impl Session {
                 .context("Pi session identity unavailable")?
                 .to_owned(),
             cancel: None,
+            abort_sent: false,
             started: Instant::now(),
             deadline_triggered: false,
         });
@@ -199,37 +215,28 @@ impl Session {
         Ok(())
     }
     pub fn poll(&mut self) -> Result<Option<(Value, Value)>> {
-        if self.timeout_s > 0.0
-            && self.active.as_ref().is_some_and(|turn| {
-                turn.cancel.is_none() && turn.started.elapsed().as_secs_f64() > self.timeout_s
-            })
-        {
-            let id = self.active.as_ref().unwrap().job["job_id"]
-                .as_str()
-                .unwrap()
-                .to_owned();
-            self.abort(&id, true)?;
-            self.active.as_mut().unwrap().deadline_triggered = true;
+        if self.closed && self.active.is_none() {
+            return Ok(None);
         }
         for _ in 0..128 {
             let Ok(record) = self.events.try_recv() else {
                 break;
             };
-            self.ingest(&record)?;
-        }
-        if let Some(exit) = self.child.try_wait()? {
-            self.ready = false;
-            if let Some(turn) = self.active.take() {
-                return Ok(Some((
-                    turn.job,
-                    failure(
-                        "incomplete",
-                        "pi_process_exit",
-                        &format!("Pi exited before settled completion: {exit}"),
-                    ),
-                )));
+            match record {
+                StreamEvent::Record(record) => self.ingest(&record)?,
+                StreamEvent::End => self.stdout_closed = true,
             }
-            anyhow::bail!("Pi RPC session exited");
+        }
+        let exit = self.child.try_wait()?;
+        if exit.is_some() || self.stdout_closed || self.input_closed {
+            self.ready = false;
+        }
+        if exit.is_some() && self.state["process_state"] != "exited" {
+            if self.state.is_null() {
+                self.state = self.saved_state.clone();
+            }
+            self.state["process_state"] = json!("exited");
+            self.dirty = true;
         }
         if self
             .active
@@ -237,21 +244,91 @@ impl Session {
             .is_some_and(|turn| turn.decision.is_some())
         {
             let turn = self.active.take().unwrap();
-            self.ready = true;
-            return Ok(Some((turn.job, turn.decision.unwrap())));
+            self.closed = exit.is_some() && self.stdout_closed;
+            self.ready = exit.is_none() && !self.stdout_closed && !self.input_closed;
+            let mut decision = turn.decision.clone().unwrap();
+            control_diagnostics(&turn, &mut decision);
+            return Ok(Some((turn.job, decision)));
+        }
+        // Process exit alone does not prove that the bounded reader has drained
+        // the last result or that inherited stdout handles have reached EOF.
+        if let Some(exit) = exit.filter(|_| self.stdout_closed) {
+            self.closed = true;
+            if let Some(turn) = self.active.take() {
+                let mut decision = failure(
+                    "incomplete",
+                    "pi_process_exit",
+                    &format!("Pi exited before settled completion: {exit}"),
+                );
+                control_diagnostics(&turn, &mut decision);
+                return Ok(Some((turn.job, decision)));
+            }
+            return Ok(None);
+        }
+        if exit.is_none() && !self.stdout_closed && !self.input_closed {
+            if let Some(turn) = self.active.as_mut() {
+                if turn.cancel.is_some() && !turn.abort_sent {
+                    turn.abort_sent = enqueue(
+                        &self.commands,
+                        json!({"id":format!("abort-{}",turn.id),"type":"abort"}),
+                    )?;
+                    self.input_closed |= !turn.abort_sent;
+                }
+            }
         }
         Ok(None)
     }
-    pub fn abort(&mut self, job_id: &str, record_reply: bool) -> Result<()> {
-        let turn = self.active.as_mut().context("Pi has no active task")?;
+    pub fn active_job_id(&self) -> Option<&str> {
+        self.active
+            .as_ref()
+            .and_then(|turn| turn.job["job_id"].as_str())
+    }
+    pub fn deadline_due(&self) -> bool {
+        self.active.as_ref().is_some_and(|turn| {
+            self.timeout_s.is_finite()
+                && self.timeout_s > 0.0
+                && turn.started.elapsed().as_secs_f64() > self.timeout_s
+                && turn.cancel.is_none()
+                && turn.decision.is_none()
+        })
+    }
+    pub fn validate_interrupt(&self, job_id: &str, record_reply: bool) -> Result<()> {
+        let turn = self.active.as_ref().context("Pi has no active task")?;
         ensure!(
             turn.job["job_id"] == job_id,
             "Pi cancel task identity mismatch"
         );
-        self.commands
-            .try_send(json!({"id":format!("abort-{}",turn.id),"type":"abort"}))
-            .context("Pi abort queue unavailable")?;
-        turn.cancel = Some(record_reply);
+        ensure!(
+            turn.cancel.is_none_or(|prior| prior == record_reply),
+            "Pi cancellation reply policy already fixed"
+        );
+        Ok(())
+    }
+    pub fn sync_job(&mut self, job: &Value) -> Result<()> {
+        let turn = self.active.as_mut().context("Pi has no active task")?;
+        ensure!(
+            turn.job["job_id"] == job["job_id"]
+                && turn.job["agent_name"] == job["agent_name"]
+                && turn.job["provider"] == job["provider"]
+                && turn.job["request"] == job["request"]
+                && turn.job["provider_options"]["native_execution_instance"]
+                    == job["provider_options"]["native_execution_instance"]
+                && turn.job["provider_options"]["native_daemon_instance"]
+                    == job["provider_options"]["native_daemon_instance"],
+            "Pi active execution identity changed"
+        );
+        turn.job = job.clone();
+        turn.deadline_triggered =
+            job["provider_options"]["native_cancel_intent"]["deadline_triggered"] == true;
+        if let Some(record_reply) =
+            job["provider_options"]["native_cancel_intent"]["record_reply"].as_bool()
+        {
+            ensure!(
+                turn.cancel.is_none_or(|prior| prior == record_reply),
+                "Pi cancellation reply policy already fixed"
+            );
+            turn.cancel = Some(record_reply);
+        }
         Ok(())
     }
     fn ingest(&mut self, record: &Value) -> Result<()> {
@@ -276,9 +353,8 @@ impl Session {
         }
         let Some(turn) = self.active.as_mut() else {
             if record["type"] == "agent_settled" {
-                self.commands
-                    .try_send(json!({"id":self.init,"type":"get_state"}))
-                    .context("Pi idle-state query unavailable")?;
+                self.input_closed |=
+                    !enqueue(&self.commands, json!({"id":self.init,"type":"get_state"}))?;
             }
             return Ok(());
         };
@@ -308,9 +384,8 @@ impl Session {
                     );
                     turn.accepted = true;
                     if turn.settled && !turn.check.is_empty() {
-                        self.commands
-                            .try_send(json!({"id":turn.check,"type":"get_state"}))
-                            .context("Pi accepted-state query unavailable")?;
+                        self.input_closed |=
+                            !enqueue(&self.commands, json!({"id":turn.check,"type":"get_state"}))?;
                     }
                 }
             }
@@ -336,9 +411,8 @@ impl Session {
         if record["type"] == "agent_settled" && turn.anchor {
             turn.settled = true;
             turn.check = format!("settled-{}", turn.id);
-            self.commands
-                .try_send(json!({"id":turn.check,"type":"get_state"}))
-                .context("Pi settled-state query unavailable")?;
+            self.input_closed |=
+                !enqueue(&self.commands, json!({"id":turn.check,"type":"get_state"}))?;
         }
         if record["type"] == "response" && !turn.check.is_empty() && record["id"] == turn.check {
             ensure!(
@@ -378,13 +452,6 @@ impl Session {
                     decision["diagnostics"]["error_message"] =
                         turn.assistant["errorMessage"].clone();
                 }
-                if let Some(record_reply) = turn.cancel {
-                    decision["diagnostics"]["result_reply_enabled"] = json!(record_reply);
-                    decision["diagnostics"]["cancel_requested"] = json!(true);
-                }
-                if turn.deadline_triggered {
-                    decision["diagnostics"]["deadline_triggered"] = json!(true);
-                }
                 turn.decision = Some(decision);
             }
         }
@@ -392,6 +459,23 @@ impl Session {
     }
     pub fn pid(&self) -> u32 {
         self.child.id()
+    }
+}
+fn enqueue(commands: &mpsc::SyncSender<Value>, value: Value) -> Result<bool> {
+    match commands.try_send(value) {
+        Ok(()) => Ok(true),
+        // A dead writer is transport evidence, never task completion evidence.
+        Err(mpsc::TrySendError::Disconnected(_)) => Ok(false),
+        Err(error) => Err(error).context("Pi command queue unavailable"),
+    }
+}
+fn control_diagnostics(turn: &Turn, decision: &mut Value) {
+    if let Some(record_reply) = turn.cancel {
+        decision["diagnostics"]["result_reply_enabled"] = json!(record_reply);
+        decision["diagnostics"]["cancel_requested"] = json!(true);
+    }
+    if turn.deadline_triggered {
+        decision["diagnostics"]["deadline_triggered"] = json!(true);
     }
 }
 fn idle(state: &Value) -> bool {

@@ -32,10 +32,14 @@ struct Pending {
     params: Value,
     answer: Option<Value>,
 }
+enum StreamEvent {
+    Record(Value),
+    End,
+}
 pub struct Session {
     child: Child,
     commands: mpsc::SyncSender<Value>,
-    events: mpsc::Receiver<Value>,
+    events: mpsc::Receiver<StreamEvent>,
     init: String,
     bind: String,
     spec: Value,
@@ -43,6 +47,10 @@ pub struct Session {
     pub runtime: String,
     pub state: Value,
     pub ready: bool,
+    pub closed: bool,
+    stdout_closed: bool,
+    input_closed: bool,
+    saved_state: Value,
     pub dirty: bool,
     active: Option<Active>,
 }
@@ -139,7 +147,7 @@ impl Session {
                     Ok(0) => break,
                     Ok(_) if line.len() <= 8 * 1024 * 1024 => {
                         if let Ok(value) = serde_json::from_slice::<Value>(&line) {
-                            if sender.send(value).is_err() {
+                            if sender.send(StreamEvent::Record(value)).is_err() {
                                 break;
                             }
                         }
@@ -147,6 +155,7 @@ impl Session {
                     _ => break,
                 }
             }
+            let _ = sender.send(StreamEvent::End);
         });
         commands
             .try_send(initialize)
@@ -171,15 +180,23 @@ impl Session {
             runtime,
             state: Value::Null,
             ready: false,
+            closed: false,
+            stdout_closed: false,
+            input_closed: false,
+            saved_state: saved["state"].clone(),
             dirty: false,
             active: None,
         })
     }
-    fn send(&self, value: Value) -> Result<()> {
-        self.commands
-            .try_send(value)
-            .context("Codex command queue unavailable")?;
-        Ok(())
+    fn send(&mut self, value: Value) -> Result<()> {
+        match self.commands.try_send(value) {
+            Ok(()) => Ok(()),
+            Err(mpsc::TrySendError::Disconnected(_)) => {
+                self.input_closed = true;
+                Ok(())
+            }
+            Err(error) => Err(error).context("Codex command queue unavailable"),
+        }
     }
     pub fn start(&mut self, job: &Value) -> Result<()> {
         ensure!(
@@ -224,16 +241,41 @@ impl Session {
         Ok(())
     }
     pub fn poll(&mut self) -> Result<Option<(Value, Value)>> {
+        if self.closed && self.active.is_none() {
+            return Ok(None);
+        }
         for _ in 0..128 {
             let Ok(record) = self.events.try_recv() else {
                 break;
             };
-            self.ingest(record)?;
+            match record {
+                StreamEvent::Record(record) => self.ingest(record)?,
+                StreamEvent::End => self.stdout_closed = true,
+            }
         }
         self.refresh_pending_metadata();
-        self.send_pending_interrupt()?;
-        if let Some(exit) = self.child.try_wait()? {
+        let exit = self.child.try_wait()?;
+        if exit.is_some() || self.stdout_closed || self.input_closed {
             self.ready = false;
+        }
+        if exit.is_some() && self.state["process_state"] != "exited" {
+            if self.state.is_null() {
+                self.state = self.saved_state.clone();
+            }
+            self.state["process_state"] = json!("exited");
+            self.dirty = true;
+        }
+        if self.active.as_ref().is_some_and(|a| a.decision.is_some()) {
+            let active = self.active.take().unwrap();
+            self.refresh_pending_metadata();
+            self.closed = exit.is_some() && self.stdout_closed;
+            self.ready = exit.is_none() && !self.stdout_closed && !self.input_closed;
+            let mut decision = active.decision.clone().unwrap();
+            control_diagnostics(&active, &mut decision);
+            return Ok(Some((active.job, decision)));
+        }
+        if let Some(exit) = exit.filter(|_| self.stdout_closed) {
+            self.closed = true;
             if let Some(active) = self.active.take() {
                 let mut decision = active.decision.clone().unwrap_or_else(|| {
                     failure(
@@ -246,15 +288,10 @@ impl Session {
                 self.refresh_pending_metadata();
                 return Ok(Some((active.job, decision)));
             }
-            anyhow::bail!("Codex app-server exited");
+            return Ok(None);
         }
-        if self.active.as_ref().is_some_and(|a| a.decision.is_some()) {
-            let active = self.active.take().unwrap();
-            self.refresh_pending_metadata();
-            self.ready = true;
-            let mut decision = active.decision.clone().unwrap();
-            control_diagnostics(&active, &mut decision);
-            return Ok(Some((active.job, decision)));
+        if exit.is_none() && !self.stdout_closed && !self.input_closed {
+            self.send_pending_interrupt()?;
         }
         Ok(None)
     }

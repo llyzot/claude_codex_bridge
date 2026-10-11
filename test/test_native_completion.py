@@ -17,6 +17,7 @@ from provider_core.catalog import build_default_provider_catalog
 
 ROOT=Path(__file__).resolve().parents[1]
 BIN=ROOT/'rust'/'target'/'debug'/('ccb-kernel.exe' if os.name=='nt' else 'ccb-kernel')
+BIN=Path(os.environ.get('CCB_TEST_KERNEL_BIN') or BIN)
 START='2026-10-11T10:00:00Z'
 
 class OracleRegistry(CompletionRegistry):

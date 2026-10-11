@@ -1,5 +1,5 @@
 //! Atomic per-provider Windows Job membership with an explicit stdio handle list.
-//! Only piped stdin/stdout and null stderr are used by the three native drivers.
+//! Provider drivers use null stderr; bounded CLI transport can capture it.
 use anyhow::{ensure, Context, Result};
 use std::{
     cmp::Ordering,
@@ -274,6 +274,7 @@ impl Drop for Attributes {
 pub(crate) struct OwnedChild {
     pub stdin: Option<File>,
     pub stdout: Option<File>,
+    pub stderr: Option<File>,
     process: OwnedHandle,
     job: OwnedHandle,
     pid: u32,
@@ -283,6 +284,12 @@ pub(crate) struct OwnedChild {
 }
 impl OwnedChild {
     pub fn spawn(command: &mut Command) -> Result<Self> {
+        Self::spawn_with_stderr(command, false)
+    }
+    pub fn capture(command: &mut Command) -> Result<Self> {
+        Self::spawn_with_stderr(command, true)
+    }
+    fn spawn_with_stderr(command: &mut Command, capture_stderr: bool) -> Result<Self> {
         let scope = uuid::Uuid::new_v4().to_string();
         let owner_created = creation_time(unsafe { GetCurrentProcess() })?;
         let namespace = current_session()?;
@@ -303,7 +310,20 @@ impl OwnedChild {
             .transpose()?;
         let (input_read, input_write) = pipe()?;
         let (output_read, output_write) = pipe()?;
+        let (error_read, error_write) = if capture_stderr {
+            let (read, write) = pipe()?;
+            (Some(read), Some(write))
+        } else {
+            (None, None)
+        };
         unsafe {
+            if let Some(read) = &error_read {
+                check(SetHandleInformation(
+                    read.as_raw_handle(),
+                    HANDLE_FLAG_INHERIT,
+                    0,
+                ))?;
+            }
             check(SetHandleInformation(
                 input_write.as_raw_handle(),
                 HANDLE_FLAG_INHERIT,
@@ -355,7 +375,10 @@ impl OwnedChild {
             let handles = [
                 input_read.as_raw_handle(),
                 output_write.as_raw_handle(),
-                null.as_raw_handle(),
+                error_write
+                    .as_ref()
+                    .map(|h| h.as_raw_handle())
+                    .unwrap_or_else(|| null.as_raw_handle()),
             ];
             let mut attributes = Attributes::new()?;
             check(UpdateProcThreadAttribute(
@@ -407,6 +430,7 @@ impl OwnedChild {
             Ok(Self {
                 stdin: Some(File::from(input_write)),
                 stdout: Some(File::from(output_read)),
+                stderr: error_read.map(File::from),
                 process,
                 job,
                 pid: info.dwProcessId,

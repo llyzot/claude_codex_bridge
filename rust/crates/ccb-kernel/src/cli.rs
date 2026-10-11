@@ -178,6 +178,25 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     if args.is_empty() {
         args.push("start".into());
     }
+    if args[0] == "herdr-transport" {
+        ensure!(
+            args.len() == 1,
+            "herdr-transport reads one JSON request from stdin"
+        );
+        let mut bytes = Vec::new();
+        std::io::stdin()
+            .lock()
+            .take(1024 * 1024 + 1)
+            .read_to_end(&mut bytes)?;
+        ensure!(
+            bytes.len() <= 1024 * 1024,
+            "Herdr transport request exceeds 1 MiB"
+        );
+        let request: Value = serde_json::from_slice(&bytes)?;
+        crate::security::own_process_tree()?;
+        println!("{}", crate::herdr_transport::execute(&request)?);
+        return Ok(());
+    }
     if args[0] == "private-copy" {
         ensure!(
             args.len() == 3,

@@ -20,6 +20,9 @@ impl OwnedChild {
     pub fn spawn(command: &mut Command) -> Result<Self> {
         Ok(Self(command.spawn()?))
     }
+    pub fn capture(command: &mut Command) -> Result<Self> {
+        Self::spawn(command)
+    }
     pub fn scope_info(&self) -> Result<serde_json::Value> {
         Ok(serde_json::json!({"supported":false}))
     }

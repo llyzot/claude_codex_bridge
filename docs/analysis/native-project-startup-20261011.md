@@ -130,6 +130,48 @@ Remaining scope includes full CLI/config/worktree/role parity, Keeper/reload,
 Herdr integration, Unix process ownership, actual model startup validation,
 installer/default native activation and Python core retirement.
 
+## Herdr command transport checkpoint
+
+The transitional Herdr adapter now uses Rust for its bounded CLI control calls
+when `CCB_CORE_RUNTIME=rust`. The DTO bridge locates `ccb-native` beside the chosen
+kernel, or uses an explicit `CCB_NATIVE_BIN`. Default Python selection retains
+the existing runner. This is a transport migration, not the complete native
+`ccb herdr open`, Server bootstrap, workspace planner or interactive Agent UI.
+
+`ccb-native herdr-transport` consumes one schema-1 JSON request from stdin:
+`operation`, explicit `session`, executable `command` argv, operation `args`,
+`expect_json`, and a bounded `timeout_ms`. It is an internal transport interface;
+CCB still determines namespace and pane ownership above it. It allows explicit
+workspace/pane/tab/agent controls and observation commands, but rejects bare
+interactive startup, Server/session/machine lifecycle commands, inherited or
+retargeting selectors, implicit mutation targets and `--wait` task waits.
+
+Rust invokes the CLI directly without a shell, removes inherited Herdr caller
+and socket selectors while retaining account config discovery, closes stdin and
+captures bounded UTF-8 output. On Windows the CLI tree enters its owned Job at
+creation; stdout/stderr handles are explicitly inherited and parent pipe ends
+are not inheritable. Existing provider transports still use null stderr.
+Completion requires CLI exit and stream EOF; a descendant holding a pipe cannot
+turn an early parent exit into a successful receipt. Timeout/output overflow
+terminates only that owned CLI tree, never an existing Herdr Server.
+
+The response distinguishes `acknowledged`, read-only `unobserved` and mutating
+`unknown` outcomes. Every response explicitly says `task_completion:false` and
+`automatic_replay:false`. Error stdout/stderr and request bodies do not enter
+error diagnostics. Unknown failure statuses, malformed output, wrong helper
+identity and helper claims of task completion/replay are rejected. The Rust
+branch bypasses the old automatic Server-start/retry path after command failure.
+A lost connection or CLI timeout is not proof that a server-side mutation failed
+to happen; inspect the explicit session before deciding on recovery.
+
+Validation uses an offline executable fixture only, plus existing owned-provider
+contracts. The current Codex process is not in a Herdr-managed pane, so the Herdr
+skill's context gate prevented live-session validation. No real Herdr session
+was inspected, created, stopped or controlled. Full native topology/application,
+explicit Server lifecycle, original provider terminal interaction, completion
+history adapters, owned-binding recovery and live Herdr validation remain open.
+The release capability `herdr_integrated` therefore remains false.
+
 ## Native Windows installation lane
 
 The repository-built core can now install itself to a **new, explicit Windows

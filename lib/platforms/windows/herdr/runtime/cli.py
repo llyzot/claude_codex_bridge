@@ -1280,6 +1280,11 @@ class HerdrCliRequestAdapter:
         executable = self._resolve_executable()
         effective_session = session_name or self._session_name
         command = [executable, "--session", effective_session, *args]
+        from native_kernel import rust_core_enabled
+        if rust_core_enabled():
+            # Native transport never restarts a server or repeats a potentially
+            # accepted mutation after a missing/ambiguous acknowledgement.
+            return self._run_command_once(operation, command, expect_json=expect_json, session_name=effective_session)
         try:
             return self._run_command_once(
                 operation,
@@ -1316,6 +1321,11 @@ class HerdrCliRequestAdapter:
         expect_json: bool,
         session_name: str,
     ) -> subprocess.CompletedProcess:
+        from native_kernel import rust_core_enabled
+        if rust_core_enabled():
+            from .native_transport import run
+            return run(operation, command, expect_json=expect_json, session=session_name,
+                       env=_env_without_xdg_redirects(), ipc_ref=self._ipc_ref_for_session(session_name))
         try:
             return self._run_fn(
                 command,

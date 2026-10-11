@@ -14,6 +14,7 @@ enum StreamEvent {
     End,
 }
 struct Active {
+    requests: crate::claude_requests::Broker,
     skills: Option<crate::claude_skills::Load>,
     job: Value,
     uuid: String,
@@ -78,6 +79,33 @@ impl Session {
         let mut command = Command::new(argv[0].as_str().unwrap());
         for arg in &argv[1..] {
             command.arg(arg.as_str().unwrap());
+        }
+        for (index, arg) in argv.iter().enumerate() {
+            if arg == "--permission-prompt-tool" {
+                ensure!(
+                    argv.get(index + 1).is_some_and(|v| v == "stdio"),
+                    "native Claude requires stdio permission prompts"
+                );
+            }
+            if let Some(value) = arg
+                .as_str()
+                .and_then(|s| s.strip_prefix("--permission-prompt-tool="))
+            {
+                ensure!(
+                    value == "stdio",
+                    "native Claude requires stdio permission prompts"
+                );
+            }
+        }
+        if !argv.iter().any(|v| {
+            v.as_str().is_some_and(|s| {
+                s == "--permission-prompt-tool" || s.starts_with("--permission-prompt-tool=")
+            })
+        }) {
+            command.arg("--permission-prompt-tool").arg("stdio");
+        }
+        if !argv.iter().any(|v| v == "--include-partial-messages") {
+            command.arg("--include-partial-messages");
         }
         command
             .arg(if saved_id.is_empty() {
@@ -247,6 +275,7 @@ impl Session {
             None
         };
         self.active = Some(Active {
+            requests: crate::claude_requests::Broker::default(),
             skills,
             job: job.clone(),
             uuid,
@@ -288,6 +317,7 @@ impl Session {
                 StreamEvent::End => self.stdout_closed = true,
             }
         }
+        self.refresh_requests();
         let exit = self.child.try_wait()?;
         let tree_empty = exit.is_some() && self.child.tree_empty()?;
         if exit.is_some() {
@@ -299,6 +329,7 @@ impl Session {
         }
         if self.active.as_ref().is_some_and(|a| a.decision.is_some()) {
             let active = self.active.take().unwrap();
+            self.refresh_requests();
             self.closed = exit.is_some() && self.stdout_closed && tree_empty;
             self.ready = !self.quarantined && !self.forced && exit.is_none() && !self.stdout_closed;
             let mut decision = active.decision.clone().unwrap();
@@ -315,6 +346,7 @@ impl Session {
                 "Claude exited before role initialization"
             );
             if let Some(active) = self.active.take() {
+                self.refresh_requests();
                 let mut decision = failure(
                     if self.forced {
                         "cancelled"
@@ -364,6 +396,70 @@ impl Session {
     pub fn active_job_id(&self) -> Option<&str> {
         self.active.as_ref().and_then(|a| a.job["job_id"].as_str())
     }
+    pub fn pending_requests(&self) -> Value {
+        self.active
+            .as_ref()
+            .map(|a| a.requests.rows(&a.job, &self.runtime))
+            .unwrap_or_else(|| json!([]))
+    }
+    fn refresh_requests(&mut self) {
+        let rows = self
+            .active
+            .as_ref()
+            .map(|a| a.requests.summaries())
+            .unwrap_or_else(|| json!([]));
+        if self.state["pending_requests"] != rows {
+            self.state["pending_requests"] = rows;
+            self.dirty = true;
+        }
+    }
+    pub fn validate_response(&self, payload: &Value) -> Result<bool> {
+        ensure!(
+            payload["runtime_instance_id"] == self.runtime,
+            "Claude response runtime identity mismatch"
+        );
+        let active = self.active.as_ref().context("Claude has no active task")?;
+        ensure!(
+            payload["job_id"] == active.job["job_id"]
+                && payload["execution_instance_id"]
+                    == active.job["provider_options"]["native_execution_instance"],
+            "Claude response execution identity mismatch"
+        );
+        ensure!(
+            active.cancel.is_none()
+                && active.decision.is_none()
+                && !self.quarantined
+                && !self.closed
+                && !self.forced,
+            "Claude task no longer accepts user responses"
+        );
+        active.requests.validate(
+            crate::records::string(payload, "request_id")?,
+            &payload["result"],
+        )
+    }
+    pub fn respond(&mut self, payload: &Value) -> Result<()> {
+        if !self.validate_response(payload)? {
+            return Ok(());
+        }
+        let handle = crate::records::string(payload, "request_id")?;
+        let response = self
+            .active
+            .as_ref()
+            .unwrap()
+            .requests
+            .response(handle, &payload["result"])?;
+        self.commands
+            .try_send(response)
+            .context("Claude response queue unavailable")?;
+        self.active
+            .as_mut()
+            .unwrap()
+            .requests
+            .answered(handle, &payload["result"])?;
+        self.refresh_requests();
+        Ok(())
+    }
     pub fn deadline_due(&self) -> bool {
         !self.quarantined
             && !self.forced
@@ -409,10 +505,81 @@ impl Session {
         {
             self.validate_interrupt(job["job_id"].as_str().unwrap(), reply)?;
             self.active.as_mut().unwrap().cancel = Some(reply);
+            self.active.as_mut().unwrap().requests.clear();
+            self.refresh_requests();
         }
         Ok(())
     }
     fn ingest(&mut self, r: &Value) -> Result<()> {
+        if r["type"] == "control_request" {
+            // No custom dialog kinds were advertised. Such dialogs must never
+            // be answered, including with a synthetic cancellation response.
+            if r["request"]["subtype"] == "request_user_dialog" {
+                return Ok(());
+            }
+            let wire = r["request_id"]
+                .as_str()
+                .filter(|id| !id.is_empty() && id.len() <= 256)
+                .context("invalid Claude control request identity")?;
+            if r["request"]["subtype"] == "can_use_tool"
+                && (r["session_id"].is_null() || r["session_id"] == self.session_id)
+            {
+                ensure!(
+                    self.active
+                        .as_ref()
+                        .is_some_and(|a| a.skills.is_none() && a.decision.is_none()),
+                    "unowned Claude permission request requires recovery"
+                );
+            }
+            if let Some(active) = &self.active {
+                ensure!(
+                    active.requests.consistent(wire, &r["request"]),
+                    "Claude request identity was reused"
+                );
+            }
+            let allowed_session = r["session_id"].is_null() || r["session_id"] == self.session_id;
+            let result = if allowed_session {
+                match self.active.as_mut() {
+                    Some(active)
+                        if active.skills.is_none()
+                            && active.cancel.is_none()
+                            && active.decision.is_none() =>
+                    {
+                        r["request_id"]
+                            .as_str()
+                            .context("invalid Claude request identity")
+                            .and_then(|id| active.requests.add(id, &r["request"]))
+                    }
+                    _ => Err(anyhow::anyhow!(
+                        "no active Claude execution owns this request"
+                    )),
+                }
+            } else {
+                Err(anyhow::anyhow!("foreign Claude request session"))
+            };
+            if result.is_err() {
+                self.commands
+                    .try_send(crate::claude_requests::reject(
+                        &r["request_id"],
+                        "Unsupported, invalid or unowned native Claude request",
+                    ))
+                    .context("Claude request rejection unavailable")?;
+            }
+            self.refresh_requests();
+            return Ok(());
+        }
+        if r["type"] == "control_cancel_request" {
+            if r["session_id"].is_null() || r["session_id"] == self.session_id {
+                let id = r["request_id"]
+                    .as_str()
+                    .context("invalid Claude withdrawal identity")?;
+                if let Some(active) = self.active.as_mut() {
+                    active.requests.withdraw(id)?;
+                }
+            }
+            self.refresh_requests();
+            return Ok(());
+        }
         if r["type"] == "control_response"
             && self
                 .initialize
@@ -479,6 +646,12 @@ impl Session {
                 None => {}
             }
             return Ok(());
+        }
+        if r["session_id"] == self.session_id
+            && active.cancel.is_none()
+            && active.decision.is_none()
+        {
+            active.requests.observe(r, &active.uuid)?;
         }
         if r["type"] == "control_response"
             && (r["session_id"].is_null() || r["session_id"] == self.session_id)
@@ -651,6 +824,10 @@ impl Session {
         self.quarantined = true;
         self.ready = false;
         self.dirty = false;
+        if let Some(active) = self.active.as_mut() {
+            active.requests.clear();
+        }
+        self.refresh_requests();
     }
     pub fn terminate_tree(&mut self) -> Result<()> {
         ensure!(
@@ -659,6 +836,10 @@ impl Session {
         );
         self.forced = true;
         self.ready = false;
+        if let Some(active) = self.active.as_mut() {
+            active.requests.clear();
+        }
+        self.refresh_requests();
         self.child.kill()?;
         Ok(())
     }

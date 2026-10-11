@@ -396,33 +396,53 @@ impl Daemon {
             }
             "provider-requests" => {
                 let agent = records::string(p, "agent_name")?;
+                let driver = self.spec(agent)?["driver_kind"].clone();
                 ensure!(
-                    self.spec(agent)?["driver_kind"] == "codex_app_server",
-                    "interactive requests require an owned Codex session"
+                    driver == "codex_app_server" || driver == "claude_stream",
+                    "interactive requests require an owned Codex or Claude session"
                 );
-                Ok(
-                    json!({"agent_name":agent,"requests":if self.faults.contains_key(agent) { json!([]) } else { self.codex.get(agent)
-                    .map(|s|s.pending_requests()).unwrap_or_else(||json!([])) }}),
-                )
+                let requests = if self.faults.contains_key(agent) {
+                    json!([])
+                } else if driver == "codex_app_server" {
+                    self.codex
+                        .get(agent)
+                        .map(|s| s.pending_requests())
+                        .unwrap_or_else(|| json!([]))
+                } else {
+                    self.claude
+                        .get(agent)
+                        .map(|s| s.pending_requests())
+                        .unwrap_or_else(|| json!([]))
+                };
+                Ok(json!({"agent_name":agent,"requests":requests}))
             }
             "provider-respond" => {
                 let agent = records::string(p, "agent_name")?;
                 ensure!(!self.faults.contains_key(agent), "provider is faulted");
-                let session = self
-                    .codex
-                    .get(agent)
-                    .context("Codex session is not available")?;
-                let fresh = session.validate_response(p)?;
+                let spec = self.spec(agent)?;
+                let fresh = if spec["driver_kind"] == "codex_app_server" {
+                    self.codex
+                        .get(agent)
+                        .context("Codex session is not available")?
+                        .validate_response(p)?
+                } else if spec["driver_kind"] == "claude_stream" {
+                    self.claude
+                        .get(agent)
+                        .context("Claude session is not available")?
+                        .validate_response(p)?
+                } else {
+                    bail!("provider does not support interactive responses")
+                };
                 let job = self.get_job(records::string(p, "job_id")?)?;
                 ensure!(
                     job["status"] == "running"
                         && job["agent_name"] == agent
-                        && job["provider"] == "codex"
+                        && job["provider"] == spec["provider"]
                         && job["provider_options"]["native_daemon_instance"] == self.state
                         && job["provider_options"]["native_execution_instance"]
                             == p["execution_instance_id"]
                         && job["provider_options"]["native_cancel_intent"].is_null(),
-                    "Codex task no longer accepts user responses"
+                    "provider task no longer accepts user responses"
                 );
                 if fresh {
                     admission::event(
@@ -433,10 +453,20 @@ impl Daemon {
                             "execution_instance_id":p["execution_instance_id"]}),
                         &now(),
                     )?;
+                    if spec["driver_kind"] == "claude_stream"
+                        && p["result"]["behavior"] == "deny"
+                        && p["result"]["interrupt"] == true
+                    {
+                        self.mark_provider_cancel(job.clone(), true, false)?;
+                    }
                     // Audit the explicit action before it can reach the provider.
                     self.kernel.store.commit()?;
                 }
-                self.codex.get_mut(agent).unwrap().respond(p)?;
+                if spec["driver_kind"] == "codex_app_server" {
+                    self.codex.get_mut(agent).unwrap().respond(p)?;
+                } else {
+                    self.claude.get_mut(agent).unwrap().respond(p)?;
+                }
                 Ok(json!({"request_id":p["request_id"],"status":"response_queued"}))
             }
             "retry" => {

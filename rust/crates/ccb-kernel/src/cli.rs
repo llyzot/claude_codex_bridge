@@ -348,11 +348,11 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             ensure!(args.len() == 1, "pending requires an agent");
             println!(
                 "{}",
-                request(
+                request_preview(&request(
                     &root,
                     "provider-requests",
                     json!({"agent_name":arg(&args,0)?})
-                )?
+                )?)
             );
             return Ok(());
         }
@@ -417,6 +417,20 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         )?
     );
     Ok(())
+}
+// Preserve exact JSON values while making terminal formatting controls visible.
+fn request_preview(value: &Value) -> String {
+    let mut text = String::new();
+    for ch in value.to_string().chars() {
+        if ch.is_control()
+            || matches!(ch,'\u{061c}'|'\u{200b}'..='\u{200f}'|'\u{2028}'..='\u{202e}'|'\u{2060}'|'\u{2066}'..='\u{2069}'|'\u{feff}')
+        {
+            text.push_str(&format!("\\u{:04x}", ch as u32));
+        } else {
+            text.push(ch);
+        }
+    }
+    text
 }
 fn arg(args: &[OsString], index: usize) -> Result<&str> {
     args.get(index)

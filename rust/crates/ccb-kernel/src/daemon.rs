@@ -1543,6 +1543,18 @@ impl Daemon {
             .or(spec["workspace_path"].as_str())
             .map(std::path::Path::new);
         let mut body = records::string(&job["request"], "body")?.to_owned();
+        let cli = std::env::current_exe()?.with_file_name(if cfg!(windows) {
+            "ccb-native.exe"
+        } else {
+            "ccb-native"
+        });
+        let state_path = self.kernel.store.owned_path("configuration.json")?;
+        body.push_str(&crate::coordination::context(
+            job,
+            &self.config,
+            state_path.parent().context("state root missing")?,
+            &cli,
+        )?);
         let memory = match crate::project_memory::prepare(project, agent) {
             Ok(memory) => memory,
             Err(_) => {

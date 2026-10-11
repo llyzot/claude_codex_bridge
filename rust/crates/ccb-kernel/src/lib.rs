@@ -25,6 +25,7 @@ mod completion_gate;
 pub mod config;
 mod context_session;
 pub mod control_plane;
+mod coordination;
 pub mod daemon;
 mod executables;
 mod execution_recovery;

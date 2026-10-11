@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "base_commit": "45cdb521",
+  "recorded_at": "2026-10-11T20:50:19.228176+00:00",
+  "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-coordination-live-izw3k0gi",
+  "source_evidence": "C:\\Users\\user\\Desktop\\work\\ccb-native-coordination-live-izw3k0gi\\result.json",
+  "real_models": true,
+  "models": {
+    "lead": "gpt-6-astra",
+    "worker": "gpt-6.1-sol"
+  },
+  "user_task": "Delegate this calculation to worker: compute 73*79 without tools, explain two independent calculations, and finish with WORKER_PRODUCT_5767_4ee38821. Review its answer; if correct, respond exactly REVIEW_OK_4ee38821. Do not perform the worker calculation yourself before delegating.",
+  "user_task_contains_wait_or_cli_instructions": false,
+  "parent_job_id": "job_b12d63a5500b",
+  "worker_job_id": "job_cdc3695865aa",
+  "continuation_job_id": "job_754e4c307f7e",
+  "edge_id": "cb_cf2156014e61",
+  "edge_state": "done",
+  "worker_job_count": 1,
+  "lead_job_count": 2,
+  "lead_tool_calls": [
+    {
+      "name": "powershell",
+      "command": "& 'C:/Users/user/Desktop/work/4.user/2.github/claude_codex_bridge/rust/target/release/ccb-native.exe' '--state-root' 'C:/Users/user/Desktop/work/ccb-native-coordination-live-izw3k0gi/project/.ccb/ccbd' 'ask' '--chain' '--from' 'lead' 'worker' '--' 'Compute 73*79 without using tools. Explain two independent calculations, and finish your answer with WORKER_PRODUCT_5767_4ee38821.'"
+    }
+  ],
+  "lead_wait_poll_tool_calls": 0,
+  "initial_lead_finished_at": "2026-10-11T20:46:48.922250900Z",
+  "worker_finished_at": "2026-10-11T20:46:50.371230600Z",
+  "lead_released_before_worker_seconds": 1.44898,
+  "same_lead_session_id": "01a12cb7-9542-73f5-8af7-03b862bd518b",
+  "worker_reply": "73 × 79 = **5767**.\n\n1. Distribute: 73 × (80 − 1) = 5840 − 73 = 5767.\n2. Difference of squares: (76 − 3)(76 + 3) = 76² − 3² = 5776 − 9 = 5767.\n\nWORKER_PRODUCT_5767_4ee38821",
+  "lead_final_reply": "REVIEW_OK_4ee38821",
+  "original_owned_process_lifetimes_gone": [
+    {
+      "pid": 8980,
+      "created": "134362251909226384",
+      "original_lifetime_gone": true,
+      "observation": "identity_query_failed_after_owned_shutdown",
+      "query_exit_code": 1
+    },
+    {
+      "pid": 33148,
+      "created": "134362251910124932",
+      "original_lifetime_gone": true,
+      "observation": "identity_query_failed_after_owned_shutdown",
+      "query_exit_code": 1
+    },
+    {
+      "pid": 57728,
+      "created": "134362251911690369",
+      "original_lifetime_gone": true,
+      "observation": "identity_query_failed_after_owned_shutdown",
+      "query_exit_code": 1
+    },
+    {
+      "pid": 42568,
+      "created": "134362251912175953",
+      "original_lifetime_gone": true,
+      "observation": "identity_query_failed_after_owned_shutdown",
+      "query_exit_code": 1
+    }
+  ],
+  "lead_history_sha256": "b8a97dc9222bdb09dfbceba4a9610d50c862582a62ba19daea271eadd2db8134",
+  "binary_sha256": {
+    "ccb-kernel.exe": "21fe75531d481f3f4750f13c383521d42be9bec19252b71d62aeadf0c840344b",
+    "ccb-native.exe": "ea7121dba2b01c9f2fdea5b1b65a72d3ebebc695730aca73020b065fa3a43cf9"
+  },
+  "production_install_changed": false,
+  "limits": [
+    "One real Pi Lead/Codex Worker acceptance run, not a compliance guarantee for all models",
+    "Prompt guidance is advisory; existing backend policy and permissions remain authoritative",
+    "No Herdr or original terminal UI was opened in this run"
+  ],
+  "verification": {
+    "initial_selection": "28 passed in 56.14s",
+    "final_selection": "73 passed in 235.28s",
+    "rust_unit_tests": "28 passed plus parent-invoked process-death helper in 31.25s",
+    "format_clippy_diff": "passed",
+    "full_repository_run": false
+  }
+}

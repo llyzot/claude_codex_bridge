@@ -19,6 +19,9 @@ def api(payload):
 emit(dict(type='system',subtype='init',session_id=session))
 for line in sys.stdin.buffer:
     user=json.loads(line);body=user['message']['content'].split('\n',1)[1]
+    if os.environ.get('CCB_FIXTURE_TRACE'):
+        with open(os.environ['CCB_FIXTURE_TRACE'], 'a', encoding='utf-8') as file:
+            file.write(json.dumps(user)+'\n')
     emit(user)
     if mode=='duplicate' and previous:emit(previous)
     emit(dict(type='assistant',session_id=session,parent_tool_use_id='subagent',message={'content':[{'type':'text','text':'wrong subagent'}]}))

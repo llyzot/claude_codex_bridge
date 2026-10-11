@@ -61,6 +61,9 @@ def prompt(command):
 
 for line in sys.stdin.buffer:
     command=json.loads(line)
+    if os.environ.get('CCB_FIXTURE_TRACE'):
+        with open(os.environ['CCB_FIXTURE_TRACE'], 'a', encoding='utf-8') as file:
+            file.write(json.dumps(command)+'\n')
     if command['type']=='get_state':
         emit(dict(type='response',command='get_state',id=command['id'],success=True,data=dict(state)))
     elif command['type']=='prompt':

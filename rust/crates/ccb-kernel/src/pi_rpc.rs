@@ -181,7 +181,7 @@ impl Session {
             timeout_s: spec["timeout_s"].as_f64().unwrap_or(3600.0),
         })
     }
-    pub fn start(&mut self, job: &Value) -> Result<()> {
+    pub fn start(&mut self, job: &Value, prompt: &str) -> Result<()> {
         ensure!(
             self.ready && self.active.is_none(),
             "Pi session is not idle"
@@ -195,9 +195,7 @@ impl Session {
         let message = format!(
             "CCB_REQ_ID: {}\n{}",
             job["job_id"].as_str().context("missing Pi job id")?,
-            job["request"]["body"]
-                .as_str()
-                .context("missing Pi prompt")?
+            prompt
         );
         self.input_closed |= !enqueue(
             &self.commands,

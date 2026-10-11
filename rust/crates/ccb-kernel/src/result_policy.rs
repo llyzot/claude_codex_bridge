@@ -205,7 +205,10 @@ fn runtime_reason(d: &Value) -> bool {
 }
 fn retryable(d: &Value, p: &Value, resume: bool) -> bool {
     let diag = &d["diagnostics"];
-    if diag["cancel_requested"] == true || diag["recovery_no_replay"] == true {
+    if diag["cancel_requested"] == true
+        || diag["recovery_no_replay"] == true
+        || diag["configuration_error"] == true
+    {
         return false;
     }
     if d["status"] == "incomplete" {

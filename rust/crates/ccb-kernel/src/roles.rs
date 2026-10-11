@@ -1,4 +1,4 @@
-//! Role identity, installed default-name lookup, and unambiguous local routing.
+//! Role identity, local routing and bounded per-turn reads of live role memory.
 use anyhow::{bail, ensure, Context, Result};
 use serde_json::Value;
 use std::{
@@ -139,7 +139,7 @@ fn find(root: &Path, identity: &str) -> Result<Option<PathBuf>> {
     }
     Ok(None)
 }
-pub fn default_agent(identity: &str, project: Option<&Path>) -> Result<String> {
+fn installed(identity: &str, project: Option<&Path>) -> Result<(PathBuf, Value)> {
     let identity = normalize(identity)?;
     let mut found = None;
     if let Some(project) = project {
@@ -164,6 +164,11 @@ pub fn default_agent(identity: &str, project: Option<&Path>) -> Result<String> {
         normalize(manifest["id"].as_str().context("role manifest has no id")?)? == identity,
         "role manifest id mismatch"
     );
+    Ok((root, manifest))
+}
+pub fn default_agent(identity: &str, project: Option<&Path>) -> Result<String> {
+    let identity = normalize(identity)?;
+    let (root, manifest) = installed(&identity, project)?;
     ensure!(
         manifest["identity"].is_null() || manifest["identity"].is_object(),
         "role identity must be a table"
@@ -198,4 +203,108 @@ pub fn default_agent(identity: &str, project: Option<&Path>) -> Result<String> {
         .to_lowercase();
     crate::models::validate_agent(&name)?;
     Ok(name)
+}
+
+/// Read only the declared live files. The caller owns the per-turn audit commit;
+/// content is returned for transport, never written into the job store here.
+pub fn prompt(spec: &Value, project: Option<&Path>, body: &str) -> Result<(String, Value)> {
+    use serde_json::json;
+    use sha2::{Digest, Sha256};
+    let Some(identity) = normalized(&spec["role"])? else {
+        return Ok((body.into(), Value::Null));
+    };
+    let (root, manifest) = installed(&identity, project)?;
+    let schema = manifest["schema"].as_str().unwrap_or("");
+    ensure!(
+        manifest["schema"].is_null() || manifest["schema"].is_string(),
+        "role schema must be a string"
+    );
+    let mut declarations = Vec::new();
+    let strategy = if schema.starts_with("agent-role/preview-") {
+        ensure!(
+            manifest["contents"].is_null() || manifest["contents"].is_object(),
+            "role contents must be a table"
+        );
+        let path = root.join("adapters/ccb/adapter.toml");
+        let adapter = if path.exists() {
+            ensure!(
+                path.canonicalize()?.starts_with(&root),
+                "role adapter escapes role root"
+            );
+            toml(&path)?
+        } else {
+            Value::Null
+        };
+        paths(&manifest["contents"]["memory"], &mut declarations)?;
+        paths(&adapter["memory"], &mut declarations)?;
+        adapter["memory_merge_strategy"].clone()
+    } else {
+        ensure!(
+            schema.is_empty() || schema == "rolepack/v1",
+            "unsupported role schema"
+        );
+        ensure!(
+            manifest["memory"].is_null() || manifest["memory"].is_object(),
+            "role memory must be a table"
+        );
+        paths(&manifest["memory"]["files"], &mut declarations)?;
+        manifest["memory"]["merge_strategy"].clone()
+    };
+    ensure!(
+        strategy.is_null() || strategy.as_str() == Some("append_after_project_memory"),
+        "unsupported role memory merge strategy"
+    );
+    ensure!(declarations.len() <= 64, "too many role memory files");
+    let mut sources = Vec::new();
+    let mut text = String::new();
+    let mut remaining = 256 * 1024;
+    for relative in declarations {
+        let path = root
+            .join(&relative)
+            .canonicalize()
+            .context("role memory file is missing")?;
+        ensure!(
+            path.starts_with(&root) && path.is_file(),
+            "role memory must be a file inside its role root"
+        );
+        let mut bytes = Vec::new();
+        std::fs::File::open(&path)?
+            .take(remaining as u64 + 1)
+            .read_to_end(&mut bytes)?;
+        ensure!(
+            bytes.len() <= remaining,
+            "role memory exceeds 256 KiB per turn"
+        );
+        remaining -= bytes.len();
+        let content = std::str::from_utf8(&bytes).context("role memory must be UTF-8")?;
+        sources.push(json!({"path":relative,"sha256":format!("{:x}",Sha256::digest(&bytes)),"bytes":bytes.len()}));
+        text.push_str(&format!("\n### {relative}\n{content}\n"));
+    }
+    let prompt = format!("{body}\n\n<ccb_role_context>\nCurrent role: {identity}\nRole root: {}\nThis is the current CCB role memory for this turn, replacing earlier CCB role memory. An empty list means no current role memory. Project and user instructions still apply.\n{text}</ccb_role_context>", root.display());
+    Ok((
+        prompt,
+        json!({"role":identity,"root":root,"sources":sources,"delivery":"per_turn_live_read"}),
+    ))
+}
+
+fn paths(value: &Value, result: &mut Vec<String>) -> Result<()> {
+    if value.is_null() {
+        return Ok(());
+    }
+    for item in value
+        .as_array()
+        .context("role memory paths must be an array")?
+    {
+        let path = item.as_str().context("role memory path must be a string")?;
+        ensure!(
+            !path.is_empty()
+                && !path.contains([':', '\\'])
+                && Path::new(path)
+                    .components()
+                    .all(|p| matches!(p, std::path::Component::Normal(_))),
+            "role memory path must stay relative to its role root"
+        );
+        result.push(path.into());
+    }
+    Ok(())
 }

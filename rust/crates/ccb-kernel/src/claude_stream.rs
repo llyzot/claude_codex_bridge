@@ -179,14 +179,14 @@ impl Session {
             timeout_s: spec["timeout_s"].as_f64().unwrap_or(0.0),
         })
     }
-    pub fn start(&mut self, job: &Value) -> Result<()> {
+    pub fn start(&mut self, job: &Value, prompt: &str) -> Result<()> {
         ensure!(
             self.ready && self.active.is_none(),
             "Claude session is not idle"
         );
         let uuid = uuid::Uuid::new_v4().to_string();
         self.commands.try_send(json!({"type":"user","uuid":uuid,"session_id":self.session_id,"parent_tool_use_id":null,
-            "message":{"role":"user","content":format!("CCB_REQ_ID: {}\n{}",job["job_id"].as_str().context("missing Claude job")?,job["request"]["body"].as_str().context("missing Claude prompt")?)}})).context("Claude input queue unavailable")?;
+            "message":{"role":"user","content":format!("CCB_REQ_ID: {}\n{}",job["job_id"].as_str().context("missing Claude job")?,prompt)}})).context("Claude input queue unavailable")?;
         self.active = Some(Active {
             job: job.clone(),
             uuid,

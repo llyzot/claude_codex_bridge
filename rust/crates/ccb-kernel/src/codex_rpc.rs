@@ -208,7 +208,7 @@ impl Session {
             Err(error) => Err(error).context("Codex command queue unavailable"),
         }
     }
-    pub fn start(&mut self, job: &Value) -> Result<()> {
+    pub fn start(&mut self, job: &Value, prompt: &str) -> Result<()> {
         ensure!(
             self.ready && self.active.is_none(),
             "Codex session is not idle"
@@ -225,7 +225,7 @@ impl Session {
             .unwrap_or_default();
         params.insert("threadId".into(), self.state["thread_id"].clone());
         params.insert("clientUserMessageId".into(), job["job_id"].clone());
-        params.insert("input".into(),json!([{"type":"text","text":format!("CCB_REQ_ID: {}\n{}",job["job_id"].as_str().unwrap_or(""),job["request"]["body"].as_str().context("missing Codex prompt")?)}]));
+        params.insert("input".into(),json!([{"type":"text","text":format!("CCB_REQ_ID: {}\n{}",job["job_id"].as_str().unwrap_or(""),prompt)}]));
         self.send(json!({"id":start,"method":"turn/start","params":params}))?;
         self.active = Some(Active {
             job: job.clone(),

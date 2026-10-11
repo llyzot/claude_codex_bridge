@@ -128,7 +128,13 @@ impl Store {
                 || stream
                 || artifact
                 || provider_state
-                || ["lease.json", "lifecycle.json"].contains(&relative),
+                || [
+                    "lease.json",
+                    "lifecycle.json",
+                    "configuration.json",
+                    "reload.json"
+                ]
+                .contains(&relative),
             "unowned state path"
         );
         let base = if agent_log {

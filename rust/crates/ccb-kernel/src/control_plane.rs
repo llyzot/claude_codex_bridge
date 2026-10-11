@@ -113,8 +113,9 @@ fn serve_runtime(
         crate::daemon::verify_owner(root)?;
         crate::security::own_process_tree()?;
     }
-    let kernel = Kernel::open(root)?;
+    let mut kernel = Kernel::open(root)?;
     if let Some(config) = &config {
+        crate::daemon::validate_startup(&mut kernel, config)?;
         crate::workspaces::materialize(config)?;
     }
     let public = config.is_some();

@@ -100,6 +100,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     }
     if args.first().is_some_and(|s| s == "--help") {
         println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask [--compact] [--silence] [--chain] [--artifact-request|--inline-request] [--artifact-reply] <agent> [from <actor>] [--] <message...>\n  target accepts a configured agent or uniquely bound role ID; agents lists bindings\n  ask also reads redirected UTF-8 stdin; --artifact-io enables request/reply artifacts\n  --task-id <id>, --reply-to <id>, --mode <type>; native --from <actor> remains supported\nccb-native --state-root <dir> ask get|cancel <job-id>\nccb-native --state-root <dir> cancel <job-id> [--silent] | retry <job-id>\nccb-native --state-root <dir> watch <target> [--cursor <n>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> agents|ping|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> job-recovery|job-reconcile <job-id>\nccb-native --state-root <dir> provider-status <agent>\nccb-native --state-root <dir> provider-terminate <agent> [--silent]\nccb-native --state-root <dir> provider-recover <agent> <fault-id>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native workspace-tree <path> [--include-controller-state]\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
+        println!("ccb-native [--project <directory>] [--state-root <dir>] reload [--config <json>|--executables <manifest>] [--dry-run] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> reload-status");
         return Ok(());
     }
     if args.is_empty() {
@@ -246,13 +247,17 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         crate::security::create_token(&token)?;
         return crate::control_plane::serve_config(&root, &token, config);
     }
-    if op == "start" {
+    if op == "start" || op == "reload" {
         let mut manifest = None;
         let mut config_file = None;
         let mut timeout = 15_000u64;
+        let mut dry_run = false;
+        let mut wait = false;
         let mut i = 0;
         while i < args.len() {
             match arg(&args, i)? {
+                "--dry-run" if op == "reload" => dry_run = true,
+                "--wait" if op == "reload" => wait = true,
                 "--executables" => {
                     i += 1;
                     manifest = Some(PathBuf::from(
@@ -269,7 +274,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
                     i += 1;
                     timeout = arg(&args, i)?.parse()?;
                 }
-                other => bail!("unknown start option: {other}"),
+                other => bail!("unknown {op} option: {other}"),
             }
             i += 1;
         }
@@ -295,6 +300,43 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             };
             crate::config::compile(&project, document, &executables)?
         };
+        if op == "reload" {
+            let plan = request(&root, "reload-plan", json!({"config":config}))?;
+            if dry_run {
+                println!("{plan}");
+                return Ok(());
+            }
+            let mut result = request(
+                &root,
+                "reload",
+                json!({"config":config,
+                "expected_fingerprint":plan["plan"]["current_fingerprint"]}),
+            )?;
+            let operation = result["reload"]["operation_id"].clone();
+            let deadline = std::time::Instant::now() + Duration::from_millis(timeout);
+            while wait
+                && ["preparing", "retiring"]
+                    .contains(&result["reload"]["status"].as_str().unwrap_or(""))
+            {
+                if std::time::Instant::now() >= deadline {
+                    result["observation_timeout"] = json!(true);
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+                result = request(&root, "reload-status", json!({}))?;
+                ensure!(
+                    result["reload"]["operation_id"] == operation,
+                    "reload observation superseded; inspect reload-status"
+                );
+            }
+            println!("{result}");
+            ensure!(
+                !["blocked", "failed", "interrupted"]
+                    .contains(&result["reload"]["status"].as_str().unwrap_or("")),
+                "configuration reload was not applied; inspect the returned status"
+            );
+            return Ok(());
+        }
         println!(
             "{}",
             crate::startup::start(&root, config, Duration::from_millis(timeout))?
@@ -302,7 +344,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         return Ok(());
     }
     let payload = match op.as_str() {
-        "ping" | "stop" | "agents" => {
+        "ping" | "stop" | "agents" | "reload-status" => {
             ensure!(args.is_empty(), "command takes no arguments");
             json!({})
         }

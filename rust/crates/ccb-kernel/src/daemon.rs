@@ -15,6 +15,13 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
+#[path = "daemon_reload.rs"]
+mod reload;
+
+pub fn validate_startup(kernel: &mut Kernel, config: &Value) -> Result<()> {
+    reload::startup_guard(kernel, config)
+}
+
 pub fn now() -> String {
     let time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -56,6 +63,8 @@ enum DriverEvent {
 pub struct Daemon {
     pub kernel: Kernel,
     config: Value,
+    known_names: Vec<String>,
+    reload: Option<reload::Pending>,
     state: String,
     running: HashMap<String, Running>,
     pi: HashMap<String, crate::pi_rpc::Session>,
@@ -210,6 +219,8 @@ impl Daemon {
         Ok(Self {
             kernel,
             config,
+            known_names: names,
+            reload: None,
             state,
             running: HashMap::new(),
             pi: HashMap::new(),
@@ -221,6 +232,7 @@ impl Daemon {
         })
     }
     pub fn mount(&mut self, endpoint: &Value) -> Result<()> {
+        self.initialize_configuration()?;
         let timestamp = now();
         let prior = self.kernel.store.json("lease.json")?.unwrap_or(Value::Null);
         let generation = prior["generation"].as_u64().unwrap_or(0) + 1;
@@ -235,7 +247,8 @@ impl Daemon {
             "save",
             &json!({"record":{"schema_version":2,"record_type":"ccbd_lease","api_version":2,"project_id":self.config["project_id"],
             "ccbd_pid":std::process::id(),"socket_path":address,"socket_inode":null,"boot_id":self.state,"generation":generation,"daemon_instance_id":self.state,
-            "started_at":timestamp,"last_heartbeat_at":timestamp,"mount_state":"mounted","control_plane_endpoint":descriptor}}),
+            "started_at":timestamp,"last_heartbeat_at":timestamp,"mount_state":"mounted","control_plane_endpoint":descriptor,
+            "config_signature":crate::config::fingerprint(&self.config)?}}),
         )?;
         crate::lifecycle::dispatch(
             &mut self.kernel,
@@ -286,7 +299,7 @@ impl Daemon {
             .collect()
     }
     fn get_job(&mut self, id: &str) -> Result<Value> {
-        for agent in self.names() {
+        for agent in self.known_names.clone() {
             let found = records::dispatch(
                 &mut self.kernel.store,
                 "find_last",
@@ -336,6 +349,9 @@ impl Daemon {
     }
     fn dispatch(&mut self, op: &str, p: &Value) -> Result<Value> {
         match op {
+            "reload-plan" => Ok(json!({"plan":self.reload_plan(&p["config"])?})),
+            "reload" => self.request_reload(p),
+            "reload-status" => Ok(json!({"reload":self.kernel.store.json("reload.json")?})),
             "ping" => Ok(
                 json!({"service":"ccbd","runtime":"rust","project_id":self.config["project_id"],"pid":std::process::id(),"status":"running",
                     "startup_id":self.config["startup_id"],"config_fingerprint":crate::config::fingerprint(&self.config)?,"degraded":!self.faults.is_empty()}),
@@ -473,6 +489,18 @@ impl Daemon {
             "retry" => {
                 let target = records::string(p, "target")?;
                 let attempt = retry::source(&mut self.kernel, target)?;
+                let retry_agent = records::string(&attempt, "agent_name")?;
+                self.reload_guard(retry_agent)?;
+                self.spec(retry_agent)?;
+                let prior_job = self.get_job(records::string(&attempt, "job_id")?)?;
+                if let Some(actor) = prior_job["request"]["from_actor"].as_str() {
+                    self.reload_guard(actor)?;
+                    ensure!(
+                        !self.known_names.iter().any(|name| name == actor)
+                            || self.config["agents"][actor].is_object(),
+                        "retry caller agent was removed; submit a new task explicitly"
+                    );
+                }
                 ensure!(
                     !self
                         .faults
@@ -480,6 +508,11 @@ impl Daemon {
                     "provider is faulted"
                 );
                 let spec = &self.config["agents"][records::string(&attempt, "agent_name")?];
+                ensure!(
+                    prior_job["provider"] == spec["provider"]
+                        && prior_job["workspace_path"] == spec["workspace_path"],
+                    "retry target configuration changed; submit a new task explicitly"
+                );
                 retry::admit(
                     &mut self.kernel,
                     &json!({"target":target,"state_id":self.state,"accepted_at":now(),"dispatch_disabled":spec["dispatch_disabled"]}),
@@ -501,6 +534,7 @@ impl Daemon {
             }
             "work" => {
                 let agent = records::string(p, "agent_name")?;
+                self.reload_guard(agent)?;
                 let spec = self.spec(agent)?;
                 ensure!(
                     spec["command"].is_null(),
@@ -575,6 +609,10 @@ impl Daemon {
                 Ok(json!({"job_id":id,"agent_name":agent,"status":"cancellation_requested"}))
             }
             "shutdown" => {
+                ensure!(
+                    self.reload.is_none(),
+                    "configuration reload in progress; observe reload-status before shutdown"
+                );
                 self.stopping = true;
                 Ok(json!({"status":"stopping"}))
             }
@@ -630,6 +668,8 @@ impl Daemon {
             records::string(&request, "to_agent")?,
             &self.config["agents"]
         )?);
+        self.reload_guard(records::string(&request, "to_agent")?)?;
+        self.reload_guard(records::string(&request, "from_actor")?)?;
         ensure!(
             !self
                 .faults
@@ -731,6 +771,7 @@ impl Daemon {
         };
         let mut drafts = Vec::new();
         for agent in &targets {
+            self.reload_guard(agent)?;
             ensure!(!self.faults.contains_key(agent), "provider is faulted: {agent}; inspect provider-status and recover its fault identity");
             let spec = self.spec(agent)?;
             let mut child = request.clone();
@@ -1022,6 +1063,7 @@ impl Daemon {
     }
     fn terminate_provider(&mut self, p: &Value) -> Result<Value> {
         let agent = records::string(p, "agent_name")?;
+        self.reload_guard(agent)?;
         let spec = self.spec(agent)?;
         let owned = self.owned_view(agent);
         let scope = self.owned_scope(agent)?;
@@ -1144,6 +1186,7 @@ impl Daemon {
     }
     fn recover_provider(&mut self, p: &Value) -> Result<Value> {
         let agent = records::string(p, "agent_name")?;
+        self.reload_guard(agent)?;
         let spec = self.spec(agent)?;
         let mut fault = self
             .faults
@@ -1536,6 +1579,7 @@ impl Daemon {
         Ok(())
     }
     pub fn tick(&mut self, endpoint: &Value, token_path: &std::path::Path) -> Result<()> {
+        self.tick_reload()?;
         if self.heartbeat.elapsed().as_secs() >= 2 {
             crate::lifecycle::dispatch(
                 &mut self.kernel,
@@ -1634,6 +1678,9 @@ impl Daemon {
         }
         self.kernel.store.commit()?;
         for agent in self.names() {
+            if self.reload_frozen(&agent) {
+                continue;
+            }
             if self.config["agents"][&agent]["dispatch_disabled"] == true {
                 continue;
             }

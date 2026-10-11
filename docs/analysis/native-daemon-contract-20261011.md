@@ -12,7 +12,7 @@ The config has `schema_version: 2`, a `project_id`, and an `agents` object. Each
 
 ## Verified behavior
 
-- Public API-2 requests keep the existing `{api_version, op, request}` and flattened success/error envelope. The current operations are ping, submit, watch, queue, retry, inbox, mailbox-head, work, complete, cancel, provider-requests, provider-respond and shutdown. Complete operation/output-shape parity is not yet claimed. Cancellation controls are implemented for owned Pi and Codex sessions; explicit Codex interaction is available through native pending/respond commands.
+- Public API-2 requests keep the existing `{api_version, op, request}` and flattened success/error envelope. The current operations are ping, submit, watch, queue, retry, inbox, mailbox-head, work, complete, cancel, provider-requests, provider-respond and shutdown. Complete operation/output-shape parity is not yet claimed. Cancellation controls are implemented for owned Pi, Codex and Claude sessions; explicit Codex interaction is available through native pending/respond commands.
 - A serialized actor owns durable mutation and a separate periodic tick. A request receipt does not wait for command execution. Child stdin writing runs separately from the actor; stdout records are bounded.
 - A transient command receives a Job JSON on stdin. A result envelope must contain matching job ID, agent, provider, execution-instance ID, and a version-2 CompletionDecision. Process exit and stdout EOF are required before terminal admission. Foreign output is diagnostic failure, not task evidence.
 - A Worker result can atomically record its reply and prepare a continuation. The daemon admits that continuation and starts the configured Lead executor. Lead does not poll during its initial submission turn.
@@ -30,7 +30,7 @@ On Windows the daemon owns a nested Job Object with kill-on-job-close and is ass
 
 ## Remaining requirements
 
-Native Pi/Codex/Claude execution is integrated, as detailed in [the provider checkpoint](native-provider-protocols-20261011.md). Codex interactive requests have native API/CLI handling; real-model interaction and graphical UI integration remain unverified. Other remaining work includes Claude control/hooks and successful real inference, Herdr startup/Agent management, complete native CLI/config/install integration, full public operation parity and Keeper behavior.
+Native Pi/Codex/Claude execution is integrated, as detailed in [the provider checkpoint](native-provider-protocols-20261011.md). Codex interactive requests and Claude cancellation/deadlines have native handling; real-model interaction/control and graphical UI integration remain unverified. Other remaining work includes Claude hooks/interactive requests and successful real inference, Herdr startup/Agent management, complete native CLI/config/install integration, full public operation parity and Keeper behavior.
 
 An old running Job with no owned process handle is kept active/fenced after restart. This avoids interpreting an observation gap as completion or replaying uncertain work. Durable provider recovery, operator reconciliation and Unix process-tree ownership are not finished. Windows descendant cleanup is verified for this owned-process driver; it is not a claim of controlling unrelated Herdr Agents.
 

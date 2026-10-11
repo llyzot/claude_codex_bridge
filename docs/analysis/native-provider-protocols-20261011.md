@@ -77,6 +77,50 @@ When a saved Pi binding has a session file, native startup passes that exact fil
 
 The public native cancel operation queues Pi `abort`; its response reports cancellation requested, not task completion. The driver waits for the anchored run's `agent_settled` and a correlated idle state. Silent-cancel intent is carried into the terminal decision and prevents reply synthesis. Pi deadlines request abort and similarly wait for provider evidence; elapsed time alone never releases the slot.
 
+## Claude control and terminal correlation
+
+Native explicit cancellation and `timeout_s` deadlines persist Job/Event intent
+before sending an owned `control_request` with subtype `interrupt`. Request IDs
+bind the process generation and user message UUID. Empty success acknowledgements,
+errors, unknown UUIDs and elapsed time do not release FIFO. If `still_queued`
+contains the current UUID, the driver requests its targeted
+`cancel_async_message`. A correlated positive queue-removal receipt (or that UUID
+in the interrupt's `cancelled` list) is exact evidence that this queued input will
+not execute; it can finish without a user replay that never happened.
+
+Normal results retain session/parent/echo fences and validate `user_message_uuid`
+or `user_message_uuids` when present. After queue cancellation, that attribution
+is mandatory and remains so across clean restarts, preventing a late result of
+the retired input from finishing the next task. Older producers without those
+fields retain ordinary legacy result handling before queue cancellation; they
+cannot provide this stronger post-cancellation attribution. Unsupported or
+unattributed frames are not substituted with inferred completion.
+
+`terminal_reason` values `aborted_streaming` and `aborted_tools` identify a
+cancelled turn. A natural completion racing an interrupt keeps its actual
+provider outcome. Error-subtype `errors` arrays enter failure classification;
+cancellation intent prevents automatic retry and preserves silent reply policy.
+An exit fallback waits for both confirmed process exit and stdout EOF, so a valid
+result behind the bounded output backlog is not discarded. An exited process
+does not make a new task ready or shut down the daemon.
+
+Primary protocol source: the official `@anthropic-ai/claude-agent-sdk` 0.3.296
+`sdk.d.ts`, matching installed Claude Code 2.1.296 according to
+[Anthropic's changelog](https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/CHANGELOG.md).
+The pinned type source is
+https://unpkg.com/@anthropic-ai/claude-agent-sdk@0.3.296/sdk.d.ts.
+It defines the control envelope, interrupt receipt, targeted cancellation,
+result user UUIDs and terminal reasons; the driver does not borrow Managed
+Agents' separate HTTP event protocol.
+
+An owned installed CLI in a new private home/workspace accepted initialize and
+idle interrupt controls; its reported version was 2.1.296. Another private
+probe accepted idle interrupt without initialization. Both returned empty
+`still_queued`/`cancelled` lists. Neither probe sent a user prompt or invoked a
+model, and user environment/login/Workspace were unchanged. Successful actual
+model interruption is still unverified; owned fixtures cover running/queued
+cancellation, missing or late results, deadlines, restart fences and EOF backlog.
+
 ## Unfinished scope
 
-Running-task reconciliation across daemon crashes, real-model Codex approval acceptance and graphical UI integration, Claude hooks/cancellation/deadlines, Herdr attachment/startup/Agent management, full config/CLI parity, production installer activation, successful real Claude inference, performance comparisons and default Rust selection remain incomplete. Claude stream execution and real Pi/Codex automatic callback evidence are recorded in [the real-model checkpoint](native-real-model-checkpoint-20261011.md). These implementations do not connect to or adopt an existing user app-server/session merely because its process or pathname exists.
+Running-task reconciliation across daemon crashes, real-model Codex approval acceptance and graphical UI integration, Claude hooks/interactive requests and real-model control acceptance, Herdr attachment/startup/Agent management, full config/CLI parity, production installer activation, successful real Claude inference, performance comparisons and default Rust selection remain incomplete. Claude stream execution and real Pi/Codex automatic callback evidence are recorded in [the real-model checkpoint](native-real-model-checkpoint-20261011.md). These implementations do not connect to or adopt an existing user app-server/session merely because its process or pathname exists.

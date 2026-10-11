@@ -436,7 +436,11 @@ impl Daemon {
                 } else if let Some(session) = self.codex.get(&agent) {
                     let record_reply = p["record_reply"] != false;
                     session.validate_interrupt(id, record_reply)?;
-                    self.mark_codex_cancel(job, record_reply, false)?;
+                    self.mark_provider_cancel(job, record_reply, false)?;
+                } else if let Some(session) = self.claude.get(&agent) {
+                    let record_reply = p["record_reply"] != false;
+                    session.validate_interrupt(id, record_reply)?;
+                    self.mark_provider_cancel(job, record_reply, false)?;
                 } else {
                     bail!("native cancellation control is not yet implemented for this provider");
                 }
@@ -449,7 +453,7 @@ impl Daemon {
             _ => bail!("unsupported native daemon operation: {op}"),
         }
     }
-    fn mark_codex_cancel(
+    fn mark_provider_cancel(
         &mut self,
         mut job: Value,
         record_reply: bool,
@@ -459,7 +463,8 @@ impl Daemon {
         if !prior.is_null() {
             ensure!(
                 prior["record_reply"] == record_reply,
-                "Codex cancellation reply policy already fixed"
+                "{} cancellation reply policy already fixed",
+                job["provider"].as_str().unwrap_or("Provider")
             );
             return Ok(job);
         }
@@ -1015,7 +1020,7 @@ impl Daemon {
                 } else if self.codex[&agent].deadline_due() {
                     let id = self.codex[&agent].active_job_id().unwrap().to_owned();
                     let job = self.get_job(&id)?;
-                    let marked = self.mark_codex_cancel(job, true, true)?;
+                    let marked = self.mark_provider_cancel(job, true, true)?;
                     // Provider IO happens only after the intent is durable.
                     self.kernel.store.commit()?;
                     self.codex.get_mut(&agent).unwrap().sync_job(&marked)?;
@@ -1064,6 +1069,10 @@ impl Daemon {
                     )?;
                     self.claude.insert(agent.clone(), session);
                 }
+                if let Some(id) = self.claude[&agent].active_job_id().map(str::to_owned) {
+                    let job = self.get_job(&id)?;
+                    self.claude.get_mut(&agent).unwrap().sync_job(&job)?;
+                }
                 let (completion, metadata, ready) = {
                     let session = self.claude.get_mut(&agent).unwrap();
                     let completion = session.poll()?;
@@ -1091,6 +1100,12 @@ impl Daemon {
                         return Err(error);
                     }
                     self.kernel.store.commit()?;
+                } else if self.claude[&agent].deadline_due() {
+                    let id = self.claude[&agent].active_job_id().unwrap().to_owned();
+                    let job = self.get_job(&id)?;
+                    let marked = self.mark_provider_cancel(job, true, true)?;
+                    self.kernel.store.commit()?;
+                    self.claude.get_mut(&agent).unwrap().sync_job(&marked)?;
                 }
                 if ready {
                     let checkpoint = self.kernel.memory_checkpoint();

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "base_commit": "54c71746",
+  "recorded_at": "2026-10-11T19:33:53.602987+00:00",
+  "command": "resubmit <message-id> [--operation-id <uuid>]",
+  "api_operation": "resubmit",
+  "legacy_source": "lib/ccbd/services/dispatcher_runtime/submission_service.py",
+  "real_models": false,
+  "production_install_changed": false,
+  "final_release_sha256": {
+    "ccb-kernel.exe": "7a11914b33793615107c1e14fd5e9359c634275f7ee113d3d2800e78c1c98f55",
+    "ccb-native.exe": "71d5dcdf6788534f238fd1913d2914418c96da06287b5364bbaed8d45c6591e9"
+  },
+  "repository_bin_matches_release": true,
+  "verification": {
+    "selected_suite": "92 passed in 181.70s",
+    "rust_unit_tests": "25 passed plus parent-invoked subprocess helper",
+    "format_clippy_diff": "passed",
+    "initial_red": "unsupported native command: resubmit"
+  }
+}

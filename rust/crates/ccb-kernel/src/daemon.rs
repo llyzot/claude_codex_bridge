@@ -23,6 +23,8 @@ mod herdr;
 mod project_view;
 #[path = "daemon_reload.rs"]
 mod reload;
+#[path = "resubmit.rs"]
+mod resubmit;
 #[path = "trace.rs"]
 mod trace;
 #[path = "wait_summary.rs"]
@@ -478,6 +480,7 @@ impl Daemon {
                     "dispatch_disabled":spec["dispatch_disabled"]==true})
             }).collect::<Vec<_>>()})),
             "submit" => self.submit(p),
+            "resubmit" => self.resubmit(p),
             "watch" => self.watch(p),
             "trace" => self.trace(p),
             "wait-summary" => self.wait_summary(p),
@@ -751,6 +754,14 @@ impl Daemon {
         Ok(spec.clone())
     }
     fn submit(&mut self, p: &Value) -> Result<Value> {
+        Ok(self.admit_request(p, None, Value::Null)?["receipt"].clone())
+    }
+    fn admit_request(
+        &mut self,
+        p: &Value,
+        planned_targets: Option<Vec<String>>,
+        origin: Value,
+    ) -> Result<Value> {
         let mut request = p.clone();
         ensure!(request.is_object(), "submit requires an object");
         request["to_agent"] = json!(crate::roles::resolve(
@@ -854,7 +865,9 @@ impl Daemon {
             request["body"].as_str().context("body must be text")?.len() <= 4096,
             "large native requests require artifact transport"
         );
-        let targets = if request["to_agent"] == "all" {
+        let targets = if let Some(targets) = planned_targets {
+            targets
+        } else if request["to_agent"] == "all" {
             self.names()
                 .into_iter()
                 .filter(|a| self.config["agents"][a]["dispatch_disabled"] != true)
@@ -881,9 +894,9 @@ impl Daemon {
         let result = admission::submit(
             &mut self.kernel,
             &json!({"state_id":self.state,"agent_names":names,"bureau_enabled":true,"max_callback_depth":self.config["max_callback_depth"].as_u64().unwrap_or(5),"accepted_at":now(),
-            "plan":{"project_id":request["project_id"],"from_actor":request["from_actor"],"task_id":request["task_id"],"request":request,"drafts":drafts,"submission_id":submission,"target_scope":"all","origin_message_id":null}}),
+            "plan":{"project_id":request["project_id"],"from_actor":request["from_actor"],"task_id":request["task_id"],"request":request,"drafts":drafts,"submission_id":submission,"target_scope":"all","origin_message_id":origin}}),
         )?;
-        Ok(result["receipt"].clone())
+        Ok(result)
     }
     fn watch(&mut self, p: &Value) -> Result<Value> {
         let target = records::string(p, "target")?;

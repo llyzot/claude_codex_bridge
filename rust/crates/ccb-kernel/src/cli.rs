@@ -136,6 +136,9 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
         println!("ccb-native installation upgrade|recover|rollback --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]\nccb-native installation status --prefix <directory>");
         println!("ccb-native --state-root <dir> view [--limit <1..64>]");
+        println!(
+            "ccb-native [--project <directory>] resubmit <message-id> [--operation-id <uuid>]"
+        );
         println!("ccb-native [--project <directory>] wait-any|wait-all <id> [--timeout <seconds>]\nccb-native [--project <directory>] wait-quorum <count> <id> [--timeout <seconds>]");
         println!("ccb-native [--project <directory>] trace <submission|message|attempt|reply|job ID> [--limit <1..1000>] [--offset <n>]");
         println!("ccb-native codex-tui-attach <host-directory> (experimental native Codex TUI)");
@@ -690,6 +693,22 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     }
     if op == "clear" || op == "compact" {
         return crate::cli_context::run(&root, &op, &args);
+    }
+    if op == "resubmit" {
+        ensure!(
+            args.len() == 1 || args.len() == 3 && arg(&args, 1)? == "--operation-id",
+            "resubmit requires a message ID and optional --operation-id UUID"
+        );
+        let operation = if args.len() == 3 {
+            uuid::Uuid::parse_str(arg(&args, 2)?)?
+        } else {
+            uuid::Uuid::new_v4()
+        }
+        .to_string();
+        let result=request(&root,"resubmit",json!({"message_id":arg(&args,0)?,"operation_id":operation}))
+            .with_context(||format!("resubmit operation {operation} was not observed; repeat with the same message ID and --operation-id {operation}, not a new operation"))?;
+        println!("{result}");
+        return Ok(());
     }
     if ["wait-any", "wait-all", "wait-quorum"].contains(&op.as_str()) {
         return crate::cli_wait::run(&root, &op, &args);

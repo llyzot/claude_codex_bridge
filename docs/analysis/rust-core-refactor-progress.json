@@ -214,7 +214,8 @@
     "Windows native startup intents record process creation/session identity and reject reused PID ownership; errors expose bounded transport failure metadata without raw output",
     "Native Claude AskUserQuestion answers support single/multiple selections, free text, general replies and denial while preserving current-task anchors and one-time response/privacy rules; real CLI validated against a local protocol fixture",
     "Native API-2/CLI trace resolves submission/message/attempt/reply/job IDs, preserves legacy summaries, exposes callback and ordinary-delivery lineage, distinguishes waiting callbacks, pages explicitly and avoids state/provider mutations",
-    "Native wait-any/wait-all/wait-quorum use immediate read-only wait-summary snapshots, latest reply routes and callback-aware parent completion; CLI timeout never cancels/restarts/replays work"
+    "Native wait-any/wait-all/wait-quorum use immediate read-only wait-summary snapshots, latest reply routes and callback-aware parent completion; CLI timeout never cancels/restarts/replays work",
+    "Native resubmit creates fresh origin-linked messages and attempts using atomic ordinary admission, freezes recipients, revalidates artifacts and protects callback/control lineage; optional operation UUIDs deduplicate lost-ACK and restart receipt replay"
   ],
   "remaining": [
     "Complete legacy/provider-history and cross-Windows-session recovery where new ownership proof is unavailable; verify non-Windows scoped process-tree termination and recovery",
@@ -551,6 +552,8 @@
     "native_trace_evidence": "docs/analysis/native-trace-20261012.json",
     "native_trace_validation": "The new trace API failed before implementation. Final trace/daemon/project-view/CLI-security/native-installation selection passed 66 cases in 93.41s. Message/attempt/reply summaries were compared with Python implementations; callbacks, ordinary delivery, retry order, broadcast job order, project fences, paging, durable-record immutability and artifact-body independence passed. Rust unit tests 25 passed plus parent-invoked subprocess helper; formatting, clippy all-targets with warnings denied, diff checks and final binary hashes passed. No full repository test or production/default promotion claimed.",
     "native_wait_evidence": "docs/analysis/native-wait-20261012.json",
-    "native_wait_validation": "38 wait/trace/daemon/CLI-security cases passed in 51.19s, plus three cancellation/invalid-deadline cases in 3.59s. Selection matches the Python latest-reply policy; broadcast quorum, retry, callback waiting, notices and durable-record immutability verified. Rust 25 plus parent-invoked helper, formatting, Clippy, diff checks and release/bin hashes passed. No full repository regression or production/default promotion claimed."
+    "native_wait_validation": "38 wait/trace/daemon/CLI-security cases passed in 51.19s, plus three cancellation/invalid-deadline cases in 3.59s. Selection matches the Python latest-reply policy; broadcast quorum, retry, callback waiting, notices and durable-record immutability verified. Rust 25 plus parent-invoked helper, formatting, Clippy, diff checks and release/bin hashes passed. No full repository regression or production/default promotion claimed.",
+    "native_resubmit_evidence": "docs/analysis/native-resubmit-20261012.json",
+    "native_resubmit_validation": "The public CLI initially rejected resubmit. Final resubmit/daemon/trace/wait/context/reload selection passed 92 cases in 181.70s. Receipt replay after daemon restart and deliberately lost socket acknowledgement created no duplicate message. Fixed recipients, atomic target rejection, artifact validation and callback/control replay fences passed. Rust 25 plus parent-invoked helper, formatting, Clippy with warnings denied, diff checks and final binary hashes passed. No full repository run or production/default promotion claimed."
   }
 }

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "base_commit": "dd8138f9",
+  "recorded_at": "2026-10-11T19:19:09.348946+00:00",
+  "commands": [
+    "wait-any",
+    "wait-all",
+    "wait-quorum"
+  ],
+  "api_operation": "wait-summary",
+  "python_oracles": [
+    "lib/cli/services/wait_runtime/replies.py",
+    "lib/cli/services/wait_runtime/policy.py"
+  ],
+  "verification": {
+    "selected_suite": "38 passed in 51.19s",
+    "additional_cases": "3 passed in 3.59s",
+    "rust_unit_tests": "25 passed plus parent-invoked helper",
+    "format_clippy_diff": "passed"
+  },
+  "production_install_changed": false,
+  "real_models": false,
+  "final_release_sha256": {
+    "ccb-kernel.exe": "b1c7bdfe689cac7c7191a68d595b0186a48fab61813dd02b82a2fc98b0d7451a",
+    "ccb-native.exe": "985963f6d050f3795fc822c00da870f37490b975146ef49998e52a4cf42fa59d"
+  },
+  "repository_bin_matches_release": true
+}

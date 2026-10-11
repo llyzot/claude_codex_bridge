@@ -13,6 +13,7 @@ mod claude_stream;
 pub mod cli;
 mod cli_context;
 mod cli_tasks;
+mod cli_wait;
 mod codex_context;
 mod codex_requests;
 mod codex_rpc;

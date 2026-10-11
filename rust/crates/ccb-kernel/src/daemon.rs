@@ -25,6 +25,8 @@ mod project_view;
 mod reload;
 #[path = "trace.rs"]
 mod trace;
+#[path = "wait_summary.rs"]
+mod wait_summary;
 
 pub fn validate_startup(kernel: &mut Kernel, config: &Value) -> Result<()> {
     reload::startup_guard(kernel, config)
@@ -478,6 +480,7 @@ impl Daemon {
             "submit" => self.submit(p),
             "watch" => self.watch(p),
             "trace" => self.trace(p),
+            "wait-summary" => self.wait_summary(p),
             "queue" => {
                 let target = p["target"].as_str().unwrap_or("all");
                 let mut queues = Vec::new();

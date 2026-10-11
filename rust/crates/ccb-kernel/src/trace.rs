@@ -76,7 +76,7 @@ fn submission(row: &Value) -> Value {
         ],
     )
 }
-fn reply(row: &Value) -> Value {
+pub(super) fn reply(row: &Value) -> Value {
     if row.is_null() {
         return Value::Null;
     }
@@ -126,12 +126,33 @@ fn reply(row: &Value) -> Value {
     ] {
         out[key] = d[key].clone();
     }
-    out["notice"] = json!(
-        d["notice"] == true
-            || d["notice_kind"]
-                .as_str()
-                .is_some_and(|s| !s.trim().is_empty())
-    );
+    let kind = if crate::records::truthy(&d["notice_kind"]) {
+        let text = d["notice_kind"]
+            .as_str()
+            .map(str::to_owned)
+            .unwrap_or_else(|| d["notice_kind"].to_string())
+            .trim()
+            .to_lowercase();
+        if text.is_empty() {
+            None
+        } else {
+            Some(text)
+        }
+    } else {
+        None
+    };
+    out["notice_kind"] = json!(kind);
+    out["last_progress_at"] = json!(d["last_progress_at"]
+        .as_str()
+        .map(str::trim)
+        .filter(|s| !s.is_empty()));
+    out["heartbeat_silence_seconds"] = json!(d["heartbeat_silence_seconds"]
+        .as_f64()
+        .or_else(|| d["heartbeat_silence_seconds"]
+            .as_str()
+            .and_then(|s| s.parse::<f64>().ok()))
+        .filter(|n| n.is_finite()));
+    out["notice"] = json!(crate::records::truthy(&d["notice"]) || kind.is_some());
     out["silence_on_success"] = json!(d["silence_on_success"] == true);
     for (key, source) in [
         ("completion_mode", "mode"),
@@ -176,7 +197,7 @@ fn page(out: &mut Value, key: &str, rows: Vec<Value>, offset: usize, limit: usiz
     offset.saturating_add(limit) < total
 }
 impl Daemon {
-    fn trace_job_record(&self, job_id: &str) -> Result<Value> {
+    pub(super) fn trace_job_record(&self, job_id: &str) -> Result<Value> {
         for agent in &self.known_names {
             let row = self.kernel.store.latest_by_id(
                 &format!("agents/{agent}/jobs.jsonl"),

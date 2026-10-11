@@ -53,6 +53,11 @@ def close_output_when_released():
     while not (directory / 'release-error').exists(): time.sleep(.025)
     close_output()
 
+def close_input():
+    os.close(sys.stdin.fileno())
+    (directory / 'stdin-closed').touch()
+    hold()
+
 if first and mode == 'idle-eof':
     threading.Thread(target=close_output_when_released, daemon=True).start()
 
@@ -64,6 +69,7 @@ if provider == 'claude':
     session = sys.argv[sys.argv.index(flag) + 1]
     emit(dict(type='system', subtype='init', session_id=secret if first and mode == 'init' else session))
     if first and mode == 'init': hold()
+    if first and mode == 'stdin-closed': close_input()
 
 for line in sys.stdin.buffer:
     command = json.loads(line)
@@ -93,6 +99,7 @@ for line in sys.stdin.buffer:
             emit(dict(type='response', command=kind, id=command['id'],
                       success=not (first and mode == 'init'), data=state, error=secret))
             if first and mode == 'init': hold()
+            if first and mode == 'stdin-closed': close_input()
             if first and mode == 'completed-eof' and command['id'].startswith('settled-'): close_output()
         elif kind == 'prompt':
             emit(dict(type='response', command='wrong-' + secret if first and mode == 'active' else kind,
@@ -117,6 +124,7 @@ for line in sys.stdin.buffer:
             emit({'id': command['id'], 'result': {'userAgent': 'fixture'}})
         elif kind in {'thread/start', 'thread/resume'}:
             emit({'id': command['id'], 'result': {'thread': thread}})
+            if first and mode == 'stdin-closed': close_input()
         elif kind == 'turn/start':
             if first and mode == 'active':
                 emit({'id': command['id'], 'result': {'turn': {'error': secret}}}); hold()

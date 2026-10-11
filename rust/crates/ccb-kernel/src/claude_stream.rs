@@ -3,7 +3,7 @@ use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
 use std::{
     collections::HashSet,
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufRead, BufReader, Read},
     process::{Command, Stdio},
     sync::mpsc,
     time::Instant,
@@ -37,6 +37,7 @@ pub struct Session {
     initialize: Option<String>,
     child: crate::owned_process::OwnedChild,
     commands: mpsc::SyncSender<Value>,
+    input_failed: std::sync::Arc<std::sync::atomic::AtomicBool>,
     events: mpsc::Receiver<StreamEvent>,
     session_id: String,
     pub runtime: String,
@@ -148,20 +149,9 @@ impl Session {
             command.creation_flags(0x08000000);
         }
         let mut child = crate::owned_process::OwnedChild::spawn(&mut command)?;
-        let mut stdin = child.stdin.take().context("missing Claude stdin")?;
+        let stdin = child.stdin.take().context("missing Claude stdin")?;
         let stdout = child.stdout.take().context("missing Claude stdout")?;
-        let (commands, input) = mpsc::sync_channel::<Value>(16);
-        std::thread::spawn(move || {
-            for value in input {
-                let Ok(mut bytes) = serde_json::to_vec(&value) else {
-                    break;
-                };
-                bytes.push(b'\n');
-                if stdin.write_all(&bytes).and_then(|_| stdin.flush()).is_err() {
-                    break;
-                }
-            }
-        });
+        let (commands, input_failed) = crate::provider_input::spawn(stdin);
         let (sender, events) = mpsc::sync_channel(64);
         std::thread::spawn(move || {
             let mut reader = BufReader::new(stdout);
@@ -213,6 +203,7 @@ impl Session {
             surface,
             child,
             commands,
+            input_failed,
             events,
             session_id: session_id.clone(),
             runtime: uuid::Uuid::new_v4().to_string(),
@@ -388,7 +379,8 @@ impl Session {
         self.refresh_requests();
         let exit = self.child.try_wait()?;
         let tree_empty = exit.is_some() && self.child.tree_empty()?;
-        if self.stdout_closed {
+        let input_closed = self.input_failed.load(std::sync::atomic::Ordering::Acquire);
+        if self.stdout_closed || input_closed {
             self.ready = false;
         }
         if exit.is_some() {
@@ -402,7 +394,11 @@ impl Session {
             let active = self.active.take().unwrap();
             self.refresh_requests();
             self.closed = exit.is_some() && self.stdout_closed && tree_empty;
-            self.ready = !self.quarantined && !self.forced && exit.is_none() && !self.stdout_closed;
+            self.ready = !self.quarantined
+                && !self.forced
+                && exit.is_none()
+                && !self.stdout_closed
+                && !input_closed;
             let mut decision = active.decision.clone().unwrap();
             control_diagnostics(&active, &mut decision);
             return Ok(Some((active.job, decision)));
@@ -447,8 +443,15 @@ impl Session {
             }
             return Ok(None);
         }
-        if !self.quarantined && !self.forced && self.stdout_closed {
-            return Err(crate::provider_fault::TransportClosed("stdout").into());
+        if !self.quarantined && !self.forced && (self.stdout_closed || input_closed) {
+            return Err(
+                crate::provider_fault::TransportClosed(if self.stdout_closed {
+                    "stdout"
+                } else {
+                    "stdin"
+                })
+                .into(),
+            );
         }
         if !self.quarantined && !self.forced && exit.is_none() && !self.stdout_closed {
             if let Some(active) = self.active.as_mut() {
@@ -477,6 +480,7 @@ impl Session {
             && !self.forced
             && !self.stdout_closed
             && !self.idle_shutdown
+            && !self.input_failed.load(std::sync::atomic::Ordering::Acquire)
     }
     pub fn pending_requests(&self) -> Value {
         self.active

@@ -2,7 +2,7 @@
 use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
 use std::{
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufRead, BufReader, Read},
     process::{Command, Stdio},
     sync::mpsc,
     time::Instant,
@@ -34,6 +34,7 @@ pub struct Session {
     role_skills_bound: bool,
     child: crate::owned_process::OwnedChild,
     commands: mpsc::SyncSender<Value>,
+    input_failed: std::sync::Arc<std::sync::atomic::AtomicBool>,
     events: mpsc::Receiver<StreamEvent>,
     init: String,
     pub runtime: String,
@@ -126,20 +127,9 @@ impl Session {
             command.creation_flags(0x08000000);
         }
         let mut child = crate::owned_process::OwnedChild::spawn(&mut command)?;
-        let mut stdin = child.stdin.take().context("missing Pi stdin")?;
+        let stdin = child.stdin.take().context("missing Pi stdin")?;
         let stdout = child.stdout.take().context("missing Pi stdout")?;
-        let (commands, input) = mpsc::sync_channel::<Value>(16);
-        std::thread::spawn(move || {
-            for value in input {
-                let Ok(mut bytes) = serde_json::to_vec(&value) else {
-                    break;
-                };
-                bytes.push(b'\n');
-                if stdin.write_all(&bytes).and_then(|_| stdin.flush()).is_err() {
-                    break;
-                }
-            }
-        });
+        let (commands, input_failed) = crate::provider_input::spawn(stdin);
         let (sender, events) = mpsc::sync_channel(64);
         std::thread::spawn(move || {
             let mut reader = BufReader::new(stdout);
@@ -183,6 +173,7 @@ impl Session {
             role_skills_bound: false,
             child,
             commands,
+            input_failed,
             events,
             init,
             runtime,
@@ -306,6 +297,7 @@ impl Session {
         Ok(())
     }
     pub fn poll(&mut self) -> Result<Option<(Value, Value)>> {
+        self.input_closed |= self.input_failed.load(std::sync::atomic::Ordering::Acquire);
         if self.closed && self.active.is_none() {
             return Ok(None);
         }
@@ -428,6 +420,7 @@ impl Session {
             && !self.forced
             && !self.stdout_closed
             && !self.input_closed
+            && !self.input_failed.load(std::sync::atomic::Ordering::Acquire)
     }
     pub fn deadline_due(&self) -> bool {
         !self.quarantined

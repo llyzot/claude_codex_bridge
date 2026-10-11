@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "base_commit": "112e7385",
+  "recorded_at": "2026-10-11T22:10:44.836959+00:00",
+  "behavior": "Shared bounded writer publishes an immediate failure flag; no second enqueue is required to report a broken provider input transport",
+  "providers": [
+    "pi",
+    "codex",
+    "claude"
+  ],
+  "real_model_inference": false,
+  "production_install_changed": false,
+  "verification": {
+    "initial_red": "Single admissible input to an initialized Pi with closed stdin did not publish a fault",
+    "focused_stdin_cases": "3 passed in 7.09s",
+    "final_selection": "123 passed in 244.31s; transport/fault/Claude-context/context/followup/ping paths",
+    "rust_unit_tests": "30 passed plus parent-invoked process-death helper in 33.84s; includes UTF-8 short writes, orderly close and write/flush failure",
+    "format_clippy_diff": "passed",
+    "full_repository_run": false
+  },
+  "binary_sha256": {
+    "ccb-kernel.exe": "0eb0f364865013b4b88e7bafe9b19195fa892e5ad6b70a67d409151c2b1137a0",
+    "ccb-native.exe": "a3a499c3793ea48e10219ccc14160872b5dd0b9bbdb34f5bd6cefd35477de351"
+  },
+  "repository_bin_matches_release": true,
+  "limits": [
+    "A write failure can follow partial or full delivery; no non-delivery or replay safety is inferred for the active task",
+    "A blocked writer with an open pipe is distinct from an observed I/O failure",
+    "No real provider model inference or production/default change in this checkpoint"
+  ]
+}

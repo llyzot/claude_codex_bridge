@@ -144,3 +144,28 @@ def test_idle_receiver_eof_keeps_reply_until_explicit_recovery(tmp_path, provide
     finally:
         (tmp_path / 'release-error').touch(); (tmp_path / 'release-fault').touch()
         server.close()
+
+
+@pytest.mark.parametrize('provider', ['pi', 'codex', 'claude'])
+def test_failed_first_stdin_write_is_reported_without_another_enqueue(tmp_path, provider):
+    server = Server(tmp_path / 'state', {'worker': config(provider, 'stdin-closed', tmp_path)})
+    try:
+        ready(server)
+        wait_for(lambda: (tmp_path / 'stdin-closed').exists())
+        receipt = submit(server, body='x' * 4090)
+        path = server.root / f'providers/{provider}/worker/fault.json'
+        wait_for(path.exists)
+        record = json.loads(path.read_text(encoding='utf-8'))
+        assert record['transport_closed'] == 'stdin' and record['job_id'] == receipt['job_id']
+        assert server.rpc('watch', {'target': receipt['job_id']})['status'] == 'running'
+        with pytest.raises(AssertionError, match='faulted'): submit(server)
+        with pytest.raises(AssertionError, match='active execution'): recover(server, record)
+        assert len((tmp_path / 'fault-launches').read_text().splitlines()) == 1
+        (tmp_path / 'release-fault').touch()
+        assert await_watch(server, receipt['job_id'], lambda r: r['terminal'])['status'] == 'failed'
+        recover(server, record)
+        new = submit(server)
+        assert await_watch(server, new['job_id'], lambda r: r['terminal'])['status'] == 'completed'
+    finally:
+        (tmp_path / 'release-fault').touch()
+        server.close()

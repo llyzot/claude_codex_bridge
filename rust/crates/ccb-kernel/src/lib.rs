@@ -49,6 +49,7 @@ mod pi_skills;
 mod pi_terminal;
 mod project_memory;
 mod provider_fault;
+mod provider_input;
 mod records;
 mod result_policy;
 mod retry;

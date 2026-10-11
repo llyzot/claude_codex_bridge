@@ -54,14 +54,14 @@ def project(setup):
     def command(**data):
         pi.stdin.write(json.dumps(data)+'\n');pi.stdin.flush();line=pi.stdout.readline();assert line,pi.stderr.read();return json.loads(line)
     def idle(name):
-        ledger=json.loads((native_root/'herdr/herdr-agents.json').read_text())
+        ledger=json.loads((native_root/'herdr/herdr-agents.json').read_text(encoding='utf-8'))
         change(backend,lambda s:s['agents'][ledger['agents'][name]['herdr_name']].update(agent_status='idle',interactive_ready=True))
     yield dict(root=root,backend=backend,options=options,file=file,native=native_root,open=open,ready=ready,pi=pi,codex=codex,session=session,log=log,prompts=prompts,command=command,idle=idle)
     start=native_root/'herdr/herdr-open-start.json'
-    if start.exists():owned_stop(json.loads(start.read_text()).get('process'))
+    if start.exists():owned_stop(json.loads(start.read_text(encoding='utf-8')).get('process'))
     cli('--state-root',native_root,'stop')
     journal=native_root/'herdr/herdr-open.json'
-    if journal.exists():owned_stop(json.loads(journal.read_text()).get('server_process'))
+    if journal.exists():owned_stop(json.loads(journal.read_text(encoding='utf-8')).get('server_process'))
     for process in [pi,codex]:
         if process.poll() is None:process.kill()
         process.wait(timeout=5)
@@ -70,7 +70,7 @@ def test_cold_open_composes_server_agents_binding_daemon_and_same_pi_lead_review
     p=project;opened=p['open']();assert opened.returncode==0,opened.stderr
     wait_for(p['ready'],timeout=20)
     root=p['native'];first=p['ready']()
-    server_identity=json.loads((root/'herdr/herdr-open.json').read_text())['server_process']
+    server_identity=json.loads((root/'herdr/herdr-open.json').read_text(encoding='utf-8'))['server_process']
     assert json.loads(cli('process-identity',server_identity['pid']).stdout)==server_identity
     assert mutate_count(p['backend'],['agent','start'])==2
     asked=cli('--state-root',root,'ask','lead','initial task');assert asked.returncode==0,asked.stderr
@@ -151,7 +151,7 @@ def test_initial_pi_name_repair_recovers_lost_ack_without_repeating_rename(proje
 
 def test_initial_pi_name_repair_refuses_a_foreign_extension_owner(project):
     p=project;change(p['backend'],lambda s:s.update(pi_hook_authority=True))
-    current=p['native']/'pi-terminal-events/lead/current.json';row=json.loads(current.read_text())
+    current=p['native']/'pi-terminal-events/lead/current.json';row=json.loads(current.read_text(encoding='utf-8'))
     row['owner']='00000000-0000-0000-0000-000000000000';current.write_text(json.dumps(row),encoding='utf-8')
     result=p['open']();assert result.returncode!=0
     assert mutate_count(p['backend'],['agent','rename'])==0 and p['pi'].poll() is None
@@ -165,7 +165,7 @@ def test_delayed_native_session_binding_continues_in_background(project):
     # Fresh Codex can publish its first rollout only after a real input. The
     # daemon admits that input using its mounted process and a unique anchor.
     wait_for(p['ready'],timeout=20)
-    worker=json.loads(ledger.read_text())['agents']['worker']['herdr_name']
+    worker=json.loads(ledger.read_text(encoding='utf-8'))['agents']['worker']['herdr_name']
     change(p['backend'],lambda s:s['agents'][worker].update(agent_session={'agent':'codex','kind':'id','value':p['session'],'source':'fixture'}))
     wait_for(p['ready'],timeout=20)
     assert mutate_count(p['backend'],['agent','start'])==2
@@ -205,7 +205,7 @@ def test_changed_request_does_not_replace_running_agents_or_daemon(project):
 def test_opener_crash_after_launch_intent_resumes_without_duplicate_agent_start(project):
     p=project;fault(p['backend'],['agent','start'],'hang-after')
     initial=p['open'](0);assert initial.returncode==0,initial.stderr
-    intent=json.loads((p['native']/'herdr/herdr-open-start.json').read_text())
+    intent=json.loads((p['native']/'herdr/herdr-open-start.json').read_text(encoding='utf-8'))
     wait_for(lambda:(p['backend']/'mutation-finished').exists())
     owned_stop(intent['process'])
     wait_for(lambda:cli('process-identity',intent['process']['pid']).returncode!=0)
@@ -215,27 +215,27 @@ def test_opener_crash_after_launch_intent_resumes_without_duplicate_agent_start(
 
 def test_live_daemon_identity_mismatch_is_rejected_before_namespace_commands(project):
     p=project;assert p['open']().returncode==0;before=wait_for(p['ready'],timeout=20)
-    record=p['native']/'herdr/herdr-open.json';value=json.loads(record.read_text());value['daemon_fingerprint']='foreign';record.write_text(json.dumps(value),encoding='utf-8')
-    calls=(p['backend']/'calls.jsonl').read_text()
+    record=p['native']/'herdr/herdr-open.json';value=json.loads(record.read_text(encoding='utf-8'));value['daemon_fingerprint']='foreign';record.write_text(json.dumps(value),encoding='utf-8')
+    calls=(p['backend']/'calls.jsonl').read_text(encoding='utf-8')
     refused=p['open']();assert refused.returncode!=0 and 'existing daemon' in refused.stderr
-    assert (p['backend']/'calls.jsonl').read_text()==calls and p['ready']()['pid']==before['pid']
+    assert (p['backend']/'calls.jsonl').read_text(encoding='utf-8')==calls and p['ready']()['pid']==before['pid']
 
 def test_explicit_history_and_windows_path_override_are_preserved(project):
     p=project;p['options']['config']['agents']['worker']['env']={'Path':os.environ['PATH']}
     p['options']['bindings']={'worker':dict(root=str(p['log'].parent),path=str(p['log']),session_id=p['session'],cwd=str(p['root']))}
     p['file'].write_text(json.dumps(p['options']),encoding='utf-8')
     result=p['open']();assert result.returncode==0,result.stderr;wait_for(p['ready'],timeout=20)
-    ledger=json.loads((p['native']/'herdr/herdr-open.json').read_text())
+    ledger=json.loads((p['native']/'herdr/herdr-open.json').read_text(encoding='utf-8'))
     assert Path(ledger['bindings']['worker']['history']['path'])==p['log']
 
 def test_agent_shell_environment_routes_plain_native_ask_from_outside_project(project):
     p=project;assert p['open']().returncode==0;wait_for(p['ready'],timeout=20)
-    namespace=json.loads((p['native']/'herdr/namespace.json').read_text())
+    namespace=json.loads((p['native']/'herdr/namespace.json').read_text(encoding='utf-8'))
     env=server(p['backend'])['panes'][namespace['bindings']['lead']['pane_id']]['env']
     assert env['CCB_AGENT_NAME']=='lead' and Path(env['CCB_NATIVE_STATE_ROOT'])==p['native']
     called=cli('ask','worker','automatic sender and root',env={**os.environ,**env},cwd=p['backend'])
     assert called.returncode==0,called.stderr
-    jobs=(p['root']/'.ccb/agents/worker/jobs.jsonl').read_text().splitlines()
+    jobs=(p['root']/'.ccb/agents/worker/jobs.jsonl').read_text(encoding='utf-8').splitlines()
     assert json.loads(jobs[-1])['request']['from_actor']=='lead'
 
 def test_dry_run_is_read_only_and_omits_environment_values(setup):

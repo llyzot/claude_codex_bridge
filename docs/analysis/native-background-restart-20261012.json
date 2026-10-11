@@ -1,0 +1,586 @@
+{
+  "schema_version": 1,
+  "base_commit": "5dddce65",
+  "recorded_at": "2026-10-11T18:17:49.717312+00:00",
+  "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it",
+  "session": "ccb-herdr-host-final-qtj6_4it",
+  "real_models": true,
+  "before": {
+    "open": {
+      "bindings": {
+        "lead": {
+          "history": {
+            "cwd": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project",
+            "path": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project\\.ccb/ccbd\\pi-terminal-events\\lead\\current.json",
+            "root": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project\\.ccb/ccbd\\pi-terminal-events\\lead",
+            "session_id": "01a12bf9-be26-7746-8911-398194b6f18f"
+          },
+          "pi_bridge_owner": "a29c495c-2f29-4dc8-a41c-e7843ba53536"
+        },
+        "worker": {
+          "native_host": true
+        }
+      },
+      "daemon": {
+        "already_running": true,
+        "pid": 20992,
+        "project_id": "0b86cf6b7a2056b3a0f6df1384e3700cd90ede2cb3bd363c394646d368fa04f5",
+        "startup_id": "4e5d60a8-17cf-488a-a9ba-ef3fa2574ec1",
+        "state_root": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project\\.ccb/ccbd",
+        "status": "running"
+      },
+      "daemon_fingerprint": "b24ba88963a22e508e13cb6614d420d29458d072f98a0f6d2723a344df45a26c",
+      "last_recovery_id": "2c51a25f-45d9-4c17-ba37-787607eb2a97",
+      "observer_instance": "a988bef9-5129-4161-8834-7249818e7764",
+      "phase": "running",
+      "project_id": "0b86cf6b7a2056b3a0f6df1384e3700cd90ede2cb3bd363c394646d368fa04f5",
+      "request_hash": "2cb006f137460ad9d1fdd635f46319dfd6042a47d55d72564f0a368ff5cf7cd8",
+      "resume_args": {
+        "lead": [
+          "--session",
+          "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-herdr-host-final-qtj6_4it-project--\\2026-10-11T17-19-09-863Z_01a12bf9-be26-7746-8911-398194b6f18f.jsonl"
+        ],
+        "worker": []
+      },
+      "schema_version": 1,
+      "server_process": {
+        "created": "134362156304489094",
+        "pid": 28372,
+        "windows_session": 1
+      },
+      "server_start_permitted": true,
+      "session": "ccb-herdr-host-final-qtj6_4it",
+      "workspace_id": "w6"
+    },
+    "mount": {
+      "agents": {
+        "lead": {
+          "agent_session": {
+            "agent": "pi",
+            "kind": "path",
+            "source": "herdr:pi",
+            "value": "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-herdr-host-final-qtj6_4it-project--\\2026-10-11T17-19-09-863Z_01a12bf9-be26-7746-8911-398194b6f18f.jsonl"
+          },
+          "binding": {
+            "process": {
+              "created": "134362156328761569",
+              "pid": 65428,
+              "windows_session": 1
+            }
+          },
+          "effective_startup_timeout_ms": 4000,
+          "herdr_name": "ccb-a8e742fec20d47fba113b30c",
+          "interactive_ready": true,
+          "launch_acknowledged": true,
+          "observed_lifecycle": "idle",
+          "operation_id": "a8e742fe-c20d-47fb-a113-b30c6f2c4d13",
+          "pane_id": "w6:p1",
+          "sent": true,
+          "shell": {
+            "created": "134362156311608795",
+            "pid": 58084,
+            "windows_session": 1
+          },
+          "status": "ready",
+          "terminal_id": "term_65d94734bf7333"
+        },
+        "worker": {
+          "agent_session": null,
+          "binding": {
+            "process": {
+              "created": "134362159610803064",
+              "pid": 57968,
+              "windows_session": 1
+            }
+          },
+          "herdr_name": "ccb-ee0ac14884ac48b4a53e31ee",
+          "host_launch": {
+            "cwd": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project",
+            "endpoint": "ws://127.0.0.1:64635",
+            "executable": "C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe",
+            "host_process": {
+              "created": "134362159574711380",
+              "pid": 53780,
+              "windows_session": 1
+            },
+            "path": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\hosts\\93f72f06-433b-42d1-af31-05b8687ba985",
+            "schema_version": 1,
+            "server_process": {
+              "created": "134362159575094896",
+              "pid": 58424,
+              "windows_session": 1
+            },
+            "session_record": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project\\.ccb\\ccbd\\providers\\codex\\worker\\session.json",
+            "status": "running",
+            "thread_id": "01a12c14-a64a-7220-b73e-c07593f95ef6"
+          },
+          "interactive_ready": false,
+          "name_repair": {
+            "host_process": {
+              "created": "134362159574711380",
+              "pid": 53780,
+              "windows_session": 1
+            },
+            "kind": "codex_host",
+            "pane_id": "w6:p2",
+            "permitted": true,
+            "process": {
+              "created": "134362159610803064",
+              "pid": 57968,
+              "windows_session": 1
+            },
+            "terminal_id": "term_65d94735687554"
+          },
+          "observed_lifecycle": "unknown",
+          "operation_id": "ee0ac148-84ac-48b4-a53e-31ee04a4de44",
+          "pane_id": "w6:p2",
+          "sent": true,
+          "shell": {
+            "created": "134362156318541590",
+            "pid": 63136,
+            "windows_session": 1
+          },
+          "status": "ready",
+          "terminal_id": "term_65d94735687554"
+        }
+      },
+      "namespace_owner": "3c352188-dd15-47b2-b41b-5c2802736734",
+      "plan": {
+        "agents": {
+          "lead": {
+            "argument_count": 10,
+            "arguments_hash": "f1e514fcec11ad8391fbf376f0554c57f45b401e27d4ae3b6c5a3e2426787c80",
+            "cwd": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project",
+            "provider": "pi"
+          },
+          "worker": {
+            "argument_count": 0,
+            "arguments_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "cwd": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project",
+            "native_host": {
+              "command_hash": "bbe006d1e915051edefe61cd1a97d9dc3fc75f9048f104432df823bc413bca38",
+              "root": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\hosts"
+            },
+            "provider": "codex"
+          }
+        },
+        "namespace_plan_hash": "c32675878ec99c7c8b07bfa8c22117c4dcb8c1862c046e74e5915dcf23290fab",
+        "startup_timeout_ms": 30000
+      },
+      "plan_hash": "3040759e50dda2f952638dcdfe7264b646a2448c62cb715102dc97ed4b1dc8df",
+      "project_id": "0b86cf6b7a2056b3a0f6df1384e3700cd90ede2cb3bd363c394646d368fa04f5",
+      "protocol": 22,
+      "record_type": "native_herdr_agents",
+      "schema_version": 1,
+      "session": "ccb-herdr-host-final-qtj6_4it",
+      "status": "ready",
+      "workspace_id": "w6"
+    },
+    "worker": {
+      "agent_name": "worker",
+      "observed_at": "2026-10-11T18:12:39.964266400Z",
+      "pid": 53780,
+      "record_type": "codex_app_server_session",
+      "runtime_instance_id": "93f72f06-433b-42d1-af31-05b8687ba985",
+      "schema_version": 1,
+      "state": {
+        "path": "\\\\?\\C:\\Users\\user\\.codex\\sessions\\2026\\10\\12\\rollout-2026-10-12T01-48-34-01a12c14-a64a-7220-b73e-c07593f95ef6.jsonl",
+        "pending_requests": [],
+        "status": {
+          "type": "idle"
+        },
+        "thread_id": "01a12c14-a64a-7220-b73e-c07593f95ef6",
+        "tui_host": {
+          "input_transport": "authenticated_websocket",
+          "path": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\hosts\\93f72f06-433b-42d1-af31-05b8687ba985"
+        }
+      }
+    },
+    "daemon_process": {
+      "created": "134362159574037754",
+      "pid": 20992,
+      "windows_session": 1
+    }
+  },
+  "after": {
+    "open": {
+      "backend_restart": {
+        "config_fingerprint": "b24ba88963a22e508e13cb6614d420d29458d072f98a0f6d2723a344df45a26c",
+        "operation_id": "71750cf4-2c83-41b0-ae7f-ec39c76280f4",
+        "phase": "running",
+        "previous_pid": 20992
+      },
+      "bindings": {
+        "lead": {
+          "history": {
+            "cwd": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project",
+            "path": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project\\.ccb/ccbd\\pi-terminal-events\\lead\\current.json",
+            "root": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project\\.ccb/ccbd\\pi-terminal-events\\lead",
+            "session_id": "01a12bf9-be26-7746-8911-398194b6f18f"
+          },
+          "pi_bridge_owner": "a29c495c-2f29-4dc8-a41c-e7843ba53536"
+        },
+        "worker": {
+          "native_host": true
+        }
+      },
+      "daemon": {
+        "already_running": true,
+        "pid": 50936,
+        "project_id": "0b86cf6b7a2056b3a0f6df1384e3700cd90ede2cb3bd363c394646d368fa04f5",
+        "startup_id": "dfa012ee-c185-4fd5-9f34-ab43c1711ae9",
+        "state_root": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project\\.ccb/ccbd",
+        "status": "running"
+      },
+      "daemon_fingerprint": "b24ba88963a22e508e13cb6614d420d29458d072f98a0f6d2723a344df45a26c",
+      "last_recovery_id": "2c51a25f-45d9-4c17-ba37-787607eb2a97",
+      "observer_instance": "bae91e9c-7541-459c-8f68-40074163b7d1",
+      "phase": "running",
+      "project_id": "0b86cf6b7a2056b3a0f6df1384e3700cd90ede2cb3bd363c394646d368fa04f5",
+      "request_hash": "2cb006f137460ad9d1fdd635f46319dfd6042a47d55d72564f0a368ff5cf7cd8",
+      "resume_args": {
+        "lead": [
+          "--session",
+          "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-herdr-host-final-qtj6_4it-project--\\2026-10-11T17-19-09-863Z_01a12bf9-be26-7746-8911-398194b6f18f.jsonl"
+        ],
+        "worker": []
+      },
+      "schema_version": 1,
+      "server_process": {
+        "created": "134362156304489094",
+        "pid": 28372,
+        "windows_session": 1
+      },
+      "server_start_permitted": true,
+      "session": "ccb-herdr-host-final-qtj6_4it",
+      "workspace_id": "w6"
+    },
+    "mount": {
+      "agents": {
+        "lead": {
+          "agent_session": {
+            "agent": "pi",
+            "kind": "path",
+            "source": "herdr:pi",
+            "value": "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-herdr-host-final-qtj6_4it-project--\\2026-10-11T17-19-09-863Z_01a12bf9-be26-7746-8911-398194b6f18f.jsonl"
+          },
+          "binding": {
+            "process": {
+              "created": "134362156328761569",
+              "pid": 65428,
+              "windows_session": 1
+            }
+          },
+          "effective_startup_timeout_ms": 4000,
+          "herdr_name": "ccb-a8e742fec20d47fba113b30c",
+          "interactive_ready": true,
+          "launch_acknowledged": true,
+          "observed_lifecycle": "idle",
+          "operation_id": "a8e742fe-c20d-47fb-a113-b30c6f2c4d13",
+          "pane_id": "w6:p1",
+          "sent": true,
+          "shell": {
+            "created": "134362156311608795",
+            "pid": 58084,
+            "windows_session": 1
+          },
+          "status": "ready",
+          "terminal_id": "term_65d94734bf7333"
+        },
+        "worker": {
+          "agent_session": null,
+          "binding": {
+            "process": {
+              "created": "134362160014586725",
+              "pid": 60108,
+              "windows_session": 1
+            }
+          },
+          "herdr_name": "ccb-831ce4d15f254781bf1c9058",
+          "host_launch": {
+            "cwd": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project",
+            "endpoint": "ws://127.0.0.1:57674",
+            "executable": "C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe",
+            "host_process": {
+              "created": "134362160000431471",
+              "pid": 60588,
+              "windows_session": 1
+            },
+            "path": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\hosts\\7b3e249f-67b7-4e41-aba2-e10c124caf13",
+            "schema_version": 1,
+            "server_process": {
+              "created": "134362160000872814",
+              "pid": 37180,
+              "windows_session": 1
+            },
+            "session_record": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project\\.ccb\\ccbd\\providers\\codex\\worker\\session.json",
+            "status": "running",
+            "thread_id": "01a12c14-a64a-7220-b73e-c07593f95ef6"
+          },
+          "interactive_ready": false,
+          "name_repair": {
+            "host_process": {
+              "created": "134362160000431471",
+              "pid": 60588,
+              "windows_session": 1
+            },
+            "kind": "codex_host",
+            "pane_id": "w6:p2",
+            "permitted": true,
+            "process": {
+              "created": "134362160014586725",
+              "pid": 60108,
+              "windows_session": 1
+            },
+            "terminal_id": "term_65d94735687554"
+          },
+          "observed_lifecycle": "unknown",
+          "operation_id": "831ce4d1-5f25-4781-bf1c-9058a0313ecd",
+          "pane_id": "w6:p2",
+          "sent": true,
+          "shell": {
+            "created": "134362156318541590",
+            "pid": 63136,
+            "windows_session": 1
+          },
+          "status": "ready",
+          "terminal_id": "term_65d94735687554"
+        }
+      },
+      "namespace_owner": "3c352188-dd15-47b2-b41b-5c2802736734",
+      "plan": {
+        "agents": {
+          "lead": {
+            "argument_count": 10,
+            "arguments_hash": "f1e514fcec11ad8391fbf376f0554c57f45b401e27d4ae3b6c5a3e2426787c80",
+            "cwd": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project",
+            "provider": "pi"
+          },
+          "worker": {
+            "argument_count": 0,
+            "arguments_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "cwd": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project",
+            "native_host": {
+              "command_hash": "bbe006d1e915051edefe61cd1a97d9dc3fc75f9048f104432df823bc413bca38",
+              "root": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\hosts"
+            },
+            "provider": "codex"
+          }
+        },
+        "namespace_plan_hash": "c32675878ec99c7c8b07bfa8c22117c4dcb8c1862c046e74e5915dcf23290fab",
+        "startup_timeout_ms": 30000
+      },
+      "plan_hash": "3040759e50dda2f952638dcdfe7264b646a2448c62cb715102dc97ed4b1dc8df",
+      "project_id": "0b86cf6b7a2056b3a0f6df1384e3700cd90ede2cb3bd363c394646d368fa04f5",
+      "protocol": 22,
+      "record_type": "native_herdr_agents",
+      "schema_version": 1,
+      "session": "ccb-herdr-host-final-qtj6_4it",
+      "status": "ready",
+      "workspace_id": "w6"
+    },
+    "worker": {
+      "agent_name": "worker",
+      "observed_at": "2026-10-11T18:13:20.829918Z",
+      "pid": 60588,
+      "record_type": "codex_app_server_session",
+      "runtime_instance_id": "7b3e249f-67b7-4e41-aba2-e10c124caf13",
+      "schema_version": 1,
+      "state": {
+        "path": "\\\\?\\C:\\Users\\user\\.codex\\sessions\\2026\\10\\12\\rollout-2026-10-12T01-48-34-01a12c14-a64a-7220-b73e-c07593f95ef6.jsonl",
+        "pending_requests": [],
+        "status": {
+          "type": "idle"
+        },
+        "thread_id": "01a12c14-a64a-7220-b73e-c07593f95ef6",
+        "tui_host": {
+          "input_transport": "authenticated_websocket",
+          "path": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\hosts\\7b3e249f-67b7-4e41-aba2-e10c124caf13"
+        }
+      }
+    }
+  },
+  "same_herdr_server": true,
+  "same_pi_process": true,
+  "same_codex_thread": true,
+  "daemon_after": {
+    "created": "134362159999749811",
+    "pid": 50936,
+    "windows_session": 1
+  },
+  "native_start_intent": {
+    "config_fingerprint": "b24ba88963a22e508e13cb6614d420d29458d072f98a0f6d2723a344df45a26c",
+    "pid": 50936,
+    "process": {
+      "created": "134362159999749811",
+      "pid": 50936,
+      "windows_session": 1
+    },
+    "project_id": "0b86cf6b7a2056b3a0f6df1384e3700cd90ede2cb3bd363c394646d368fa04f5",
+    "record_type": "native_start_intent",
+    "schema_version": 1,
+    "startup_id": "dfa012ee-c185-4fd5-9f34-ab43c1711ae9"
+  },
+  "jobs": [
+    {
+      "job_id": "job_7457b9aa1977",
+      "agent": "lead",
+      "result": {
+        "status": "completed",
+        "reply": "§25§ BACKEND_RESTART_REVIEW_OK_6557",
+        "completion_reason": "pi_agent_settled",
+        "visible_reply_source": "message_bureau_reply"
+      }
+    },
+    {
+      "job_id": "job_18dbb60c204b",
+      "agent": "lead",
+      "result": {
+        "status": "completed",
+        "reply": "§25§ BACKEND_RESTART_REVIEW_OK_6557",
+        "completion_reason": "pi_agent_settled",
+        "visible_reply_source": "job_terminal_decision"
+      }
+    },
+    {
+      "job_id": "job_a3b8be38d8e2",
+      "agent": "worker",
+      "result": {
+        "status": "completed",
+        "reply": "BACKEND_RESTART_WORKER_6557",
+        "completion_reason": "codex_turn_completed",
+        "visible_reply_source": "job_terminal_decision"
+      }
+    }
+  ],
+  "production_install_changed": false,
+  "cleanup": {
+    "pending": false,
+    "test_daemon_and_named_herdr_server_stopped": true,
+    "process_observations": [
+      {
+        "previous": {
+          "created": "134362159574037754",
+          "pid": 20992,
+          "windows_session": 1
+        },
+        "same_lifetime": false,
+        "probe_exit_code": 1
+      },
+      {
+        "previous": {
+          "created": "134362156304489094",
+          "pid": 28372,
+          "windows_session": 1
+        },
+        "same_lifetime": false,
+        "probe_exit_code": 1
+      },
+      {
+        "previous": {
+          "created": "134362156304489094",
+          "pid": 28372,
+          "windows_session": 1
+        },
+        "same_lifetime": false,
+        "probe_exit_code": 1
+      },
+      {
+        "previous": {
+          "created": "134362159999749811",
+          "pid": 50936,
+          "windows_session": 1
+        },
+        "same_lifetime": false,
+        "probe_exit_code": 1
+      },
+      {
+        "previous": {
+          "created": "134362156328761569",
+          "pid": 65428,
+          "windows_session": 1
+        },
+        "same_lifetime": false,
+        "probe_exit_code": 1
+      },
+      {
+        "previous": {
+          "created": "134362159610803064",
+          "pid": 57968,
+          "windows_session": 1
+        },
+        "same_lifetime": false,
+        "probe_exit_code": 1
+      },
+      {
+        "previous": {
+          "created": "134362159574711380",
+          "pid": 53780,
+          "windows_session": 1
+        },
+        "same_lifetime": false,
+        "probe_exit_code": 1
+      },
+      {
+        "previous": {
+          "created": "134362159575094896",
+          "pid": 58424,
+          "windows_session": 1
+        },
+        "same_lifetime": false,
+        "probe_exit_code": 1
+      },
+      {
+        "previous": {
+          "created": "134362156328761569",
+          "pid": 65428,
+          "windows_session": 1
+        },
+        "same_lifetime": false,
+        "probe_exit_code": 1
+      },
+      {
+        "previous": {
+          "created": "134362160014586725",
+          "pid": 60108,
+          "windows_session": 1
+        },
+        "same_lifetime": false,
+        "probe_exit_code": 1
+      },
+      {
+        "previous": {
+          "created": "134362160000431471",
+          "pid": 60588,
+          "windows_session": 1
+        },
+        "same_lifetime": false,
+        "probe_exit_code": 1
+      },
+      {
+        "previous": {
+          "created": "134362160000872814",
+          "pid": 37180,
+          "windows_session": 1
+        },
+        "same_lifetime": false,
+        "probe_exit_code": 1
+      }
+    ]
+  },
+  "live_release_sha256": {
+    "ccb-kernel.exe": "e08ee378e4172042d76ac358d5ac4ec332b2de5b6401ae05c34823dc83340074",
+    "ccb-native.exe": "875c193be66ab63fe613fead42cf77b8ab2a5f238b3ac5e3c857166f8001afc5"
+  },
+  "verification": {
+    "broad_selection": "60 passed in 299.67s",
+    "final_focused_selection": "6 passed in 49.10s after the backend PID-lifetime gate change",
+    "rust_unit_tests": "25 passed; one subprocess helper invoked by its parent",
+    "format_clippy_diff": "passed"
+  },
+  "final_release_sha256": {
+    "ccb-kernel.exe": "733dca9da35fe36b16937521d935c86f69c5e4ba7afadbe93929e30c7d252e54",
+    "ccb-native.exe": "10574e966072a2d9a0a12bd72a42f2108785a85cb4445111a9d2b5c36c7a40b1"
+  },
+  "repository_bin_matches_release": true
+}

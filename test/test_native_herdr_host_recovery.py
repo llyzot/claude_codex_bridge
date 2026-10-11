@@ -69,6 +69,51 @@ def test_foreign_pane_occupant_is_not_replaced(hosted):
     assert mutate_count(p['backend'],['pane','run'])==1 and other.poll() is None
     assert not (p['native']/'herdr/herdr-attachments.jsonl').exists()
 
+@pytest.mark.parametrize('recycled_pid',[False,True])
+def test_reopen_restarts_stopped_daemon_without_restarting_herdr_or_pi(hosted,recycled_pid):
+    p=hosted;before=read(p['native']/'herdr/herdr-agents.json');session=read(p['native']/'providers/codex/worker/session.json')
+    daemon=p['ready']()['pid'];server_before=read(p['native']/'herdr/herdr-open.json')['server_process']
+    identity=json.loads(cli('process-identity',daemon).stdout)
+    cli('--state-root',p['native'],'stop');wait_for(lambda:cli('process-identity',daemon).returncode!=0)
+    surrogate=None
+    if recycled_pid:
+        surrogate=p['helper']();lease_path=p['native']/'lease.json';lease=read(lease_path);lease['ccbd_pid']=surrogate.pid;lease_path.write_text(json.dumps(lease),encoding='utf-8')
+        intent_path=p['native']/'kernel/native-start.json';intent=read(intent_path);intent['pid']=surrogate.pid;intent['process']={**identity,'pid':surrogate.pid};intent_path.write_text(json.dumps(intent),encoding='utf-8')
+    remove_display(p);new_display=p['helper']();change(p['backend'],lambda s:s.update(provider_pids=[new_display.pid]))
+    result=p['open']();assert result.returncode==0,result.stderr
+    wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=20)
+    after=read(p['native']/'herdr/herdr-agents.json');new_session=read(p['native']/'providers/codex/worker/session.json')
+    assert after['agents']['lead']['binding']==before['agents']['lead']['binding']
+    assert read(p['native']/'herdr/herdr-open.json')['server_process']==server_before
+    assert p['ready']()['pid']!=daemon and new_session['pid']!=session['pid']
+    if surrogate:assert surrogate.poll() is None and p['ready']()['pid']!=surrogate.pid
+    assert new_session['state']['thread_id']==session['state']['thread_id']
+    assert mutate_count(p['backend'],['agent','start'])==1 and mutate_count(p['backend'],['pane','run'])==2
+
+def test_background_restart_refuses_missing_native_history(hosted):
+    p=hosted;s=read(p['native']/'providers/codex/worker/session.json');daemon=p['ready']()['pid']
+    cli('--state-root',p['native'],'stop');wait_for(lambda:cli('process-identity',daemon).returncode!=0)
+    remove_display(p);Path(s['state']['path']).unlink()
+    result=p['open']();assert result.returncode!=0
+    assert not p['ready']() and mutate_count(p['backend'],['pane','run'])==1
+
+def test_background_restart_does_not_replay_unfinished_lead_job(hosted):
+    p=hosted;asked=cli('--state-root',p['native'],'ask','lead','hold this request');assert asked.returncode==0,asked.stderr
+    wait_for(lambda:len(p['prompts']())==1)
+    daemon=p['ready']()['pid'];cli('--state-root',p['native'],'stop');wait_for(lambda:cli('process-identity',daemon).returncode!=0)
+    remove_display(p);result=p['open']()
+    assert result.returncode!=0 and 'unfinished' in result.stderr
+    assert not p['ready']() and len(p['prompts']())==1
+
+def test_background_restart_refuses_changed_live_pi_binding(hosted):
+    p=hosted;daemon=p['ready']()['pid'];ledger=read(p['native']/'herdr/herdr-agents.json')
+    cli('--state-root',p['native'],'stop');wait_for(lambda:cli('process-identity',daemon).returncode!=0)
+    remove_display(p)
+    change(p['backend'],lambda s:s['agents'][ledger['agents']['lead']['herdr_name']]['agent_session'].update(value=str(p['root']/'different-pi-history.jsonl')))
+    result=p['open']();assert result.returncode!=0 and 'session' in result.stderr
+    assert not p['ready']() and p['pi'].poll() is None
+    assert mutate_count(p['backend'],['agent','start'])==1
+
 def test_missing_inventory_does_not_relaunch_a_live_display(hosted):
     p=hosted;remove_display(p,kill=False)
     p['open'](500)

@@ -76,6 +76,25 @@ def test_readiness_observation_expiry_reuses_live_startup_owner(tmp_path):
     finally:
         stop(root)
 
+@pytest.mark.skipif(os.name!='nt',reason='Windows process lifetime evidence')
+def test_stale_start_intent_does_not_adopt_recycled_pid(tmp_path):
+    import sys
+    root=tmp_path/'state';config=configuration(tmp_path);created=start(root,config)
+    old=json.loads(cli('process-identity',created['pid']).stdout)
+    stop(root)
+    until=time.monotonic()+5
+    while cli('process-identity',created['pid']).returncode==0 and time.monotonic()<until:time.sleep(.03)
+    helper=subprocess.Popen([sys.executable,'-I','-c','import time;time.sleep(30)'],creationflags=0x08000000)
+    try:
+        path=root/'kernel/native-start.json';intent=json.loads(path.read_text(encoding='utf-8'))
+        intent['pid']=helper.pid;intent['process']={**old,'pid':helper.pid};path.write_text(json.dumps(intent),encoding='utf-8')
+        result=start(root,config)
+        assert result['status']=='running' and result['pid']!=helper.pid
+        assert helper.poll() is None
+        stop(root)
+    finally:
+        helper.kill();helper.wait(timeout=5)
+
 
 def test_foreign_project_cannot_adopt_a_live_state_root(tmp_path):
     root = tmp_path / 'state'

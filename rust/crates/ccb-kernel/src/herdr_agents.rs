@@ -119,7 +119,10 @@ pub(crate) fn rpc(request: &Value, arguments: Vec<String>) -> Result<Value> {
     )?;
     ensure!(
         response["ok"] == true,
-        "Herdr agent command outcome is unobserved"
+        "Herdr agent command outcome is unobserved: {} (exit {}, {} ms)",
+        response["failure"].as_str().unwrap_or("unknown"),
+        response["exit_code"],
+        response["elapsed_ms"]
     );
     let value: Value = serde_json::from_str(text(&response, "stdout")?)?;
     Ok(if value["result"].is_object() {
@@ -758,16 +761,43 @@ impl Manager<'_> {
         }
         let runtime =
             crate::config::state_root(Path::new(text(&self.request["config"], "project_root")?))?;
-        let host = crate::codex_tui_host::current(
+        let Some(host) = crate::codex_tui_host::current(
             &runtime,
             name,
             Path::new(text(&self.plan["agents"][name]["native_host"], "root")?),
         )?
-        .context("Codex host unavailable for display reattachment")?;
-        ensure!(
-            crate::codex_tui_host::same_owner(&host, &row["host_launch"]),
-            "Codex host/thread changed; explicit recovery required"
-        );
+        else {
+            return Ok(());
+        };
+        if !crate::codex_tui_host::same_owner(&host, &row["host_launch"]) {
+            for key in ["host_process", "server_process"] {
+                let old = &row["host_launch"][key];
+                let pid = old["pid"]
+                    .as_u64()
+                    .filter(|p| *p > 0 && *p <= u32::MAX as u64)
+                    .context("invalid previous Codex host identity")?
+                    as u32;
+                match crate::owned_process::observe_external_process(pid) {
+                    Ok(current) => ensure!(
+                        current != *old,
+                        "previous Codex host still owns this thread"
+                    ),
+                    Err(_) => ensure!(
+                        crate::daemon::owner_stopped(pid),
+                        "previous Codex host exit is unconfirmed"
+                    ),
+                }
+            }
+            ensure!(
+                host["thread_id"] == row["host_launch"]["thread_id"]
+                    && host["executable"] == row["host_launch"]["executable"]
+                    && crate::pi_terminal::same_session_path(
+                        &host["cwd"],
+                        &row["host_launch"]["cwd"]
+                    ),
+                "replacement host changed the native thread or workspace"
+            );
+        }
         let operation = uuid::Uuid::new_v4();
         let mut next = shell;
         next["operation_id"] = json!(operation.to_string());

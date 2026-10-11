@@ -104,6 +104,31 @@ fn ping(root: &Path, project: &Value, fingerprint: &str) -> Result<Option<Value>
     }
     Ok(None)
 }
+pub(crate) fn owner_alive(intent: &Value) -> Result<bool> {
+    let pid = intent["pid"]
+        .as_u64()
+        .filter(|p| *p > 0 && *p <= u32::MAX as u64)
+        .context("invalid startup owner PID")? as u32;
+    if cfg!(windows) && intent["process"].is_object() {
+        let expected = &intent["process"];
+        ensure!(
+            expected["pid"] == pid
+                && expected["created"]
+                    .as_str()
+                    .is_some_and(|s| s.parse::<u64>().is_ok())
+                && expected["windows_session"].is_u64(),
+            "invalid startup process lifetime"
+        );
+        return match crate::owned_process::observe_external_process(pid) {
+            Ok(current) => Ok(current == *expected),
+            Err(_) if crate::daemon::owner_stopped(pid) => Ok(false),
+            Err(error) => Err(error),
+        };
+    }
+    // Legacy intents without a lifetime proof remain conservative while their
+    // PID is observable. A missing ping is not proof of process exit.
+    Ok(!crate::daemon::owner_stopped(pid))
+}
 fn wait(root: &Path, intent: &Value, fingerprint: &str, timeout: Duration) -> Result<Value> {
     let started = Instant::now();
     let pid = intent["pid"]
@@ -122,7 +147,7 @@ fn wait(root: &Path, intent: &Value, fingerprint: &str, timeout: Duration) -> Re
             );
         }
         ensure!(
-            !crate::daemon::owner_stopped(pid),
+            owner_alive(intent)?,
             "native startup owner exited before ready; inspect native.stderr.log"
         );
         if started.elapsed() >= timeout {
@@ -170,11 +195,7 @@ pub fn start(root: &Path, mut config: Value, timeout: Duration) -> Result<Value>
     }
     let intent_path = kernel.join("native-start.json");
     if let Some(prior) = load(&intent_path)? {
-        let pid = prior["pid"]
-            .as_u64()
-            .filter(|p| *p > 0 && *p <= u32::MAX as u64)
-            .context("invalid native startup intent")? as u32;
-        if !crate::daemon::owner_stopped(pid) {
+        if owner_alive(&prior)? {
             ensure!(
                 prior["project_id"] == config["project_id"]
                     && prior["config_fingerprint"] == fingerprint,
@@ -219,7 +240,12 @@ pub fn start(root: &Path, mut config: Value, timeout: Duration) -> Result<Value>
     let mut child = command.spawn()?;
     #[cfg(windows)]
     drop(handle_guard);
-    let intent = json!({"schema_version":1,"record_type":"native_start_intent","pid":child.id(),
+    let process = if cfg!(windows) {
+        crate::owned_process::observe_external_process(child.id())?
+    } else {
+        Value::Null
+    };
+    let intent = json!({"schema_version":1,"record_type":"native_start_intent","pid":child.id(),"process":process,
         "startup_id":config["startup_id"],"project_id":config["project_id"],"config_fingerprint":fingerprint});
     save(&intent_path, &intent)?;
     let mut input = child

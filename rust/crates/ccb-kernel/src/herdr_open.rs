@@ -450,6 +450,102 @@ fn binding(
         json!({"discovery":{"root":root,"cwd":cwd,"session_id":id}})
     }))
 }
+fn restart_stopped_backend(
+    request: &Value,
+    bridges: &Value,
+    options: &Value,
+    root: &Path,
+    record: &mut Value,
+    wait: Duration,
+) -> Result<()> {
+    let specs = request["config"]["agents"].as_object().unwrap();
+    if !specs.values().any(hosted)
+        || record["daemon"].is_null()
+        || !record["daemon_fingerprint"].is_string()
+        || record["bindings"].as_object().unwrap().len() != specs.len()
+    {
+        return Ok(());
+    }
+    let runtime = crate::config::state_root(Path::new(crate::records::string(
+        &request["config"],
+        "project_root",
+    )?))?;
+    let Some(lease) = read(&runtime, "lease.json")? else {
+        return Ok(());
+    };
+    let pid = lease["ccbd_pid"]
+        .as_u64()
+        .filter(|p| *p > 0 && *p <= u32::MAX as u64)
+        .context("invalid previous daemon PID")? as u32;
+    let intent = read(&runtime, "kernel/native-start.json")?.unwrap_or(Value::Null);
+    let owner_alive = if intent["pid"] == pid
+        && intent["process"].is_object()
+        && intent["project_id"] == request["config"]["project_id"]
+    {
+        crate::startup::owner_alive(&intent)?
+    } else {
+        !crate::daemon::owner_stopped(pid)
+    };
+    if owner_alive {
+        return Ok(());
+    }
+    let daemon = daemon_configuration(request, record);
+    ensure!(
+        json!(crate::config::fingerprint(&daemon)?) == record["daemon_fingerprint"],
+        "backend restart configuration changed"
+    );
+    let pending = record["backend_restart"]["previous_pid"] == pid
+        && record["backend_restart"]["phase"] == "starting"
+        && record["backend_restart"]["config_fingerprint"] == record["daemon_fingerprint"];
+    if !pending {
+        let authority = recovery::quiet(&runtime, &request["config"])?;
+        let mut inspect = request.clone();
+        inspect["action"] = json!("inspect");
+        let agents = crate::herdr_agents::execute(&inspect)?["mount"].clone();
+        for (name, spec) in specs {
+            if hosted(spec) {
+                recovery::native_host_session(&runtime, spec, name, &agents)?;
+            } else {
+                let bound = binding(request, bridges, options, name, root, record)?
+                    .context("live terminal session is not ready for backend restart")?;
+                ensure!(
+                    record["bindings"][name] == bound,
+                    "live terminal binding changed during backend restart"
+                );
+            }
+        }
+        drop(authority);
+        record["backend_restart"] = json!({"operation_id":uuid::Uuid::new_v4().to_string(),
+            "previous_pid":pid,"phase":"starting","config_fingerprint":record["daemon_fingerprint"]});
+    }
+    record["phase"] = json!("daemon_restarting");
+    save(root, record)?;
+    record["daemon"] = crate::startup::start(&runtime, daemon, wait)?;
+    if record["daemon"]["status"] == "running" {
+        record["backend_restart"]["phase"] = json!("running");
+    }
+    save(root, record)
+}
+fn daemon_configuration(request: &Value, record: &Value) -> Value {
+    let mut daemon = request["config"].clone();
+    daemon["herdr"] = request.clone();
+    for (name, spec) in daemon["agents"].as_object_mut().unwrap() {
+        if hosted(spec) {
+            continue;
+        }
+        spec["driver_kind"] = json!("herdr_tui");
+        spec["profile_family"] = json!("protocol_turn");
+        spec["herdr_history"] = record["bindings"][name]["history"].clone();
+        if record["bindings"][name]["discovery"].is_object() {
+            spec["herdr_discovery"] = record["bindings"][name]["discovery"].clone();
+        }
+        if spec["provider"] == "pi" {
+            spec["pi_bridge_owner"] = record["bindings"][name]["pi_bridge_owner"].clone();
+        }
+    }
+    daemon
+}
+
 pub(crate) fn open(
     project: &Path,
     mut config: Value,
@@ -599,6 +695,14 @@ pub(crate) fn open(
             if namespace["status"] != "prepared" {
                 record["phase"] = json!("namespace_uncertain");
             } else {
+                restart_stopped_backend(
+                    &request,
+                    &bridges,
+                    options,
+                    &root,
+                    &mut record,
+                    deadline.saturating_duration_since(Instant::now()),
+                )?;
                 let mounted = crate::herdr_agents::execute(&request)?["mount"].clone();
                 record["phase"] = json!(if mounted["status"] == "ready" {
                     "binding_sessions"
@@ -679,24 +783,7 @@ pub(crate) fn open(
                     if record["bindings"].as_object().unwrap().len()
                         == request["config"]["agents"].as_object().unwrap().len()
                     {
-                        let mut daemon = request["config"].clone();
-                        daemon["herdr"] = request.clone();
-                        for (name, spec) in daemon["agents"].as_object_mut().unwrap() {
-                            if hosted(spec) {
-                                continue;
-                            }
-                            spec["driver_kind"] = json!("herdr_tui");
-                            spec["profile_family"] = json!("protocol_turn");
-                            spec["herdr_history"] = record["bindings"][name]["history"].clone();
-                            if record["bindings"][name]["discovery"].is_object() {
-                                spec["herdr_discovery"] =
-                                    record["bindings"][name]["discovery"].clone();
-                            }
-                            if spec["provider"] == "pi" {
-                                spec["pi_bridge_owner"] =
-                                    record["bindings"][name]["pi_bridge_owner"].clone();
-                            }
-                        }
+                        let daemon = daemon_configuration(&request, &record);
                         record["daemon_fingerprint"] = json!(crate::config::fingerprint(&daemon)?);
                         save(&root, &record)?;
                         let started = crate::startup::start(

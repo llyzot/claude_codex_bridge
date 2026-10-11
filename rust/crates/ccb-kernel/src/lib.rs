@@ -6,6 +6,7 @@ mod callback_policy;
 mod callback_recovery;
 mod claude_stream;
 pub mod cli;
+mod cli_tasks;
 mod codex_requests;
 mod codex_rpc;
 mod completion;

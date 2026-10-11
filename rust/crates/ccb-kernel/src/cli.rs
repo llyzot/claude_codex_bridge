@@ -76,6 +76,10 @@ pub fn request(root: &Path, op: &str, payload: Value) -> Result<Value> {
 fn write(stream: &mut TcpStream, value: &Value) -> Result<()> {
     let mut bytes = serde_json::to_vec(value)?;
     bytes.push(b'\n');
+    ensure!(
+        bytes.len() <= 1024 * 1024,
+        "native request frame exceeds 1 MiB"
+    );
     stream.write_all(&bytes)?;
     Ok(())
 }
@@ -95,7 +99,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         return Ok(());
     }
     if args.first().is_some_and(|s| s == "--help") {
-        println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask <agent> [--from <actor>] [--chain] [--silence] <message>\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> ping|watch <target>|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> job-recovery|job-reconcile <job-id>\nccb-native --state-root <dir> provider-status <agent>\nccb-native --state-root <dir> provider-terminate <agent> [--silent]\nccb-native --state-root <dir> provider-recover <agent> <fault-id>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
+        println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask [--compact] [--silence] [--chain] [--artifact-request|--inline-request] [--artifact-reply] <agent> [from <actor>] [--] <message...>\n  ask also reads redirected UTF-8 stdin; --artifact-io enables request/reply artifacts\n  --task-id <id>, --reply-to <id>, --mode <type>; native --from <actor> remains supported\nccb-native --state-root <dir> ask get|cancel <job-id>\nccb-native --state-root <dir> cancel <job-id> [--silent] | retry <job-id>\nccb-native --state-root <dir> watch <target> [--cursor <n>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> ping|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> job-recovery|job-reconcile <job-id>\nccb-native --state-root <dir> provider-status <agent>\nccb-native --state-root <dir> provider-terminate <agent> [--silent]\nccb-native --state-root <dir> provider-recover <agent> <fault-id>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
         return Ok(());
     }
     if args.is_empty() {
@@ -183,10 +187,17 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     if args.is_empty() {
         args.push("start".into());
     }
-    let op = args
+    let mut op = args
         .remove(0)
         .into_string()
         .map_err(|_| anyhow::anyhow!("invalid command encoding"))?;
+    if op == "ask" && args.first().is_some_and(|s| s == "get" || s == "cancel") {
+        op = if args.remove(0) == "get" {
+            "watch".into()
+        } else {
+            "cancel".into()
+        };
+    }
     if op == "daemon" {
         let config = if args.len() == 1 && args[0] == "--config-stdin" {
             let mut bytes = Vec::new();
@@ -269,7 +280,20 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     }
     let payload = match op.as_str() {
         "ping" | "stop" => json!({}),
-        "watch" => json!({"target":arg(&args,0)?}),
+        "watch" | "get" | "pend" => {
+            return crate::cli_tasks::watch(&root, &args);
+        }
+        "cancel" => {
+            ensure!(
+                args.len() == 1 || args.len() == 2 && arg(&args, 1)? == "--silent",
+                "cancel requires Job ID and optional --silent"
+            );
+            json!({"job_id":arg(&args,0)?,"record_reply":args.len()==1})
+        }
+        "retry" => {
+            ensure!(args.len() == 1, "retry requires a Job ID");
+            json!({"target":arg(&args,0)?})
+        }
         "job-recovery" | "job-reconcile" => {
             ensure!(args.len() == 1, "job recovery requires a target Job");
             json!({"target":arg(&args,0)?})
@@ -352,50 +376,15 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             return Ok(());
         }
         "ask" => {
-            let target = arg(&args, 0)?.to_owned();
-            let mut project_id = project
-                .as_deref()
-                .map(crate::config::project_id)
-                .transpose()?;
-            let mut actor = std::env::var("CCB_AGENT_NAME").unwrap_or_else(|_| "user".to_owned());
-            let mut chain = false;
-            let mut silence = false;
-            let mut body = Vec::new();
-            let mut i = 1;
-            while i < args.len() {
-                let value = arg(&args, i)?;
-                match value {
-                    "--project" => {
-                        i += 1;
-                        project_id = Some(arg(&args, i)?.to_owned());
-                    }
-                    "--from" => {
-                        i += 1;
-                        actor = arg(&args, i)?.to_owned();
-                    }
-                    "--chain" => chain = true,
-                    "--silence" => silence = true,
-                    "--" => {
-                        i += 1;
-                        while i < args.len() {
-                            body.push(arg(&args, i)?.to_owned());
-                            i += 1;
-                        }
-                        break;
-                    }
-                    _ => body.push(value.to_owned()),
-                }
-                i += 1;
+            let mut payload = crate::cli_tasks::ask(&args)?;
+            if payload["project_id"].is_null() {
+                payload["project_id"] = if let Some(project) = project.as_deref() {
+                    json!(crate::config::project_id(project)?)
+                } else {
+                    request(&root, "ping", json!({}))?["project_id"].clone()
+                };
             }
-            let project_id = if let Some(id) = project_id {
-                id
-            } else {
-                request(&root, "ping", json!({}))?["project_id"]
-                    .as_str()
-                    .context("daemon project identity missing")?
-                    .to_owned()
-            };
-            json!({"project_id":project_id,"to_agent":target,"from_actor":actor,"body":body.join(" "),"delivery_scope":if target=="all" {"broadcast"} else {"single"},"silence_on_success":silence,"route_options":if chain {json!({"mode":"chain"})} else {json!({})}})
+            payload
         }
         _ => bail!("unsupported native command: {op}"),
     };

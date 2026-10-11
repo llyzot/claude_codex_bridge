@@ -498,11 +498,28 @@ impl Daemon {
             "cancel" => {
                 let id = records::string(p, "job_id")?;
                 let job = self.get_job(id)?;
+                let agent = records::string(&job, "agent_name")?.to_owned();
+                if job["status"] == "cancelled" {
+                    return Ok(json!({"job_id":id,"agent_name":agent,"status":"cancelled"}));
+                }
+                if ["accepted", "queued"].contains(&job["status"].as_str().unwrap_or("")) {
+                    let marked =
+                        self.mark_provider_cancel(job, p["record_reply"] != false, false)?;
+                    self.kernel.dispatch("scheduler.remove_queued_for",&json!({"state_id":self.state,"target_kind":"agent","target_name":agent,"job_id":id}))?;
+                    let mut decision = failure(
+                        "cancelled",
+                        "cancel_info",
+                        "Cancelled before provider execution.",
+                    );
+                    decision["diagnostics"] = json!({"cancel_requested":true,"result_reply_enabled":p["record_reply"]!=false,
+                        "provider_prompt_sent":false,"completion_authority":"queued_cancellation"});
+                    self.complete(&marked, &decision)?;
+                    return Ok(json!({"job_id":id,"agent_name":agent,"status":"cancelled"}));
+                }
                 ensure!(
                     job["status"] == "running",
                     "native cancel requires a running owned provider task"
                 );
-                let agent = records::string(&job, "agent_name")?.to_owned();
                 if let Some(session) = self.pi.get(&agent) {
                     let record_reply = p["record_reply"] != false;
                     session.validate_interrupt(id, record_reply)?;
@@ -555,7 +572,7 @@ impl Daemon {
             &mut self.kernel,
             &job,
             "job_cancel_requested",
-            json!({"status":"running","record_reply":record_reply,"deadline_triggered":deadline}),
+            json!({"status":job["status"],"record_reply":record_reply,"deadline_triggered":deadline}),
             &timestamp,
         )?;
         Ok(job)
@@ -595,10 +612,47 @@ impl Daemon {
             request["project_id"] == self.config["project_id"],
             "project identity mismatch"
         );
+        ensure!(
+            request["message_type"] != "reply_delivery",
+            "reply_delivery is reserved for the native mailbox"
+        );
+        let transport = request["body_transport"]
+            .as_str()
+            .unwrap_or("inline")
+            .to_owned();
+        ensure!(
+            ["inline", "auto", "artifact"].contains(&transport.as_str()),
+            "invalid body transport"
+        );
+        let body = records::string(&request, "body")?.to_owned();
+        ensure!(
+            body.len() <= 512 * 1024,
+            "native request body exceeds 512 KiB"
+        );
         if !request["body_artifact"].is_null() {
+            ensure!(
+                transport == "inline",
+                "artifact reference cannot be combined with body transport generation"
+            );
             request["body_artifact"] =
                 crate::artifacts::validate_reference(&self.kernel, &request["body_artifact"])?;
+        } else if transport == "artifact" || transport == "auto" && body.len() > 4096 {
+            let owner = format!(
+                "{}-to-{}",
+                request["from_actor"].as_str().unwrap_or("user"),
+                request["to_agent"].as_str().unwrap_or("agent")
+            );
+            let artifact =
+                crate::artifacts::write(&mut self.kernel, &body, "ask-request", &owner, &now())?;
+            request["body"] = json!(crate::artifacts::stub(
+                "CCB ask request was stored as a text artifact.",
+                &artifact,
+                false,
+                None
+            ));
+            request["body_artifact"] = artifact;
         }
+        request.as_object_mut().unwrap().remove("body_transport");
         ensure!(
             request["body"].as_str().context("body must be text")?.len() <= 4096,
             "large native requests require artifact transport"
@@ -665,6 +719,7 @@ impl Daemon {
             &json!({"stream":"attempts","fields":{"job_id":job["job_id"]}}),
         )?;
         let mut reply = job["terminal_decision"]["reply"].clone();
+        let mut status = job["status"].as_str().unwrap_or("").to_owned();
         let mut reason = job["terminal_decision"]["reason"].clone();
         let mut source = "job_terminal_decision";
         let mut reply_id = Value::Null;
@@ -681,17 +736,18 @@ impl Daemon {
                 reply = found["reply"].clone();
                 reason = found["diagnostics"]["reason"].clone();
                 reply_id = found["reply_id"].clone();
+                status = records::string(found, "terminal_status")?.to_owned();
                 source = "message_bureau_reply";
             } else {
                 reply = json!("");
                 reason = json!("callback_pending");
                 source = "callback_delegated_pending";
+                status = "waiting_callback".into();
             }
         }
-        let status = job["status"].as_str().unwrap_or("");
         Ok(
             json!({"target":target,"job_id":job["job_id"],"agent_name":job["agent_name"],"target_kind":"agent","target_name":job["agent_name"],"provider":job["provider"],"provider_instance":null,
-            "cursor":events["line_no"],"terminal":(["completed","cancelled","failed","incomplete"].contains(&status)),"status":status,"reply":reply.as_str().unwrap_or(""),"completion_reason":reason,
+            "cursor":events["line_no"],"terminal":(["completed","cancelled","failed","incomplete"].contains(&status.as_str())),"status":status,"job_status":job["status"],"reply":reply.as_str().unwrap_or(""),"completion_reason":reason,
             "visible_reply_source":source,"visible_reply_id":reply_id,"message_id":attempt["message_id"],"events":events["rows"].as_array().unwrap().iter().filter(|e|e["job_id"]==job["job_id"]).cloned().collect::<Vec<_>>()}),
         )
     }

@@ -117,7 +117,10 @@
     "Windows provider scopes now have collision-checked names and capture daemon/provider creation identities and the Windows session; execution ownership binds project/Agent/Job/runtime/execution and commits before provider input",
     "Cold execution recovery probes original process identities and named scope closure before releasing old slots; valid matching terminal snapshots are reused, otherwise incomplete/cancelled outcomes are recorded without automatic replay and distinct queued work proceeds",
     "Missing/invalid legacy proofs, live owners/providers/scopes and unavailable namespace observations remain fenced without replacement sessions; job-recovery/job-reconcile API and CLI expose eligibility and its reason",
-    "Interrupted reply delivery keeps its original mailbox head under an explicit recovery fault instead of replaying the Lead automatically; a saved Pi Lead session can automatically continue after its owned Worker is reconciled"
+    "Interrupted reply delivery keeps its original mailbox head under an explicit recovery fault instead of replaying the Lead automatically; a saved Pi Lead session can automatically continue after its owned Worker is reconciled",
+    "Native task CLI accepts leading ask options, redirected UTF-8 stdin, sender/task/reply metadata and compact/silent guidance; long or forced requests stage full text artifacts atomically with admission and reject invalid input without leaked artifacts",
+    "Native accepted/queued cancellation journals terminal state and mailbox abandonment without provider input, preserves another active slot and FIFO order, and remains idempotent across restart; CLI get/cancel/retry aliases use the native authority",
+    "Native watch exposes final logical callback status plus physical job_status; optional bounded waiting pins Job identity and advances cursors, and observation expiry never cancels, restarts or replays the task"
   ],
   "remaining": [
     "Complete legacy/provider-history and cross-Windows-session recovery where new ownership proof is unavailable; verify non-Windows scoped process-tree termination and recovery",
@@ -132,6 +135,8 @@
     "Reconcile legacy Python provider test assumptions with the user-approved live-resource behavior and Windows fixtures; wider repository regression is not yet green"
   ],
   "verification": {
+    "native_task_cli": "20 final-release cases passed: leading ask flags, literal message boundary, UTF-8 stdin, sender/task/reply metadata, differential compact/silent guidance, automatic/forced request artifacts, forced reply artifacts, rejected-admission artifact rollback, reserved internal delivery rejection, queued/middle/idempotent/restart cancellation, running Pi/Codex/Claude cancel receipts, explicit retry, logical callback success/failure, cursor reads and timeout without cancellation or replay",
+    "native_task_cli_current_suite": "All 305 selected Rust kernel/CLI contracts passed on final release artifacts in 510.77s; Rust unit tests 7, formatting and clippy all-targets with warnings denied passed. Repository bin artifacts match release hashes. Initial command fixtures reproduced six failures against the preceding release; focused implementation and final complete suite passed",
     "native_owned_execution_recovery": "21 final-release Windows cases passed: three-provider crash/FIFO recovery without execution replay; provider-side proof observation before prompt handling; missing legacy proof fences; silent cancellation; live owner, PID reuse and invalid execution binding; matching/foreign durable terminal snapshots; live/empty named scopes; uncertain reply delivery retained across restart until explicit recovery; saved Pi session continuation after Worker reconciliation; and non-mutating current-owner CLI observations",
     "native_recovery_current_suite": "All 285 selected Rust kernel/CLI contracts passed on final release artifacts in 484.90s; Rust tests 7, fmt check and clippy all-targets with warnings denied passed. The initial three-provider crash loop failed against the preceding release by retaining old running slots; after implementation all recovery fixtures and the complete suite passed",
     "native_recovery_compatibility": "Existing Pi/Codex/Claude daemon-death cancellation contracts now verify cancelled terminal outcomes with preserved silent policy and no prompt replay for newly sealed Windows ownership. A dedicated legacy fault test removes the proof and still verifies fencing. Uncertain prior interactive Codex prompts/answers are not replayed. No new real-model inference or Unix recovery is claimed",
@@ -172,7 +177,7 @@
     "result_policy_differential": "14 retry/notice cases match the existing Python oracle, including boolean policy opt-out and structured permission code precedence over auth message text",
     "result_policy_integration": "56 existing retry/empty-result/callback/finalization cases passed in native mode",
     "daemon_scope": "Real model-backed Pi Lead/Codex Worker automatic callback verified; native Claude protocol and actual unauthenticated failure verified, but successful Claude inference and Herdr execution remain unverified. Unknown prior running executions remain fenced, not automatically replayed",
-    "native_contract_tests": 285,
+    "native_contract_tests": 305,
     "native_claude_release": "All 6 Claude stream contracts passed on final release; complete debug contract suite 130 passed; Rust tests 5 passed and clippy warnings denied",
     "native_provider_suite": "Complete debug suite 123 passed before adding delayed-idle case; all 15 final Pi/Codex provider contracts passed on final release; Rust 5 passed and clippy warnings denied",
     "native_cli_pi_release": "8 CLI/security/Pi RPC cases passed on final release executables, including installed Pi get_state handshake; final debug contract suite 114 passed",

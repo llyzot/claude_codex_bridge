@@ -178,7 +178,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     if args.is_empty() {
         args.push("start".into());
     }
-    if args[0] == "herdr-transport" {
+    if args[0] == "herdr-transport" || args[0] == "herdr-namespace" {
         ensure!(
             args.len() == 1,
             "herdr-transport reads one JSON request from stdin"
@@ -194,7 +194,14 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         );
         let request: Value = serde_json::from_slice(&bytes)?;
         crate::security::own_process_tree()?;
-        println!("{}", crate::herdr_transport::execute(&request)?);
+        println!(
+            "{}",
+            if args[0] == "herdr-transport" {
+                crate::herdr_transport::execute(&request)?
+            } else {
+                crate::herdr_namespace::execute(&request)?
+            }
+        );
         return Ok(());
     }
     if args[0] == "private-copy" {

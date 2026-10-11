@@ -132,7 +132,8 @@ impl Store {
                     "lease.json",
                     "lifecycle.json",
                     "configuration.json",
-                    "reload.json"
+                    "reload.json",
+                    "namespace.json"
                 ]
                 .contains(&relative),
             "unowned state path"

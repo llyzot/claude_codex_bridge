@@ -172,6 +172,66 @@ explicit Server lifecycle, original provider terminal interaction, completion
 history adapters, owned-binding recovery and live Herdr validation remain open.
 The release capability `herdr_integrated` therefore remains false.
 
+## Native Herdr namespace allocation
+
+`ccb-native herdr-namespace` is an internal JSON/EOF interface for `plan`,
+`prepare`, local `inspect`, and explicit pending-operation `confirm`. Requests
+contain schema version 1, the compiled native `config`, an explicit Herdr
+`session`, executable `command` argv and optional bounded `timeout_ms`. It does
+not implement the full `ccb herdr open` command or launch providers. Its
+`provider_commands_sent:false` result is not a claim about processes that Herdr
+templates might start themselves; provider occupancy/control remains separate.
+
+The planner reuses the native compact grammar, resolves named rich-config leaves
+against compiled providers, preserves mixed nested splits and explicit relative
+percentages, and matches the existing first-specified-percentage and ties-to-even
+balancing rules. A default balanced layout is supported. The current plan must
+cover its configured agents exactly, with `cmd` first when present. Multiple
+explicit windows, topology changes after allocation and partial Agent selection
+are rejected pending their own migration. Work directories must be materialized
+before allocation; this controller does not silently create/copy workspaces.
+
+The authority lives under `<native state root>/herdr`, with its own exclusive
+writer and redo journal. `namespace.json` stores the plan, random ownership
+identity, returned workspace/pane IDs, verified binding markers and one pending
+mutation. The executable/environment discovery context is hashed; provider
+environment values and command bodies are not copied into this record.
+`inspect` reads the atomic local record without waiting for the writer or calling
+Herdr, reports `live_checked:false`, and reports plan mismatch explicitly.
+
+Every create/split/metadata call first commits an operation ID and then a sent
+intent. Successful allocation binds IDs returned by Herdr, preserving the
+current focus through `--no-focus`. It never closes existing workspaces or
+guesses pane IDs. Workspace/project/owner/slot markers are checked before reuse;
+missing or foreign bindings stop preparation. Metadata acknowledgements may be
+JSON, plain text or empty, but success still requires observing the expected
+tokens in the inventory. A lost metadata acknowledgement can be reconciled by
+observation without writing again.
+
+Creation has no known server idempotency key. A lost acknowledgement therefore
+remains `uncertain`, even if an extra workspace or pane appears. Repeated prepare
+calls do not create a replacement. A caller deliberately resolving it must send
+the exact `operation_id`, `confirm_pending_creation:true` and the observed
+`workspace_id`/`pane_id` as appropriate. The controller rejects objects present
+in the pre-creation baseline and validates the target namespace/label/ownership.
+The same explicit confirmation can permit reapplying pending metadata. This
+local administrative operation is not a human-identity/authentication mechanism.
+If creation did not happen, there is currently no automatic intent reset or
+speculative retry. Persistence failures are fatal rather than overwritten with
+a guessed recovery record.
+
+Tests use a persistent offline inventory fixture, including intentional lost
+receipts and killing the owned controller after a simulated remote mutation.
+They verify duplicate prevention, explicit recovery, operation-identity fencing,
+local observation during an active writer, existing-workspace preservation,
+corrupt-ledger rejection and no provider launch commands. Real Herdr validation
+is still pending permission to use an independent test session from the current
+non-Herdr task context. Full native startup composition, original provider UI,
+binding to active Agent lifetimes, API/version-specific runtime confirmation,
+multi-workspace reload/retirement and cross-server-generation recovery remain
+open. Ownership markers and inventory reads are not a server-side transactional
+compare-and-swap guarantee across concurrent external changes or restarts.
+
 ## Native Windows installation lane
 
 The repository-built core can now install itself to a **new, explicit Windows

@@ -167,10 +167,21 @@ pub fn parse_at(text: &str, root: Option<&Path>) -> Result<Value> {
 struct LayoutText {
     text: String,
     rank: u8,
+    tree: Value,
 }
 impl LayoutText {
     fn leaf(text: String) -> Self {
-        Self { text, rank: 3 }
+        let (leaf, percent) = text
+            .rsplit_once('@')
+            .map(|(name, pct)| (name, pct.parse::<u64>().ok()))
+            .unwrap_or((&text, None));
+        let name = leaf.split(':').next().unwrap().trim();
+        let tree = json!({"kind":"leaf","name":name,"percent":percent});
+        Self {
+            text,
+            rank: 3,
+            tree,
+        }
     }
     fn nested(self, parent: u8) -> String {
         if self.rank < parent {
@@ -180,11 +191,47 @@ impl LayoutText {
         }
     }
     fn join(left: Self, right: Self, rank: u8, delimiter: char) -> Self {
+        let tree = json!({"kind":if delimiter==';'{"horizontal"}else{"vertical"},"left":left.tree,"right":right.tree});
         Self {
             text: format!("{}{delimiter} {}", left.nested(rank), right.nested(rank)),
             rank,
+            tree,
         }
     }
+}
+
+/// Reuse the compact grammar for native topology, including named rich-config
+/// leaves. Providers in an explicit layout must agree with the compiled config.
+pub(crate) fn layout_tree(text: &str, root: &Path, agents: &Value) -> Result<Value> {
+    let mut parser = Layout::new(text, Some(root))?;
+    for token in &mut parser.tokens {
+        if ["(", ")", ",", ";"].contains(&token.as_str()) {
+            continue;
+        }
+        let (name, suffix) = token
+            .split_once('@')
+            .map(|(n, p)| (n, format!("@{p}")))
+            .unwrap_or((token.as_str(), String::new()));
+        if name.trim() != "cmd" && !name.contains(':') {
+            let normalized = name.trim().to_lowercase();
+            let provider = agents[&normalized]["provider"]
+                .as_str()
+                .context("layout references unknown agent")?;
+            *token = format!("{normalized}:{provider}{suffix}");
+        }
+    }
+    let parsed = parser.horizontal()?;
+    ensure!(
+        parser.index == parser.tokens.len(),
+        "unexpected native layout token"
+    );
+    for (name, spec) in parser.agents {
+        ensure!(
+            agents[&name]["provider"] == spec["provider"],
+            "layout provider does not match compiled agent"
+        );
+    }
+    Ok(parsed.tree)
 }
 struct Layout {
     tokens: Vec<String>,

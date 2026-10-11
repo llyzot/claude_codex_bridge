@@ -47,6 +47,10 @@ def exit_with_pipe_holder():
 
 for line in sys.stdin.buffer:
     command = json.loads(line)
+    if first and mode == 'closing-exit' and (command.get('type') in {'prompt','user'} or command.get('method') == 'turn/start'):
+        os.close(sys.stdout.fileno())
+        time.sleep(.15)
+        os._exit(0)
     if provider == 'pi':
         kind = command['type']
         if kind == 'get_state':

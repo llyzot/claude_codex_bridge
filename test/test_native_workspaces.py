@@ -1,5 +1,5 @@
 """Native worktree startup uses Git in disposable fixture repositories only."""
-import json,os,subprocess,sys
+import json,os,subprocess,sys,time
 import shlex
 from pathlib import Path
 from types import SimpleNamespace
@@ -39,7 +39,17 @@ def start(root,**kwargs):
     assert result.returncode==0,result.stderr
     return json.loads(result.stdout)
 def stop(state):
+    before=cli('--state-root',state,'ping');assert before.returncode==0,before.stderr
+    pid=json.loads(before.stdout)['pid']
     result=cli('--state-root',state,'stop');assert result.returncode==0,result.stderr
+    # stop acknowledges the request before unmount drains the provider processes.
+    deadline=time.monotonic()+10
+    while time.monotonic()<deadline:
+        lifecycle=state/'lifecycle.json'
+        if lifecycle.exists() and record(lifecycle).get('phase')=='unmounted' and cli('process-identity',pid).returncode!=0:
+            return
+        time.sleep(.025)
+    pytest.fail('owned workspace daemon did not finish unmounting')
 def rich(root,extra='',agents=('worker',)):
     text='version=2\n'+''.join(f'[agents.{name}]\nprovider="claude"\ntarget="."\nworkspace_mode="git-worktree"\n'+extra+'\n' for name in agents)
     (root/'.ccb/ccb.config').write_text(text,encoding='utf-8')

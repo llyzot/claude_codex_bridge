@@ -60,6 +60,20 @@ def test_active_exit_finishes_one_attempt_and_continues_fifo_on_new_process(tmp_
         assert await_watch(server, healthy['job_id'], lambda r: r['terminal'])['status'] == 'completed'
     finally: server.close()
 
+
+@pytest.mark.parametrize('provider',['pi','codex','claude'])
+def test_stdout_closure_during_process_exit_keeps_natural_exit_classification(tmp_path,provider):
+    record=config(provider,'closing-exit',tmp_path)
+    record['command'][0]=sys._base_executable
+    server=Server(tmp_path/'state',{'worker':record})
+    try:
+        first=submit(server)['job_id'];second=submit(server)['job_id']
+        result=await_watch(server,first,lambda r:r['terminal'])
+        assert result['status']=='incomplete' and result['completion_reason']==f'{provider}_process_exit'
+        assert await_watch(server,second,lambda r:r['terminal'])['status']=='completed'
+        assert server.rpc('provider-status',{'agent_name':'worker'})['fault'] is None
+    finally:server.close()
+
 @pytest.mark.parametrize('provider', ['pi', 'codex'])
 @pytest.mark.parametrize('mode', ['final-exit', 'buffered-final-exit'])
 def test_verified_result_survives_process_exit_and_bounded_reader_batches(tmp_path, provider, mode):

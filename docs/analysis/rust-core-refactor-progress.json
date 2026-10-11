@@ -596,6 +596,16 @@
     "native_input_failure_evidence": "docs/analysis/native-input-failure-20261012.json",
     "native_input_failure_validation": "A single-input Pi test failed to observe a fault before the shared writer flag was added. All three stdin-failure cases passed, followed by 123 transport/fault/context/followup/ping cases in 244.31s. Rust 30 plus parent-invoked helper passed, including short UTF-8 writes, orderly EOF and write/flush failures. Formatting, Clippy, diff and binary equality passed. Active work remains uncertain until existing terminal/exit handling; no replay, model inference or production promotion claimed.",
     "native_idle_fault_recovery_evidence": "docs/analysis/native-idle-fault-recovery-20261012.json",
-    "native_idle_fault_recovery_validation": "Missing idle provider scope reproduced before implementation. Focused 12 cases and final 94 fault/recovery/transport/ping cases passed in 217.20s. Three-provider cold recovery, simulated PID reuse preserving an unrelated test process, live named-scope member refusal, namespace mismatch, malformed-proof rejection and legacy PID-only conservatism verified. Rust 30 plus parent-invoked helper, formatting, Clippy, diff and binary equality passed. No real model or production/default change."
+    "native_idle_fault_recovery_validation": "Missing idle provider scope reproduced before implementation. Focused 12 cases and final 94 fault/recovery/transport/ping cases passed in 217.20s. Three-provider cold recovery, simulated PID reuse preserving an unrelated test process, live named-scope member refusal, namespace mismatch, malformed-proof rejection and legacy PID-only conservatism verified. Rust 30 plus parent-invoked helper, formatting, Clippy, diff and binary equality passed. No real model or production/default change.",
+    "native_full_suite_initial": "1020 collected: 1003 passed, 6 failed, 11 explicitly opted-out skips in 2172.75s; retained original JUnit/results. Not a passing gate.",
+    "native_exit_race_repair": "Deterministic stdout-close then 150 ms process-exit case failed before repair. A bounded 500 ms transport classification grace preserves natural incomplete exits without overriding known root exit or verified completion. All 42 lifetime/EOF cases passed. Rust unit suite: 31 passed, one parent-invoked worker ignored; Clippy/fmt/build passed.",
+    "native_recovery_recheck": "53/54 passed; worktree teardown now awaits unmount/process exit, Windows Job check awaits confirmed accounting. Remaining Herdr failure was again offline query observation timeout at 1502 ms. 80 matched queries had no failures (venv max 140 ms, base max 91 ms). Ordinary fixture timeout raised to 5000 ms; dedicated transport timeout limits unchanged. Final targeted Herdr/transport selection: 43 passed in 47.34s. Full rerun pending.",
+    "legacy_python_baseline": "Separately inventoried 141 Python provider cases: 76 passed, 65 failed. Report preserves all failures. Includes Windows symlink privilege failures, unquoted Windows test command paths and stale snapshot contracts; unresolved and not counted as Rust successes.",
+    "native_suite_artifacts": [
+      "docs/analysis/native-suite-results-20261012.json",
+      "docs/analysis/native-recovery-recheck-20261012.xml",
+      "docs/analysis/herdr-query-probe-20261012.json",
+      "docs/analysis/legacy-provider-baseline-20261012.json"
+    ]
   }
 }

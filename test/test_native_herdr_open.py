@@ -42,7 +42,7 @@ def project(setup):
     state=server(backend);state.update(server_running=False,shell_pid=os.getpid(),provider_pids=[pi.pid,codex.pid],
         agent_sessions={'pi':{'agent':'pi','kind':'path','value':str(native_session),'source':'fixture'},'codex':{'agent':'codex','kind':'id','value':session,'source':'fixture'}})
     (backend/'server.json').write_text(json.dumps(state),encoding='utf-8')
-    options=dict(config=request['config'],command=request['command'],session=request['session'],history_roots={'worker':str(history)},transport_timeout_ms=1500)
+    options=dict(config=request['config'],command=request['command'],session=request['session'],history_roots={'worker':str(history)},transport_timeout_ms=request['timeout_ms'])
     file=root/'open-options.json';file.write_text(json.dumps(options),encoding='utf-8')
     def open(timeout=10000):return cli('--project',root,'herdr','open','--options',file,'--no-attach','--timeout-ms',timeout)
     def ready():

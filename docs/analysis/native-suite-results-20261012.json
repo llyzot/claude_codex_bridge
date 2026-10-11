@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "source_commit": "8c90aa23",
+  "completed_at": "2026-10-11T22:59:20.225004+00:00",
+  "collected": 1020,
+  "passed": 1003,
+  "failed": 6,
+  "skipped": 11,
+  "seconds": 2172.75,
+  "failures": [
+    {
+      "class": "test.test_native_herdr_host_recovery",
+      "name": "test_reopen_replaces_only_dead_display_and_keeps_native_thread[False]",
+      "message": "AssertionError: ccb-native: Herdr open failed: Herdr agent command outcome is unobserved: observation_timeout (exit null, 1502 ms)\n  \nassert 1 == 0\n +  where 1 = CompletedProcess(args=['C:\\\\Users\\\\user\\\\Desktop\\\\work\\\\4.user\\\\2.github\\\\claude_codex_bridge\\\\rust\\\\target\\\\rel...'ccb-native: Herdr open failed: Herdr agent command outcome is unobserved: observation_timeout (exit null, 1502 ms)\\n').returncode",
+      "traceback": "test\\test_native_herdr_host_recovery.py:52: in test_reopen_replaces_only_dead_display_and_keeps_native_thread\n    result=p['open']();assert result.returncode==0,result.stderr\n                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   AssertionError: ccb-native: Herdr open failed: Herdr agent command outcome is unobserved: observation_timeout (exit null, 1502 ms)\nE     \nE   assert 1 == 0\nE    +  where 1 = CompletedProcess(args=['C:\\\\Users\\\\user\\\\Desktop\\\\work\\\\4.user\\\\2.github\\\\claude_codex_bridge\\\\rust\\\\target\\\\rel...'ccb-native: Herdr open failed: Herdr agent command outcome is unobserved: observation_timeout (exit null, 1502 ms)\\n').returncode"
+    },
+    {
+      "class": "test.test_native_idle_fault_recovery",
+      "name": "test_live_named_scope_member_blocks_recovery_without_termination",
+      "message": "AssertionError: assert 'scope_has_live_processes' == 'owned_scope_empty'\n  \n  - owned_scope_empty\n  + scope_has_live_processes",
+      "traceback": "test\\test_native_idle_fault_recovery.py:114: in test_live_named_scope_member_blocks_recovery_without_termination\n    assert status(server)['recovery_observation']['reason'] == 'owned_scope_empty'\nE   AssertionError: assert 'scope_has_live_processes' == 'owned_scope_empty'\nE     \nE     - owned_scope_empty\nE     + scope_has_live_processes"
+    },
+    {
+      "class": "test.test_native_rpc_lifetime",
+      "name": "test_active_exit_finishes_one_attempt_and_continues_fifo_on_new_process[codex]",
+      "message": "AssertionError: assert 'failed' == 'incomplete'\n  \n  - incomplete\n  + failed",
+      "traceback": "test\\test_native_rpc_lifetime.py:54: in test_active_exit_finishes_one_attempt_and_continues_fifo_on_new_process\n    assert row['status'] == 'incomplete'\nE   AssertionError: assert 'failed' == 'incomplete'\nE     \nE     - incomplete\nE     + failed"
+    },
+    {
+      "class": "test.test_native_rpc_lifetime",
+      "name": "test_exit_without_stdout_eof_does_not_release_or_restart_active_execution[pi]",
+      "message": "AssertionError: assert 'failed' == 'incomplete'\n  \n  - incomplete\n  + failed",
+      "traceback": "test\\test_native_rpc_lifetime.py:88: in test_exit_without_stdout_eof_does_not_release_or_restart_active_execution\n    assert row['status'] == 'incomplete'\nE   AssertionError: assert 'failed' == 'incomplete'\nE     \nE     - incomplete\nE     + failed"
+    },
+    {
+      "class": "test.test_native_rpc_lifetime",
+      "name": "test_pi_deadline_intent_is_committed_before_abort_and_process_exit",
+      "message": "AssertionError: assert ('failed' == 'incomplete'\n  \n  - incomplete\n  + failed)",
+      "traceback": "test\\test_native_rpc_lifetime.py:149: in test_pi_deadline_intent_is_committed_before_abort_and_process_exit\n    assert row['status'] == 'incomplete' and row['completion_reason'] == 'pi_process_exit'\nE   AssertionError: assert ('failed' == 'incomplete'\nE     \nE     - incomplete\nE     + failed)"
+    },
+    {
+      "class": "test.test_native_workspaces",
+      "name": "test_missing_registered_worktree_is_not_pruned_or_recreated",
+      "message": "PermissionError: [WinError 32] 另一个程序正在使用此文件，进程无法访问。: 'C:\\\\Users\\\\user\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-user\\\\pytest-409\\\\test_missing_registered_worktr0\\\\project\\\\.ccb\\\\workspaces\\\\worker' -> 'C:\\\\Users\\\\user\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-user\\\\pytest-409\\\\test_missing_registered_worktr0\\\\parked-worktree'",
+      "traceback": "test\\test_native_workspaces.py:188: in test_missing_registered_worktree_is_not_pruned_or_recreated\n    work.rename(parked)\n..\\..\\..\\..\\..\\scoop\\apps\\python\\current\\Lib\\pathlib\\__init__.py:1076: in rename\n    os.rename(self, target)\nE   PermissionError: [WinError 32] 另一个程序正在使用此文件，进程无法访问。: 'C:\\\\Users\\\\user\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-user\\\\pytest-409\\\\test_missing_registered_worktr0\\\\project\\\\.ccb\\\\workspaces\\\\worker' -> 'C:\\\\Users\\\\user\\\\AppData\\\\Local\\\\Temp\\\\pytest-of-user\\\\pytest-409\\\\test_missing_registered_worktr0\\\\parked-worktree'"
+    }
+  ],
+  "skips": [
+    {
+      "class": "test.test_native_pi_terminal",
+      "name": "test_installed_pi_loads_bridge_and_session_switch_rotates_log_without_a_model",
+      "reason": "Explicit installed-Pi no-model probe"
+    },
+    {
+      "class": "test.test_native_real_models",
+      "name": "test_real_claude_clear_and_empty_compact_without_model",
+      "reason": "Explicit real-model opt-in required"
+    },
+    {
+      "class": "test.test_native_real_models",
+      "name": "test_real_claude_compact_against_local_protocol_backend",
+      "reason": "Explicit real-model opt-in required"
+    },
+    {
+      "class": "test.test_native_real_models",
+      "name": "test_real_context_clear_without_model_or_credentials[pi]",
+      "reason": "Explicit real-model opt-in required"
+    },
+    {
+      "class": "test.test_native_real_models",
+      "name": "test_real_context_clear_without_model_or_credentials[codex]",
+      "reason": "Explicit real-model opt-in required"
+    },
+    {
+      "class": "test.test_native_real_models",
+      "name": "test_real_codex_worker_model_round_trip",
+      "reason": "Explicit real-model opt-in required"
+    },
+    {
+      "class": "test.test_native_real_models",
+      "name": "test_real_pi_lead_codex_worker_automatic_callback",
+      "reason": "Explicit real-model opt-in required"
+    },
+    {
+      "class": "test.test_native_real_models",
+      "name": "test_real_native_compaction_preserves_conversation_and_process[pi]",
+      "reason": "Explicit real-model opt-in required"
+    },
+    {
+      "class": "test.test_native_real_models",
+      "name": "test_real_native_compaction_preserves_conversation_and_process[codex]",
+      "reason": "Explicit real-model opt-in required"
+    },
+    {
+      "class": "test.test_native_real_models",
+      "name": "test_real_codex_role_skill_reads_updated_body_in_same_thread",
+      "reason": "Explicit real-model opt-in required"
+    },
+    {
+      "class": "test.test_native_real_models",
+      "name": "test_real_pi_role_skill_reads_updated_body_in_same_session",
+      "reason": "Explicit real-model opt-in required"
+    }
+  ],
+  "production_install_changed": false
+}

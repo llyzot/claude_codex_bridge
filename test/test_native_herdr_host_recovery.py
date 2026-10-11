@@ -169,7 +169,7 @@ def stopped_host(setup):
     first=helper();request['config']['agents']['worker'].update(command=[str(CODEX),'app-server','--stdio'],
         driver_kind='codex_app_server',profile_family='protocol_turn',tui_host_root=str(project/'hosts'),env={'CODEX_HOME':str(home)})
     s=server(backend);s.update(server_running=False,shell_pid=os.getpid(),shell_name='pwsh.exe',provider_pids=[first.pid]);(backend/'server.json').write_text(json.dumps(s),encoding='utf-8')
-    options=project/'options.json';options.write_text(json.dumps({'config':request['config'],'command':request['command'],'session':request['session'],'transport_timeout_ms':1500}),encoding='utf-8')
+    options=project/'options.json';options.write_text(json.dumps({'config':request['config'],'command':request['command'],'session':request['session'],'transport_timeout_ms':request['timeout_ms']}),encoding='utf-8')
     def open(recover=False):return cli('--project',project,'herdr','open','--options',options,'--no-attach','--timeout-ms','10000',*(['--recover-stopped'] if recover else []))
     try:
         r=open();assert r.returncode==0,r.stderr

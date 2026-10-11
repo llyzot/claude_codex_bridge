@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "status": "finished_failed",
+  "recorded_at": "2026-10-11T22:53:23.336435+00:00",
+  "exec_session_id": null,
+  "collected_rust_cases": 1020,
+  "collected_legacy_python_cases": 141,
+  "observed_progress_percent": 100,
+  "junit_path": "docs/analysis/native-suite-run-20261012.xml",
+  "manifest_path": "docs/analysis/native-suite-inventory-20261012.json",
+  "source_commit": "8c90aa23",
+  "real_model_opt_in": false,
+  "production_install_changed": false,
+  "next_action": "Transport-exit race repaired with deterministic red/green coverage (42 passed); recovery/workspace recheck is running. Legacy Python baseline completed: 76 passed, 65 failed, recorded separately.",
+  "failure_markers_observed": true,
+  "last_observation": "Original full run is terminal: 1003 passed, 6 failed, 11 skipped. Exact failures are in the result and JUnit artifacts.",
+  "provisional_failure_inspection": {
+    "basis": "Inference from ordered pytest progress characters; must confirm against final JUnit/traceback",
+    "candidate": "test/test_native_herdr_host_recovery.py::test_reopen_replaces_only_dead_display_and_keeps_native_thread[False]",
+    "fixture_root": "C:/Users/user/AppData/Local/Temp/pytest-of-user/pytest-409/test_reopen_replaces_only_dead0",
+    "observed_herdr_phase": "agents_starting",
+    "attachment_records": 1,
+    "native_stderr_empty": true,
+    "source_modified": false
+  },
+  "observed_failure_marker_count": 6,
+  "second_provisional_failure": {
+    "basis": "Ordered progress character inference; await final traceback",
+    "candidate": "test/test_native_idle_fault_recovery.py::test_live_named_scope_member_blocks_recovery_without_termination",
+    "inspection_note": "The test waits for only the helper root after child.kill and immediately expects an empty named scope; process-tree exit/cleanup timing must be checked against the final error. No code changed."
+  },
+  "skip_markers_observed": true,
+  "result_path": "docs\\analysis\\native-suite-results-20261012.json"
+}

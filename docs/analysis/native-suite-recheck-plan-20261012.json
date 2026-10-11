@@ -1,0 +1,108 @@
+{
+  "status": "prepared_not_started",
+  "base_commit": "8c90aa23e1024d103d61fb624db7ca315eaa70df",
+  "shards": [
+    {
+      "files": [
+        "test/test_native_herdr_host_recovery.py",
+        "test/test_native_execution_recovery.py",
+        "test/test_native_context.py",
+        "test/test_native_claude_role_skills.py",
+        "test/test_native_kernel.py",
+        "test/test_native_rpc_lifetime.py",
+        "test/test_native_restart.py",
+        "test/test_native_task_cli.py",
+        "test/test_native_project_memory.py",
+        "test/test_native_codex_controls.py",
+        "test/test_native_admission.py",
+        "test/test_native_wait.py",
+        "test/test_native_codex_tui_host.py",
+        "test/test_native_coordination.py",
+        "test/test_native_completion.py",
+        "test/test_native_config.py"
+      ],
+      "prior_duration_seconds": 541.7390000000001
+    },
+    {
+      "files": [
+        "test/test_native_herdr_worker.py",
+        "test/test_native_git_observation.py",
+        "test/test_native_provider_faults.py",
+        "test/test_native_installation_upgrade.py",
+        "test/test_native_codex_role_skills.py",
+        "test/test_native_role_memory.py",
+        "test/test_native_idle_fault_recovery.py",
+        "test/test_native_provider_termination.py",
+        "test/test_native_installation.py",
+        "test/test_native_resubmit.py",
+        "test/test_native_daemon.py",
+        "test/test_native_codex_rpc.py",
+        "test/test_native_role_delivery.py",
+        "test/test_native_herdr_transport.py",
+        "test/test_native_cli_security.py",
+        "test/test_native_startup.py",
+        "test/test_native_real_models.py"
+      ],
+      "prior_duration_seconds": 541.5319999999999
+    },
+    {
+      "files": [
+        "test/test_native_herdr_open.py",
+        "test/test_native_claude_requests.py",
+        "test/test_native_codex_requests.py",
+        "test/test_native_herdr_namespace.py",
+        "test/test_native_herdr_recovery.py",
+        "test/test_native_workspaces.py",
+        "test/test_native_herdr_discovery.py",
+        "test/test_native_project_view.py",
+        "test/test_native_ping.py",
+        "test/test_native_trace.py",
+        "test/test_native_mailbox_control.py",
+        "test/test_native_claude_question_cli.py",
+        "test/test_native_claude_stream.py",
+        "test/test_native_control_plane.py",
+        "test/test_native_installation_recovery.py",
+        "test/test_native_agent_journal_authority.py"
+      ],
+      "prior_duration_seconds": 541.6730000000001
+    },
+    {
+      "files": [
+        "test/test_native_herdr_agents.py",
+        "test/test_native_pi_terminal.py",
+        "test/test_native_reload.py",
+        "test/test_native_pi_role_skills.py",
+        "test/test_native_claude_context.py",
+        "test/test_native_transport_eof.py",
+        "test/test_native_finalization.py",
+        "test/test_native_followup.py",
+        "test/test_native_claude_controls.py",
+        "test/test_native_result_policy.py",
+        "test/test_native_pi_rpc.py",
+        "test/test_native_records.py",
+        "test/test_native_observation.py",
+        "test/test_native_roles.py",
+        "test/test_native_lifecycle.py"
+      ],
+      "prior_duration_seconds": 542.191
+    }
+  ],
+  "real_model_opt_in": false,
+  "production_install_changed": false,
+  "binary_sha256": {
+    "ccb-kernel.exe": {
+      "release": "1abceafd4e81b645fe252ed4f6709bbd80b9f8ce0b1de33156c4d5f7149d8303",
+      "bin": "1abceafd4e81b645fe252ed4f6709bbd80b9f8ce0b1de33156c4d5f7149d8303"
+    },
+    "ccb-native.exe": {
+      "release": "4d02fafc0f115a4b652d357908f7121b6dc02eb2bf7fb319b257be84380ff9ff",
+      "bin": "4d02fafc0f115a4b652d357908f7121b6dc02eb2bf7fb319b257be84380ff9ff"
+    }
+  },
+  "test_changes": [
+    "Three-provider deterministic stdout-before-exit regression",
+    "Wait for actual daemon unmount/process exit before moving a worktree",
+    "Wait for confirmed empty Windows Job after helper exit",
+    "Ordinary offline Herdr query budget 1500 to 5000 ms; dedicated timeout cases unchanged"
+  ]
+}

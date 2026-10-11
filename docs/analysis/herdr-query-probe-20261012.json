@@ -1,0 +1,574 @@
+{
+  "summary": {
+    "venv": {
+      "failures": 0,
+      "max_ms": 140
+    },
+    "base": {
+      "failures": 0,
+      "max_ms": 91
+    }
+  },
+  "rows": [
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 132,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 90,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 96,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 76,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 84,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 61,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 96,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 79,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 88,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 83,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 94,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 65,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 93,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 74,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 121,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 69,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 85,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 70,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 82,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 69,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 88,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 86,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 105,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 88,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 83,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 66,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 85,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 69,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 87,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 69,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 101,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 66,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 91,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 73,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 103,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 66,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 96,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 68,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 83,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 69,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 108,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 68,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 96,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 67,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 98,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 67,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 87,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 66,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 89,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 76,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 93,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 69,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 83,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 72,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 114,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 72,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 114,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 66,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 93,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 70,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 101,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 79,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 110,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 91,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 140,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 66,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 88,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 68,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 82,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 70,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 88,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 74,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 93,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 71,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 93,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 68,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 84,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 68,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "venv",
+      "ok": true,
+      "elapsed_ms": 86,
+      "failure": null,
+      "exit_code": 0
+    },
+    {
+      "kind": "base",
+      "ok": true,
+      "elapsed_ms": 68,
+      "failure": null,
+      "exit_code": 0
+    }
+  ]
+}

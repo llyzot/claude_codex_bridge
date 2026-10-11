@@ -29,7 +29,9 @@ def setup(tmp_path,monkeypatch):
     config=dict(schema_version=2,project_id=hashlib.sha256(identity.encode()).hexdigest(),project_root=str(project),
                 agents={name:{'provider':provider,'workspace_path':str(project),'command':None} for name,provider in [('lead','pi'),('worker','codex')]},
                 source_config={'layout':'lead:pi; worker:codex'})
-    request=dict(schema_version=1,action='prepare',session='native-namespace-test',command=[sys.executable,'-I',str(STUB),str(backend)],config=config,timeout_ms=1500)
+    # Normal inventory tests allow interpreter/scheduler jitter during the full
+    # Windows suite. Timeout-contract tests explicitly override this budget.
+    request=dict(schema_version=1,action='prepare',session='native-namespace-test',command=[sys.executable,'-I',str(STUB),str(backend)],config=config,timeout_ms=5000)
     return project,backend,request
 
 

@@ -51,6 +51,7 @@ pub struct Session {
     consumed: HashSet<String>,
     active: Option<Active>,
     stdout_closed: bool,
+    transport_exit_grace: crate::provider_fault::TransportExitGrace,
     require_result_identity: bool,
     timeout_s: f64,
 }
@@ -217,6 +218,7 @@ impl Session {
             consumed,
             active: None,
             stdout_closed: false,
+            transport_exit_grace: Default::default(),
             require_result_identity: saved["state"]["require_result_identity"] == true,
             timeout_s: spec["timeout_s"].as_f64().unwrap_or(0.0),
         })
@@ -443,7 +445,12 @@ impl Session {
             }
             return Ok(None);
         }
-        if !self.quarantined && !self.forced && (self.stdout_closed || input_closed) {
+        if !self.quarantined
+            && !self.forced
+            && self
+                .transport_exit_grace
+                .expired(self.stdout_closed || input_closed, exit.is_some())
+        {
             return Err(
                 crate::provider_fault::TransportClosed(if self.stdout_closed {
                     "stdout"

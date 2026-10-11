@@ -65,6 +65,7 @@ pub struct Session {
     pub quarantined: bool,
     forced: bool,
     stdout_closed: bool,
+    transport_exit_grace: crate::provider_fault::TransportExitGrace,
     input_closed: bool,
     saved_state: Value,
     pub dirty: bool,
@@ -229,6 +230,7 @@ impl Session {
             quarantined: false,
             forced: false,
             stdout_closed: false,
+            transport_exit_grace: Default::default(),
             input_closed: false,
             saved_state: saved["state"].clone(),
             dirty: false,
@@ -423,7 +425,12 @@ impl Session {
             }
             return Ok(None);
         }
-        if !self.quarantined && !self.forced && (self.stdout_closed || self.input_closed) {
+        if !self.quarantined
+            && !self.forced
+            && self
+                .transport_exit_grace
+                .expired(self.stdout_closed || self.input_closed, exit.is_some())
+        {
             return Err(
                 crate::provider_fault::TransportClosed(if self.stdout_closed {
                     "stdout"

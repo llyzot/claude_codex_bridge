@@ -111,7 +111,8 @@ def test_live_named_scope_member_blocks_recovery_without_termination(tmp_path):
         with pytest.raises(AssertionError, match='not confirmed stopped'): recover(server, row)
         assert child.poll() is None
         child.kill(); child.wait(timeout=5)
-        assert status(server)['recovery_observation']['reason'] == 'owned_scope_empty'
+        # Waiting on the root process does not synchronously update Job accounting.
+        wait_for(lambda: status(server)['recovery_observation']['reason'] == 'owned_scope_empty')
         recover(server, row)
     finally:
         if server: server.close()

@@ -15,6 +15,24 @@ impl std::fmt::Display for TransportClosed {
 }
 impl std::error::Error for TransportClosed {}
 
+/// Allow an observed pipe closure to settle into ordinary process exit before
+/// classifying a still-live root as a broken transport. Never infer completion.
+#[derive(Default)]
+pub struct TransportExitGrace(Option<std::time::Instant>);
+impl TransportExitGrace {
+    pub fn expired(&mut self, closed: bool, root_exited: bool) -> bool {
+        self.observe(closed, root_exited, std::time::Instant::now())
+    }
+    fn observe(&mut self, closed: bool, root_exited: bool, now: std::time::Instant) -> bool {
+        if !closed || root_exited {
+            self.0 = None;
+            return false;
+        }
+        now.saturating_duration_since(*self.0.get_or_insert(now))
+            >= std::time::Duration::from_millis(500)
+    }
+}
+
 pub fn path(provider: &str, agent: &str) -> String {
     format!("providers/{provider}/{agent}/fault.json")
 }
@@ -160,4 +178,22 @@ pub fn validate(row: &Value, provider: &Value, agent: &str, project: &Value) -> 
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+    #[test]
+    fn transport_grace_never_overrides_a_known_root_exit() {
+        let mut grace = TransportExitGrace::default();
+        let start = Instant::now();
+        assert!(!grace.observe(true, false, start));
+        assert!(!grace.observe(true, false, start + Duration::from_millis(499)));
+        assert!(grace.observe(true, false, start + Duration::from_millis(500)));
+        assert!(!grace.observe(true, true, start + Duration::from_secs(3)));
+        assert!(!grace.observe(true, false, start + Duration::from_secs(4)));
+        assert!(!grace.observe(false, false, start + Duration::from_secs(5)));
+        assert!(!grace.observe(true, false, start + Duration::from_secs(6)));
+    }
 }

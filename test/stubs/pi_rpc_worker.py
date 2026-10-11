@@ -57,7 +57,7 @@ def prompt(command):
         return
     body=command['message'].split('\n',1)[1]
     if mode=='lead' and not body.startswith('CCB result-chain continuation.'):
-        result=api('submit',dict(project_id='native-test',to_agent='worker',from_actor='lead',body='delegate from persistent Pi',
+        result=api('submit',dict(project_id=os.environ.get('CCB_TEST_PROJECT_ID','native-test'),to_agent='worker',from_actor='lead',body='delegate from persistent Pi',
                                  route_options={'mode':'chain'}))
         assert result['ok'],result
         reply='delegated'

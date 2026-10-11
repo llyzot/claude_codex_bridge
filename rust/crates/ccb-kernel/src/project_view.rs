@@ -342,6 +342,7 @@ impl Daemon {
                 ("pending", "provider_user_input")
             } else if !active.is_null()
                 && current["provider_options"]["native_daemon_instance"] != self.state
+                && spec["driver_kind"] != "herdr_tui"
             {
                 ("pending", "execution_recovery_required")
             } else if !active.is_null() {
@@ -358,6 +359,8 @@ impl Daemon {
                         .contains(&spec["driver_kind"].as_str().unwrap_or(""))
             {
                 ("pending", "provider_starting")
+            } else if spec["driver_kind"] == "herdr_tui" && owned["ready"] == true {
+                ("idle", "herdr_readiness_last_observed")
             } else if spec["command"].is_null() {
                 ("offline", "external_worker_unobserved")
             } else {

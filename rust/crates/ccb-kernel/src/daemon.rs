@@ -1,5 +1,5 @@
 //! Public API-2 actor and autonomous queue execution. Provider processes are
-//! runtime-owned handles; this module never controls an external Agent.
+//! runtime-owned handles, or explicit mounted Herdr bindings with no kill rights.
 use crate::{
     admission, bureau, callback, callback_recovery, finalization, records, result_policy, retry,
     Kernel,
@@ -17,6 +17,8 @@ use std::{
 
 #[path = "daemon_context.rs"]
 mod context;
+#[path = "daemon_herdr.rs"]
+mod herdr;
 #[path = "project_view.rs"]
 mod project_view;
 #[path = "daemon_reload.rs"]
@@ -74,6 +76,7 @@ pub struct Daemon {
     pi: HashMap<String, crate::pi_rpc::Session>,
     codex: HashMap<String, crate::codex_rpc::Session>,
     claude: HashMap<String, crate::claude_stream::Session>,
+    herdr: HashMap<String, crate::herdr_worker::Worker>,
     faults: HashMap<String, Value>,
     pub stopping: bool,
     heartbeat: Instant,
@@ -122,8 +125,14 @@ impl Daemon {
             );
             ensure!(
                 spec["driver_kind"].is_null()
-                    || ["command", "pi_rpc", "codex_app_server", "claude_stream"]
-                        .contains(&spec["driver_kind"].as_str().unwrap_or("")),
+                    || [
+                        "command",
+                        "pi_rpc",
+                        "codex_app_server",
+                        "claude_stream",
+                        "herdr_tui"
+                    ]
+                    .contains(&spec["driver_kind"].as_str().unwrap_or("")),
                 "unknown native driver kind"
             );
             if spec["driver_kind"] == "pi_rpc" {
@@ -131,6 +140,9 @@ impl Daemon {
                     spec["provider"] == "pi" && spec["command"].is_array(),
                     "Pi RPC driver requires pi provider and command argv"
                 );
+            }
+            if spec["driver_kind"] == "herdr_tui" {
+                crate::herdr_worker::validate(config, name, spec)?;
             }
             ensure!(
                 spec["profile_family"].is_null()
@@ -232,6 +244,7 @@ impl Daemon {
             pi: HashMap::new(),
             codex: HashMap::new(),
             claude: HashMap::new(),
+            herdr: HashMap::new(),
             faults,
             stopping: false,
             heartbeat: Instant::now(),
@@ -272,6 +285,7 @@ impl Daemon {
         self.pi.clear();
         self.codex.clear();
         self.claude.clear();
+        self.herdr.clear();
         for running in self.running.values_mut() {
             let _ = running.child.kill();
             let _ = running.child.wait();
@@ -598,7 +612,7 @@ impl Daemon {
                 self.reload_guard(agent)?;
                 let spec = self.spec(agent)?;
                 ensure!(
-                    spec["command"].is_null(),
+                    spec["command"].is_null() && spec["driver_kind"] != "herdr_tui",
                     "command-driven agents cannot claim external work"
                 );
                 Ok(json!({"job":self.start(agent)?}))
@@ -615,7 +629,10 @@ impl Daemon {
                 );
                 ensure!(job["status"] == "running", "job is not running");
                 ensure!(
-                    self.config["agents"][job["agent_name"].as_str().unwrap()]["command"].is_null(),
+                    self.config["agents"][job["agent_name"].as_str().unwrap()]["command"].is_null()
+                        && self.config["agents"][job["agent_name"].as_str().unwrap()]
+                            ["driver_kind"]
+                            != "herdr_tui",
                     "managed completion requires provider evidence"
                 );
                 ensure!(
@@ -627,6 +644,7 @@ impl Daemon {
                 let result = self.complete(&job, &p["decision"])?;
                 Ok(json!({"job":result}))
             }
+            "herdr-reobserve" => self.reobserve_herdr(p),
             "cancel" => {
                 let id = records::string(p, "job_id")?;
                 let job = self.get_job(id)?;
@@ -1079,6 +1097,9 @@ impl Daemon {
         }
     }
     fn owned_view(&self, agent: &str) -> Value {
+        if let Some(s) = self.herdr.get(agent) {
+            return s.view.clone();
+        }
         if let Some(s) = self.pi.get(agent) {
             return json!({"pid":s.pid(),"runtime_instance_id":s.runtime,"closed":s.closed,"ready":s.ready});
         }
@@ -1091,6 +1112,9 @@ impl Daemon {
         Value::Null
     }
     fn owned_scope(&self, agent: &str) -> Result<Value> {
+        if self.config["agents"][agent]["driver_kind"] == "herdr_tui" {
+            return Ok(json!({"supported":false,"external":true}));
+        }
         if let Some(s) = self.pi.get(agent) {
             return s.scope_info();
         }
@@ -1625,8 +1649,9 @@ impl Daemon {
             } else {
                 self.kernel.dispatch("rewrite_head",&json!({"agent_name":agent,"inbound_event_id":event,"payload_ref":format!("reply:{}",current["provider_options"]["reply_delivery_reply_id"].as_str().unwrap_or("")),"status":"queued","timestamp":timestamp,"clear_progress":true}))?;
                 if !self.faults.contains_key(agent)
-                    && current["provider_options"]["native_daemon_instance"] == self.state
-                    && ["pi_rpc", "codex_app_server", "claude_stream"]
+                    && (current["provider_options"]["native_daemon_instance"] == self.state
+                        || spec["driver_kind"] == "herdr_tui")
+                    && ["pi_rpc", "codex_app_server", "claude_stream", "herdr_tui"]
                         .contains(&spec["driver_kind"].as_str().unwrap_or(""))
                 {
                     let owned = self.owned_view(agent);
@@ -1776,12 +1801,16 @@ impl Daemon {
                 "scheduler.active_job_for",
                 &json!({"state_id":self.state,"target_kind":"agent","target_name":agent}),
             )?;
+            let spec = self.spec(&agent)?;
+            if spec["driver_kind"] == "herdr_tui" {
+                self.tick_herdr(&agent, &active)?;
+                continue;
+            }
             if let Some(id) = active.as_str() {
                 if self.get_job(id)?["provider_options"]["native_daemon_instance"] != self.state {
                     continue;
                 }
             }
-            let spec = self.spec(&agent)?;
             if spec["driver_kind"] == "pi_rpc" {
                 if self.pi.get(&agent).is_some_and(|session| session.closed)
                     && !self.faults.contains_key(&agent)

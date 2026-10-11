@@ -16,11 +16,11 @@ BIN=Path(os.environ.get('CCB_TEST_KERNEL_BIN') or BIN)
 STUB=ROOT/'test'/'stubs'/'native_command_worker.py'
 
 class Server:
-    def __init__(self,root,agents,*,standalone=False):
+    def __init__(self,root,agents,*,standalone=False,config_extra=None):
         self.root=root
         self.token=create_token_file(root/'kernel'/f'token-{time.monotonic_ns()}.json')
         config=root/'daemon.json'
-        config.write_text(json.dumps(dict(schema_version=2,project_id='native-test',agents=agents)),encoding='utf-8')
+        config.write_text(json.dumps({**dict(schema_version=2,project_id='native-test',agents=agents),**(config_extra or {})}),encoding='utf-8')
         args=[str(BIN),'--state-root',str(root),'--token-file',self.token.token_ref,'--daemon-config',str(config)]
         if standalone:args+=['--standalone']
         self.proc=subprocess.Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,

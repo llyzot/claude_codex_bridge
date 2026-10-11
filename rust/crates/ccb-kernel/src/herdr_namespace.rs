@@ -825,6 +825,18 @@ pub(crate) fn with_prepared(
     controller.validate_bound()?;
     action(&mut controller.store, &controller.plan, &controller.record)
 }
+pub(crate) fn inspect_prepared(request: &Value) -> Result<Value> {
+    let mut request = request.clone();
+    request["action"] = json!("inspect");
+    let namespace = execute(&request)?["namespace"].clone();
+    let plan = plan(&request)?;
+    validate_record(&namespace, &plan, &hash(&plan)?)?;
+    ensure!(
+        namespace["status"] == "prepared",
+        "Herdr namespace is not prepared"
+    );
+    Ok(namespace)
+}
 pub fn execute(request: &Value) -> Result<Value> {
     let plan = plan(request)?;
     let signature = hash(&plan)?;

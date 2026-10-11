@@ -5,7 +5,10 @@ Codex and Claude terminal programs into a previously prepared native namespace.
 It is a prerequisite for native `herdr open`, not a completed replacement for
 that command. Its response explicitly reports `daemon_connected: false` and
 `task_completion_supported: false`. Native task dispatch/history completion and
-automatic result delivery through these terminal Agents are still separate work.
+automatic result delivery through these terminal Agents are separate work. The
+subsequent [Codex terminal Worker checkpoint](native-herdr-worker-20261011.md)
+connects an explicitly configured Codex binding to the native daemon and Pi RPC
+Lead; the standalone mounting command itself still does not connect a daemon.
 
 ## Evidence and interface
 

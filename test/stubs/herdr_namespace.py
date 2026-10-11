@@ -42,6 +42,13 @@ elif args[:2]==['agent','start']:
          'terminal_id':pane['terminal_id'],'tab_id':pane['workspace_id']+':t1','interactive_ready':status in ['idle','done'],
          'launch_pending':False,'revision':1,'focused':False,'tokens':pane['tokens'].copy()}
     state.setdefault('agents',{})[name]=row;save();result={'type':'agent_started','agent':row,'argv':['DO_NOT_PERSIST_SECRET_ARGUMENT']}
+elif args[:2]==['agent','prompt']:
+    assert len(args)==4 and '--wait' not in args
+    row=state['agents'][args[2]]
+    row.update(agent_status='working',interactive_ready=False);save()
+    with (root/'prompts.jsonl').open('a',encoding='utf-8') as output:
+        output.write(json.dumps({'name':args[2],'body':args[3]})+'\n')
+    result={'type':'agent_prompted','agent':row}
 elif args[:2]==['pane','list']:
     workspace=option('--workspace');result={'panes':[p for p in state['panes'].values() if p['workspace_id']==workspace]}
 elif args[:2]==['workspace','create']:

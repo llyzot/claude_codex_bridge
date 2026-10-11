@@ -788,6 +788,7 @@ impl Daemon {
             self.pi.remove(agent);
             self.codex.remove(agent);
             self.claude.remove(agent);
+            self.herdr.remove(agent);
         }
         self.config = desired;
         self.known_names = next["history_agents"]

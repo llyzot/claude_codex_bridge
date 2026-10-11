@@ -100,7 +100,7 @@ fn plan(request: &Value) -> Result<Value> {
         json!({"namespace_plan_hash":hash(&namespace)?,"agents":agents,"startup_timeout_ms":timeout}),
     )
 }
-fn rpc(request: &Value, arguments: Vec<String>) -> Result<Value> {
+pub(crate) fn rpc(request: &Value, arguments: Vec<String>) -> Result<Value> {
     let response = herdr_transport::execute(
         &json!({"schema_version":1,"operation":"agent_mount","command":request["command"],
         "session":request["session"],"args":arguments,"expect_json":true,"timeout_ms":request["timeout_ms"].as_u64().unwrap_or(10000)}),
@@ -117,7 +117,7 @@ fn rpc(request: &Value, arguments: Vec<String>) -> Result<Value> {
     })
 }
 struct Manager<'a> {
-    store: &'a mut Store,
+    store: Option<&'a mut Store>,
     request: &'a Value,
     namespace: &'a Value,
     plan: Value,
@@ -125,8 +125,12 @@ struct Manager<'a> {
 }
 impl Manager<'_> {
     fn save(&mut self) -> Result<()> {
-        self.store.save(RECORD, &self.record)?;
-        self.store.commit()
+        let store = self
+            .store
+            .as_mut()
+            .context("read-only Herdr observer cannot save")?;
+        store.save(RECORD, &self.record)?;
+        store.commit()
     }
     fn snapshot(&self) -> Result<Value> {
         let snapshot =
@@ -522,7 +526,7 @@ pub fn execute(request: &Value) -> Result<Value> {
             validate(&record, &plan, namespace, request)?;
         }
         Manager {
-            store,
+            store: Some(store),
             request,
             namespace,
             plan,
@@ -530,6 +534,39 @@ pub fn execute(request: &Value) -> Result<Value> {
         }
         .run(action == "mount")
     })
+}
+
+/// Observe a previously mounted process without acquiring a second journal writer.
+/// The process remains owned by Herdr; callers never gain termination rights.
+pub(crate) fn bound(request: &Value, agent: &str) -> Result<Value> {
+    let namespace = herdr_namespace::inspect_prepared(request)?;
+    let mut inspect = request.clone();
+    inspect["action"] = json!("inspect");
+    let record = execute(&inspect)?["mount"].clone();
+    let plan = plan(request)?;
+    validate(&record, &plan, &namespace, request)?;
+    let row = &record["agents"][agent];
+    ensure!(
+        row["binding"].is_object(),
+        "Herdr agent has no saved process binding"
+    );
+    let identity = json!({"namespace_owner":record["namespace_owner"],"workspace_id":record["workspace_id"],
+        "herdr_name":row["herdr_name"],"pane_id":row["pane_id"],"terminal_id":row["terminal_id"],
+        "process":row["binding"]["process"],"plan_hash":record["plan_hash"]});
+    let manager = Manager {
+        store: None,
+        request,
+        namespace: &namespace,
+        plan,
+        record,
+    };
+    let mut observed = manager.observe(&manager.snapshot()?, agent)?;
+    ensure!(
+        observed["binding"].is_object(),
+        "mounted Herdr provider is no longer present"
+    );
+    observed["identity"] = identity;
+    Ok(observed)
 }
 
 #[cfg(test)]

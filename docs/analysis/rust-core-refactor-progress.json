@@ -159,7 +159,8 @@
     "Native Herdr namespace planning reuses compact layout grammar, resolves named rich-config leaves, preserves nested split order/percentages and matches legacy balancing including ties-to-even rounding without flattening the layout",
     "Rust-owned namespace allocation journals creation/metadata intent, actual returned IDs and verified ownership bindings under a separate per-project single-writer store; it preserves focus and never closes/adopts pre-existing resources automatically",
     "Lost creation acknowledgements remain uncertain without replay; exact operation/target confirmation can resolve them, while metadata acknowledgements are independently verified and repaired through read-only observation",
-    "Native namespace inspection reads local atomic records without remote calls or blocking an active writer, checks scope and marks plan mismatch; corrupt bindings, changed plans, linked authority paths and unmaterialized workspaces are fenced before remote mutation"
+    "Native namespace inspection reads local atomic records without remote calls or blocking an active writer, checks scope and marks plan mismatch; corrupt bindings, changed plans, linked authority paths and unmaterialized workspaces are fenced before remote mutation",
+    "Native Windows installation now uses a persistent empty OS-locked file plus handle-sharing exclusion, preserving one lock identity across retries, fencing live legacy writable handles and recovering automatically after confirmed process exit without deleting stale markers"
   ],
   "remaining": [
     "Complete legacy/provider-history and cross-Windows-session recovery where new ownership proof is unavailable; verify non-Windows scoped process-tree termination and recovery",
@@ -176,13 +177,13 @@
     "Finish Claude MCP elicitation, structured/native question and dialog rendering, host hook callbacks, persistent permission configuration and unowned/background/inherited approval recovery; verify real authenticated tool approval and enforce caller authorization/UI consent beyond the local administrative control-plane token",
     "Complete native copy-mode and controller worktree lifecycle/retirement/reload parity, explicit workspace setup hooks and broader project-target/config-schema compatibility; validate cross-platform workspace behavior and production startup performance before default rollout",
     "Complete remaining workgroup Git operations and integration controller migration, evaluate asynchronous/bounded Git observation latency and content-filter behavior on production repositories, and extend explicitly rejected sparse/conflicted/submodule states where safe",
-    "Complete controlled native prefix upgrades/removal, interrupted-installer lock/stage recovery, active-runtime coexistence and tested state rollback; build/validate a complete real release archive and finish production/default Rust promotion",
+    "Complete controlled native prefix upgrades/removal, explicit orphan-stage recovery/cleanup, active-runtime coexistence and tested state rollback; build/validate a complete real release archive and finish production/default Rust promotion",
     "Complete native Herdr startup composition and explicit Server lifecycle, original provider terminal interaction, completion-history adapters, Agent lifetime binding, multi-workspace reload/retirement and cross-server-generation recovery; transport and single-workspace journaled allocation exist, but full native herdr open is not complete"
   ],
   "verification": {
     "native_role_addressing": "20 final-release cases passed: compact canonical/legacy role expansion against the existing parser, project/user/current-directory precedence, adapter and source-home naming, managed-HOME avoidance, hybrid/rich binding, invalid IDs/manifests/names, duplicate default names, unambiguous/ambiguous/disabled targeting, agents listing, and actual native project startup plus role-addressed fixture work",
     "native_role_affected_suite": "All 63 affected role/config/startup/task-command cases passed on final release artifacts in 35.54s; Rust tests 7, formatting and clippy all-targets with warnings denied passed. The full 305-case result remains the preceding checkpoint; this change used focused affected-path regression rather than claiming a new full-suite run",
-    "native_contract_inventory": 613,
+    "native_contract_inventory": 618,
     "native_task_cli": "20 final-release cases passed: leading ask flags, literal message boundary, UTF-8 stdin, sender/task/reply metadata, differential compact/silent guidance, automatic/forced request artifacts, forced reply artifacts, rejected-admission artifact rollback, reserved internal delivery rejection, queued/middle/idempotent/restart cancellation, running Pi/Codex/Claude cancel receipts, explicit retry, logical callback success/failure, cursor reads and timeout without cancellation or replay",
     "native_task_cli_current_suite": "All 305 selected Rust kernel/CLI contracts passed on final release artifacts in 510.77s; Rust unit tests 7, formatting and clippy all-targets with warnings denied passed. Repository bin artifacts match release hashes. Initial command fixtures reproduced six failures against the preceding release; focused implementation and final complete suite passed",
     "native_owned_execution_recovery": "21 final-release Windows cases passed: three-provider crash/FIFO recovery without execution replay; provider-side proof observation before prompt handling; missing legacy proof fences; silent cancellation; live owner, PID reuse and invalid execution binding; matching/foreign durable terminal snapshots; live/empty named scopes; uncertain reply delivery retained across restart until explicit recovery; saved Pi session continuation after Worker reconciliation; and non-mutating current-owner CLI observations",
@@ -225,7 +226,7 @@
     "result_policy_differential": "14 retry/notice cases match the existing Python oracle, including boolean policy opt-out and structured permission code precedence over auth message text",
     "result_policy_integration": "56 existing retry/empty-result/callback/finalization cases passed in native mode",
     "daemon_scope": "Real model-backed Pi Lead/Codex Worker automatic callback verified; native Claude protocol and actual unauthenticated failure verified, but successful Claude inference and Herdr execution remain unverified. Unknown prior running executions remain fenced, not automatically replayed",
-    "native_contract_tests": 305,
+    "native_contract_tests": 613,
     "native_claude_release": "All 6 Claude stream contracts passed on final release; complete debug contract suite 130 passed; Rust tests 5 passed and clippy warnings denied",
     "native_provider_suite": "Complete debug suite 123 passed before adding delayed-idle case; all 15 final Pi/Codex provider contracts passed on final release; Rust 5 passed and clippy warnings denied",
     "native_cli_pi_release": "8 CLI/security/Pi RPC cases passed on final release executables, including installed Pi get_state handshake; final debug contract suite 114 passed",
@@ -301,7 +302,7 @@
     "native_installation_regression": "All 79 selected native installation/release-builder/legacy installer/startup/task/daemon cases passed on final release in 70.61s. Rust tests 11, formatting, clippy all-targets with warnings denied and git diff checks passed. Repository bin hashes equal release artifacts. The 550-case native inventory was collected, not fully executed; the prior complete-suite checkpoint remains unchanged",
     "native_installation_provenance": "Release-builder tests verify the resolved commit is exported, every cargo manifest comes from that export and builds in its manifest directory, kernel and native CLI share the build cache, required archive entries/checksum metadata agree and a successful matching-version native capability probe gates installation claims. Local test ZIPs were actually extracted and installed through PowerShell. A complete all-helper production release archive was not built or published in this checkpoint",
     "native_installation_setup_repairs": "Initial installed-chain fixture expected the wrong Codex literal; correcting it passed the full callback. The junction test originally required the word reparse, while Rust classified the junction as a linked path first; it now accepts either valid rejection and verifies the target remains intact. Final 79-case run passed",
-    "native_installation_limits": "Only temporary prefixes and owned test services were installed/controlled. Production installation, account PATH, user provider configuration and existing Workspace/codex_impl remain unchanged. Native prefix commands default to Rust, while the ordinary account installer still defaults to Python. In-place upgrade/removal, stale installer lock/stage recovery, Herdr integration, full CLI/core parity and production/default promotion remain open. Provider fixtures use Python as their own executable; core commands and installer were tested with Python and legacy CCB unavailable on PATH, not with new real-model inference",
+    "native_installation_limits": "Only temporary prefixes and owned test services were installed/controlled. Production installation, account PATH, user provider configuration and existing Workspace/codex_impl remain unchanged. Native prefix commands default to Rust, while the ordinary account installer still defaults to Python. In-place upgrade/removal, orphan-stage cleanup, Herdr integration, full CLI/core parity and production/default promotion remain open. Provider fixtures use Python as their own executable; core commands and installer were tested with Python and legacy CCB unavailable on PATH, not with new real-model inference",
     "native_installation_release_sha256": {
       "ccb-kernel.exe": "7ee2ad7003fdcc2e9f4e87099338f778b571373fc6563564af51ce2ecd38f8fe",
       "ccb-native.exe": "6bacc4068f214f44032cef3e31bf8ed89c789008cb12af4093439106ab22a568",
@@ -325,6 +326,23 @@
     "native_herdr_namespace_release_sha256": {
       "ccb-kernel.exe": "c145f5536fac912e1d24da313cf1e1b7548604e06a6539d2ca3f92581c60e7ab",
       "ccb-native.exe": "282c8aa92c2c7bcfaae5787ba3f90f806ab063bdb4eaa92856e0c81ae730184e",
+      "repository_bin_matches_release": true
+    },
+    "native_full_suite_checkpoint": {
+      "source_commit": "5f974e09",
+      "passed": 613,
+      "elapsed_s": 1011.41,
+      "scope": "All curated native test files except opt-in real-model and three older Python CLI/provider suites; CCB_RUN_REAL_MODELS=0",
+      "binary_scope": "Pre-installation-lock-change release artifacts; these were kept unchanged throughout the run",
+      "kernel_sha256": "c145f5536fac912e1d24da313cf1e1b7548604e06a6539d2ca3f92581c60e7ab",
+      "native_sha256": "282c8aa92c2c7bcfaae5787ba3f90f806ab063bdb4eaa92856e0c81ae730184e"
+    },
+    "native_installation_lock_recovery": "5 dedicated cases passed first on a separate debug binary in 11.18s: reuse of a closed legacy creation marker with stable file identity, refusal while either a plain writable legacy handle or a byte lock is held by a confirmed live process, successful installation after killing/waiting for that owned process, preservation of nonempty locks, and no adoption/deletion of an orphan stage from its name alone",
+    "native_installation_lock_final": "After the complete 613-case run ended, release artifacts were rebuilt. All 42 installation/recovery/release-builder/legacy-installer cases passed on the final release in 26.82s. Rust tests 11, formatting and clippy all-targets with warnings denied passed. Repository bin hashes match final release artifacts. The full 618-case inventory was collected, not rerun after this installation-only change",
+    "native_installation_lock_limits": "No active installer is declared stale from file existence, age or guessed PID state. Windows rejects conflicting writable handles before byte locking, including old installers; process exit releases the OS handle. Lock files remain empty and are not unlinked, avoiding split file-identity races. In-place prefix upgrade/removal and orphan-stage cleanup remain open; unknown staging contents are retained. Only disposable test prefixes/helpers were used; no production installation, account PATH or existing Agent/Workspace control occurred",
+    "native_installation_lock_release_sha256": {
+      "ccb-kernel.exe": "1ae262ea9b9bf7f9774d574e2aacc263630877b1b3d7d5466651b4a8de65dc56",
+      "ccb-native.exe": "791680ac3246f17b4e478a8ba2c0352cedbc9e7e679b72ea61fd553d5f361c9f",
       "repository_bin_matches_release": true
     }
   }

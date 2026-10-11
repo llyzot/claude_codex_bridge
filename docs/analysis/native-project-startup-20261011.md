@@ -272,9 +272,15 @@ modify account PATH or global provider skills, settings or credentials.
 Installation stages files beside the destination, verifies their hashes, then
 publishes a complete new directory. Existing unowned prefixes, reparse points,
 modified installed files and different builds are refused. Reinstalling the
-same verified build is idempotent. A creation lock fences simultaneous installs;
-an interrupted installer can leave that lock/stage for inspection. There is no
-automatic removal or overwrite recovery. For version changes, use a separate
+same verified build is idempotent. An empty persistent lock file uses OS locking
+and Windows handle-sharing rules to fence simultaneous installs, including an
+older installer that holds a writable handle without a byte-range lock. Its
+existence alone does not mean an installer is alive. Process exit releases its
+ownership, so a subsequent install can reuse the same file without deleting it.
+The file identity stays stable to avoid contenders locking different files.
+Nonempty or linked lock paths are rejected without truncation. Interrupted
+staging directories remain for inspection; they are not adopted or deleted based
+on their names. For version changes, use a separate
 prefix and retain the prior one for explicit rollback, stopping owned services
 and checking state compatibility before switching. `installation verify` checks
 the fixed owned inventory; it is a corruption/provenance check, not a signature

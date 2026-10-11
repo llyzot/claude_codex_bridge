@@ -118,6 +118,58 @@ fn write(path: &Path, bytes: &[u8]) -> Result<()> {
     file.sync_all()?;
     Ok(())
 }
+fn existing(target: &Path, sha: &str) -> Result<Option<Value>> {
+    match fs::symlink_metadata(target) {
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    }
+    let verified = verify(target)
+        .context("destination exists; refusing to replace an unverified native installation")?;
+    ensure!(verified["binary_sha256"]==sha && verified["version"]==version(),
+        "destination contains another native build; install to a new prefix for an explicit upgrade");
+    Ok(Some(
+        json!({"status":"already_installed","prefix":target,"runtime":"rust","version":version(),"binary_sha256":sha}),
+    ))
+}
+fn installation_lock(path: &Path) -> Result<fs::File> {
+    if fs::symlink_metadata(path).is_ok() {
+        unlinked(path)?;
+    }
+    let mut options = fs::OpenOptions::new();
+    options.read(true).write(true).create(true).truncate(false);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::{
+            FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ,
+        };
+        // Also excludes an older installer that holds a writable creation-lock
+        // handle without using byte-range locks. Never follow a swapped link.
+        options
+            .share_mode(FILE_SHARE_READ)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+    }
+    let lock = options
+        .open(path)
+        .context("installation lock is unavailable; another installer may still own it")?;
+    let metadata = lock.metadata()?;
+    ensure!(
+        metadata.is_file() && metadata.len() == 0,
+        "installation lock is not an empty native lock file"
+    );
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        ensure!(
+            metadata.file_attributes() & 0x400 == 0,
+            "reparse native installation lock"
+        );
+    }
+    lock.try_lock()
+        .context("installation is already in progress")?;
+    Ok(lock)
+}
 pub fn install(prefix: &Path, dry_run: bool) -> Result<Value> {
     ensure!(
         cfg!(all(windows, target_arch = "x86_64")),
@@ -143,14 +195,8 @@ pub fn install(prefix: &Path, dry_run: bool) -> Result<Value> {
         "native installer is not a Windows executable"
     );
     let sha = digest(&bytes);
-    if fs::symlink_metadata(&target).is_ok() {
-        let verified = verify(&target)
-            .context("destination exists; refusing to replace an unverified native installation")?;
-        ensure!(verified["binary_sha256"] == sha && verified["version"] == version(),
-            "destination contains another native build; install to a new prefix for an explicit upgrade");
-        return Ok(
-            json!({"status":"already_installed","prefix":target,"runtime":"rust","version":version(),"binary_sha256":sha}),
-        );
+    if let Some(record) = existing(&target, &sha)? {
+        return Ok(record);
     }
     let planned = json!({"status":if dry_run {"planned"} else {"installed"},"prefix":target,
         "runtime":"rust","version":version(),"core_version":env!("CARGO_PKG_VERSION"),"binary_sha256":sha,
@@ -158,22 +204,17 @@ pub fn install(prefix: &Path, dry_run: bool) -> Result<Value> {
     if dry_run {
         return Ok(planned);
     }
-    // A same-directory exclusive creation lock prevents competing installers
-    // from racing publication. It is a regular file, never recursively removed.
+    // Keep the empty lock inode stable across invocations. Its OS ownership,
+    // not the presence or age of a file, decides whether installation may run.
     let lock_path = parent.join(format!(
         ".{}.ccb-native-install.lock",
         name.to_string_lossy()
     ));
-    let lock = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&lock_path)
-        .context("installation is already in progress or its creation lock requires inspection")?;
+    let lock = installation_lock(&lock_path)?;
     let result = (|| {
-        ensure!(
-            fs::symlink_metadata(&target).is_err(),
-            "native installation destination appeared during preparation"
-        );
+        if let Some(record) = existing(&target, &sha)? {
+            return Ok(record);
+        }
         let stage = tempfile::Builder::new()
             .prefix(".ccb-native-install-")
             .tempdir_in(&parent)?;
@@ -216,7 +257,8 @@ pub fn install(prefix: &Path, dry_run: bool) -> Result<Value> {
         Ok(planned)
     })();
     drop(lock);
-    fs::remove_file(&lock_path)?;
+    // Deleting here can let contenders lock different file identities. A crash
+    // releases the handle automatically; the next invocation reuses the file.
     result
 }
 

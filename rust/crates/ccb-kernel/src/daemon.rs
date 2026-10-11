@@ -15,6 +15,8 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
+#[path = "project_view.rs"]
+mod project_view;
 #[path = "daemon_reload.rs"]
 mod reload;
 
@@ -73,6 +75,8 @@ pub struct Daemon {
     faults: HashMap<String, Value>,
     pub stopping: bool,
     heartbeat: Instant,
+    view_sequence: u64,
+    view_digest: String,
 }
 impl Drop for Daemon {
     fn drop(&mut self) {
@@ -229,6 +233,8 @@ impl Daemon {
             faults,
             stopping: false,
             heartbeat: Instant::now(),
+            view_sequence: 0,
+            view_digest: String::new(),
         })
     }
     pub fn mount(&mut self, endpoint: &Value) -> Result<()> {
@@ -349,6 +355,8 @@ impl Daemon {
     }
     fn dispatch(&mut self, op: &str, p: &Value) -> Result<Value> {
         match op {
+            "project_view" => self.project_view(p),
+            "project_view_dismiss_comms" => self.dismiss_comms(p),
             "reload-plan" => Ok(json!({"plan":self.reload_plan(&p["config"])?})),
             "reload" => self.request_reload(p),
             "reload-status" => Ok(json!({"reload":self.kernel.store.json("reload.json")?})),

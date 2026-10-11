@@ -54,7 +54,15 @@ pub fn run(args: Args) -> io::Result<()> {
     let action = run_tui(&args)?;
     match action {
         ExitAction::SidebarOnly => {}
-        ExitAction::KillProject => run_ccb_kill(&args.project_root)?,
+        ExitAction::KillProject => {
+            if args.native_state_root.is_some() {
+                CcbdClient::from_args(&args)
+                    .and_then(|client| client.stop_native())
+                    .map_err(io::Error::other)?;
+            } else {
+                run_ccb_kill(&args.project_root)?;
+            }
+        }
     }
     Ok(())
 }
@@ -69,7 +77,7 @@ fn run_tui(args: &Args) -> io::Result<ExitAction> {
     let _session = TuiSession;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-    let client = CcbdClient::new(args.ccbd_socket.clone());
+    let client = CcbdClient::from_args(args).map_err(io::Error::other)?;
     let ccb_program = ccb_program();
     let mut theme_resolver = RuntimeThemeResolver::new(&args.theme);
     let mut app = SidebarApp::with_theme(args.pane_window.clone(), theme_resolver.theme());
@@ -459,6 +467,12 @@ impl SidebarApp {
         let areas = self.sidebar_areas(area);
         match header_action_at(column, row, areas.tree) {
             Some(HeaderMouseAction::Settings) => {
+                if client.is_native() {
+                    self.set_error(
+                        "Configuration editing is not available in this native view yet".into(),
+                    );
+                    return None;
+                }
                 if !self.config_ui_launch_is_active() {
                     match launch_config_ui(project_root, ccb_program) {
                         Ok(launch) => self.config_ui_launch = Some(launch),
@@ -610,8 +624,7 @@ impl SidebarApp {
         comms_action_at_area(
             &visible_items,
             areas.comms,
-            column,
-            row,
+            (column, row),
             content_width,
             self.sidebar_view().comms_compact,
             prefix_lines,
@@ -1245,13 +1258,13 @@ fn header_action_at(column: u16, row: u16, area: Rect) -> Option<HeaderMouseActi
 fn comms_action_at_area(
     items: &[CommsItem],
     area: Rect,
-    column: u16,
-    row: u16,
+    position: (u16, u16),
     width: usize,
     compact: bool,
     prefix_lines: u16,
     theme: SidebarTheme,
 ) -> Option<(usize, CommsMouseAction)> {
+    let (column, row) = position;
     if items.is_empty() || area.width < 3 || area.height < 3 {
         return None;
     }
@@ -2039,6 +2052,9 @@ fn comms_is_normal_terminal(item: &CommsItem) -> bool {
 }
 
 fn comms_cancel_enabled(item: &CommsItem) -> bool {
+    if let Some(enabled) = item.cancel_enabled {
+        return enabled;
+    }
     if item.recoverable {
         return true;
     }
@@ -3154,15 +3170,14 @@ mod tests {
         let theme = SidebarTheme::default_dark();
 
         assert_eq!(
-            comms_action_at_area(&[item], area, 1, 11, 22, true, 0, theme),
+            comms_action_at_area(&[item], area, (1, 11), 22, true, 0, theme),
             Some((0, CommsMouseAction::Retry))
         );
         assert_eq!(
             comms_action_at_area(
                 &[sample_comms_item("msg1")],
                 area,
-                3,
-                11,
+                (3, 11),
                 22,
                 true,
                 0,
@@ -3174,8 +3189,7 @@ mod tests {
             comms_action_at_area(
                 &[sample_comms_item("msg1")],
                 area,
-                4,
-                11,
+                (4, 11),
                 22,
                 true,
                 0,
@@ -3187,8 +3201,7 @@ mod tests {
             comms_action_at_area(
                 &[sample_comms_item("msg1")],
                 area,
-                7,
-                11,
+                (7, 11),
                 22,
                 true,
                 0,
@@ -3200,8 +3213,7 @@ mod tests {
             comms_action_at_area(
                 &[sample_comms_item("msg1")],
                 area,
-                10,
-                11,
+                (10, 11),
                 22,
                 true,
                 0,
@@ -3213,8 +3225,7 @@ mod tests {
             comms_action_at_area(
                 &[sample_comms_item("msg1")],
                 area,
-                4,
-                12,
+                (4, 12),
                 22,
                 true,
                 0,
@@ -4045,7 +4056,10 @@ mod tests {
             Some("job_7deaebaf8043"),
         );
         let text = spans_text(&agent_row_spans(&agent, SidebarTheme::default_dark()));
-        assert!(text.contains("·3"), "should include queue depth, got: {text}");
+        assert!(
+            text.contains("·3"),
+            "should include queue depth, got: {text}"
+        );
         assert!(
             text.contains("#8043"),
             "should include active jobid short, got: {text}"

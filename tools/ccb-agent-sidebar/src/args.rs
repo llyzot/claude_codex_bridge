@@ -9,6 +9,9 @@ pub struct Args {
     pub project_root: PathBuf,
     pub pane_window: String,
     pub theme: String,
+    pub native_state_root: Option<PathBuf>,
+    pub native_bin: Option<PathBuf>,
+    pub dump_json: bool,
 }
 
 impl Args {
@@ -29,10 +32,20 @@ impl Args {
         let mut project_root: Option<PathBuf> = None;
         let mut pane_window: Option<String> = None;
         let mut theme: Option<String> = None;
+        let mut native_state_root = None;
+        let mut native_bin = None;
+        let mut dump_json = false;
         let mut iter = items.into_iter().map(Into::into);
 
         while let Some(item) = iter.next() {
             match item.as_str() {
+                "--state-root" => {
+                    native_state_root = Some(PathBuf::from(next_value(&mut iter, "--state-root")?))
+                }
+                "--native-bin" => {
+                    native_bin = Some(PathBuf::from(next_value(&mut iter, "--native-bin")?))
+                }
+                "--dump-json" => dump_json = true,
                 "--ccbd-socket" => {
                     ccbd_socket = Some(PathBuf::from(next_value(&mut iter, "--ccbd-socket")?));
                 }
@@ -53,10 +66,30 @@ impl Args {
             }
         }
 
+        if ccbd_socket.is_some() && native_state_root.is_some() {
+            return Err("choose --ccbd-socket or --state-root, not both".into());
+        }
+        if native_bin.is_some() && native_state_root.is_none() {
+            return Err("--native-bin requires --state-root".into());
+        }
+        if ccbd_socket.is_none() && native_state_root.is_none() {
+            return Err(missing("--ccbd-socket or --state-root"));
+        }
         Ok(Self {
-            ccbd_socket: ccbd_socket.ok_or_else(|| missing("--ccbd-socket"))?,
-            project_root: project_root.ok_or_else(|| missing("--project-root"))?,
-            pane_window: pane_window.ok_or_else(|| missing("--pane-window"))?,
+            ccbd_socket: ccbd_socket.unwrap_or_default(),
+            project_root: if dump_json {
+                project_root.unwrap_or_default()
+            } else {
+                project_root.ok_or_else(|| missing("--project-root"))?
+            },
+            pane_window: if dump_json {
+                pane_window.unwrap_or_else(|| "native".into())
+            } else {
+                pane_window.ok_or_else(|| missing("--pane-window"))?
+            },
+            native_state_root,
+            native_bin,
+            dump_json,
             theme: theme
                 .or_else(|| {
                     if use_env_theme {
@@ -108,7 +141,7 @@ fn missing(flag: &str) -> String {
 }
 
 pub fn usage() -> String {
-    "usage: ccb-agent-sidebar --ccbd-socket <path> --project-root <path> --pane-window <name> [--theme <profile>]"
+    "usage: ccb-agent-sidebar (--ccbd-socket <path> | --state-root <native-dir> [--native-bin <exe>]) --project-root <path> --pane-window <name> [--theme <profile>]\n  --dump-json reads one view without opening a terminal; project/pane arguments are then optional"
         .to_string()
 }
 
@@ -139,6 +172,39 @@ mod tests {
         let err =
             Args::parse_from(["--project-root", "/repo", "--pane-window", "main"]).unwrap_err();
         assert!(err.contains("--ccbd-socket"));
+    }
+    #[test]
+    fn native_dump_requires_only_explicit_service_context() {
+        let args = Args::parse_from([
+            "--state-root",
+            "native-state",
+            "--native-bin",
+            "ccb-native.exe",
+            "--dump-json",
+        ])
+        .unwrap();
+        assert_eq!(args.native_state_root, Some(PathBuf::from("native-state")));
+        assert!(args.dump_json && args.ccbd_socket.as_os_str().is_empty());
+        assert!(
+            Args::parse_from([
+                "--state-root",
+                "state",
+                "--ccbd-socket",
+                "socket",
+                "--dump-json"
+            ])
+            .is_err()
+        );
+        assert!(
+            Args::parse_from([
+                "--ccbd-socket",
+                "socket",
+                "--native-bin",
+                "helper",
+                "--dump-json"
+            ])
+            .is_err()
+        );
     }
 
     #[test]

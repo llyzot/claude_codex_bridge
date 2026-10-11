@@ -236,6 +236,8 @@ pub struct CommsItem {
     pub recover_target: Option<Value>,
     #[serde(default)]
     pub block_reason: Option<String>,
+    #[serde(default)]
+    pub cancel_enabled: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

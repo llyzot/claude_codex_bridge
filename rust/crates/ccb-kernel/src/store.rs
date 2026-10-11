@@ -133,7 +133,8 @@ impl Store {
                     "lifecycle.json",
                     "configuration.json",
                     "reload.json",
-                    "namespace.json"
+                    "namespace.json",
+                    "project-view.json"
                 ]
                 .contains(&relative),
             "unowned state path"
@@ -248,6 +249,42 @@ impl Store {
     }
     pub fn index_metrics(&self) -> Value {
         serde_json::json!({"history_reads":self.index_reads.get(),"history_rows":self.index_rows.get()})
+    }
+    fn projection_index(&self, path: &str, identity: &str) -> Result<(String, String)> {
+        ensure!(
+            !self.staged.contains_key(path),
+            "projection requires committed records"
+        );
+        let key = (path.to_owned(), identity.to_owned());
+        let signature = self.signature(path)?;
+        if !self
+            .latest_indices
+            .borrow()
+            .get(&key)
+            .is_some_and(|index| index.signature == signature)
+        {
+            self.latest_rows(path, identity)?;
+        }
+        Ok(key)
+    }
+    pub(crate) fn project_latest<T>(
+        &self,
+        path: &str,
+        identity: &str,
+        project: impl FnOnce(&[Value]) -> T,
+    ) -> Result<T> {
+        let key = self.projection_index(path, identity)?;
+        Ok(project(&self.latest_indices.borrow()[&key].rows))
+    }
+    pub(crate) fn latest_by_id(&self, path: &str, identity: &str, id: &str) -> Result<Value> {
+        let key = self.projection_index(path, identity)?;
+        let indices = self.latest_indices.borrow();
+        let index = &indices[&key];
+        Ok(index
+            .indices
+            .get(id)
+            .map(|at| index.rows[*at].clone())
+            .unwrap_or(Value::Null))
     }
     pub fn save(&mut self, path: &str, value: &Value) -> Result<()> {
         self.path(path)?;

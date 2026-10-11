@@ -187,6 +187,16 @@ pub(super) fn startup_guard(kernel: &mut Kernel, config: &Value) -> Result<()> {
         .unwrap_or(Value::Null);
     let desired = descriptors(config)?;
     let names = history(kernel, &prior, config)?;
+    for name in &names {
+        ensure!(
+            latest(kernel, "jobs", "job_id", Some(name))?
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|job| job["request"]["project_id"] == config["project_id"]),
+            "agent journal belongs to another project; choose a separate runtime parent directory"
+        );
+    }
     let prior_lease = kernel.store.json("lease.json")?.unwrap_or(Value::Null);
     let namespace_changed =
         !prior.is_null() && prior["namespace_hash"] != hash(&namespace(config))?;

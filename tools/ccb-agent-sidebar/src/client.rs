@@ -1,4 +1,6 @@
-use std::io::{Read, Write};
+use std::io::Read;
+#[cfg(unix)]
+use std::io::Write;
 #[cfg(unix)]
 use std::os::unix::net::UnixStream;
 use std::path::Path;
@@ -12,6 +14,7 @@ use crate::model::ProjectViewResponse;
 pub struct CcbdClient {
     socket_path: std::path::PathBuf,
     timeout: Duration,
+    native: Option<(std::path::PathBuf, std::path::PathBuf)>,
 }
 
 impl CcbdClient {
@@ -19,11 +22,62 @@ impl CcbdClient {
         Self {
             socket_path: socket_path.into(),
             timeout: Duration::from_secs(3),
+            native: None,
         }
+    }
+    pub fn from_args(args: &crate::args::Args) -> Result<Self, String> {
+        let Some(root) = &args.native_state_root else {
+            return Ok(Self::new(args.ccbd_socket.clone()));
+        };
+        let binary = if let Some(path) = &args.native_bin {
+            path.clone()
+        } else {
+            std::env::current_exe()
+                .map_err(|_| "cannot locate native sidebar executable")?
+                .parent()
+                .ok_or("missing sidebar directory")?
+                .join(if cfg!(windows) {
+                    "ccb-native.exe"
+                } else {
+                    "ccb-native"
+                })
+        };
+        if !binary.is_file() {
+            return Err("native command helper is unavailable; specify --native-bin".into());
+        }
+        #[cfg(windows)]
+        if !binary
+            .extension()
+            .is_some_and(|s| s.eq_ignore_ascii_case("exe"))
+        {
+            return Err("native helper must be an executable, not a shell script".into());
+        }
+        Ok(Self {
+            socket_path: Default::default(),
+            timeout: Duration::from_secs(3),
+            native: Some((
+                root.clone(),
+                binary
+                    .canonicalize()
+                    .map_err(|_| "cannot resolve native helper")?,
+            )),
+        })
+    }
+    pub fn is_native(&self) -> bool {
+        self.native.is_some()
+    }
+    pub fn project_view_json(&self) -> Result<serde_json::Value, String> {
+        self.request("project_view", json!({"schema_version":1}))
+    }
+    pub fn stop_native(&self) -> Result<(), String> {
+        if !self.is_native() {
+            return Err("native stop requires a native state root".into());
+        }
+        self.request("shutdown", json!({})).map(|_| ())
     }
 
     pub fn project_view(&self) -> Result<ProjectViewResponse, String> {
-        let payload = self.request("project_view", json!({"schema_version": 1}))?;
+        let payload = self.project_view_json()?;
         serde_json::from_value(payload)
             .map_err(|err| format!("invalid project_view response: {err}"))
     }
@@ -87,8 +141,149 @@ impl CcbdClient {
     }
 
     fn request(&self, op: &str, request: serde_json::Value) -> Result<serde_json::Value, String> {
+        if let Some((root, binary)) = &self.native {
+            if ![
+                "project_view",
+                "cancel",
+                "project_view_dismiss_comms",
+                "shutdown",
+            ]
+            .contains(&op)
+            {
+                return Err("This control is not available for the native runtime yet".into());
+            }
+            return request_native(root, binary, self.timeout, op, request);
+        }
         request_unix_socket(&self.socket_path, self.timeout, op, request)
     }
+}
+
+// Reuse the native client's token ACL, endpoint/generation and loopback checks
+// instead of duplicating its security implementation in the terminal renderer.
+fn request_native(
+    root: &Path,
+    binary: &Path,
+    timeout: Duration,
+    op: &str,
+    request: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    use std::{
+        process::{Child, Command, Stdio},
+        sync::mpsc,
+        time::Instant,
+    };
+    struct Owned(Child);
+    impl Drop for Owned {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+    let mut command = Command::new(binary);
+    command
+        .args([
+            std::ffi::OsStr::new("--state-root"),
+            root.as_os_str(),
+            std::ffi::OsStr::new("request"),
+            std::ffi::OsStr::new(op),
+        ])
+        .arg(request.to_string())
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
+    let mut child = Owned(
+        command
+            .spawn()
+            .map_err(|_| "cannot launch native command helper")?,
+    );
+    let (send, recv) = mpsc::channel();
+    fn reader(
+        mut input: impl Read + Send + 'static,
+        send: std::sync::mpsc::Sender<(bool, Result<Vec<u8>, ()>)>,
+        stderr: bool,
+    ) {
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            let result = input.by_ref().take(1024 * 1024 + 1).read_to_end(&mut bytes);
+            let _ = send.send((
+                stderr,
+                if result.is_ok() && bytes.len() <= 1024 * 1024 {
+                    Ok(bytes)
+                } else {
+                    Err(())
+                },
+            ));
+        });
+    }
+    reader(
+        child.0.stdout.take().ok_or("missing native stdout")?,
+        send.clone(),
+        false,
+    );
+    reader(
+        child.0.stderr.take().ok_or("missing native stderr")?,
+        send,
+        true,
+    );
+    let start = Instant::now();
+    let (mut stdout, mut stderr, mut status) = (None, None, None);
+    loop {
+        while let Ok((err, bytes)) = recv.try_recv() {
+            let bytes = bytes
+                .map_err(|_| "native helper output exceeded its bound or could not be read")?;
+            if err {
+                stderr = Some(bytes)
+            } else {
+                stdout = Some(bytes)
+            }
+        }
+        if status.is_none() {
+            status = child
+                .0
+                .try_wait()
+                .map_err(|_| "native helper status is unavailable")?;
+        }
+        if status.is_some() && stdout.is_some() && stderr.is_some() {
+            break;
+        }
+        if start.elapsed() >= timeout {
+            return Err("Native request timed out; its outcome is unknown. Refresh before retrying a control.".into());
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    if !status.unwrap().success() {
+        let text = String::from_utf8_lossy(stderr.as_ref().unwrap());
+        let safe = text
+            .chars()
+            .filter(|c| !c.is_control() || c.is_whitespace())
+            .take(1024)
+            .collect::<String>();
+        return Err(if safe.trim().is_empty() {
+            "native command failed".into()
+        } else {
+            safe.trim().into()
+        });
+    }
+    let value: serde_json::Value = serde_json::from_slice(stdout.as_ref().unwrap())
+        .map_err(|_| "invalid native helper response")?;
+    if value["api_version"] != 2 || value["ok"] != true {
+        return Err("invalid native response contract".into());
+    }
+    if op == "project_view" && value["view"]["schema_version"] != 1 {
+        return Err("unsupported native ProjectView schema".into());
+    }
+    let mut payload = value
+        .as_object()
+        .cloned()
+        .ok_or("native response is not an object")?;
+    payload.remove("api_version");
+    payload.remove("ok");
+    Ok(serde_json::Value::Object(payload))
 }
 
 fn reload_error_message(payload: &serde_json::Value, status: &str) -> String {

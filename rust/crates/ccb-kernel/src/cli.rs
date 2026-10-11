@@ -95,7 +95,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         return Ok(());
     }
     if args.first().is_some_and(|s| s == "--help") {
-        println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask <agent> [--from <actor>] [--chain] [--silence] <message>\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> ping|watch <target>|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> provider-status <agent>\nccb-native --state-root <dir> provider-terminate <agent> [--silent]\nccb-native --state-root <dir> provider-recover <agent> <fault-id>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
+        println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask <agent> [--from <actor>] [--chain] [--silence] <message>\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> ping|watch <target>|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> job-recovery|job-reconcile <job-id>\nccb-native --state-root <dir> provider-status <agent>\nccb-native --state-root <dir> provider-terminate <agent> [--silent]\nccb-native --state-root <dir> provider-recover <agent> <fault-id>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
         return Ok(());
     }
     if args.is_empty() {
@@ -270,6 +270,10 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     let payload = match op.as_str() {
         "ping" | "stop" => json!({}),
         "watch" => json!({"target":arg(&args,0)?}),
+        "job-recovery" | "job-reconcile" => {
+            ensure!(args.len() == 1, "job recovery requires a target Job");
+            json!({"target":arg(&args,0)?})
+        }
         "queue" => json!({"target":args.first().and_then(|s|s.to_str()).unwrap_or("all")}),
         "inbox" => json!({"agent_name":arg(&args,0)?}),
         "provider-status" => {

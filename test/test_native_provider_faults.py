@@ -187,13 +187,17 @@ def test_recovery_rechecks_durable_fault_instead_of_clearing_changed_identity(tm
         assert not (tmp_path / 'fault-launches').exists()
     finally: server.close()
 
-def test_faulted_active_execution_remains_fenced_after_daemon_death(tmp_path):
+def test_legacy_faulted_active_execution_without_proof_remains_fenced_after_daemon_death(tmp_path):
     root = tmp_path / 'state'
     agents = {'worker': provider_spec('codex', 'active', tmp_path), 'healthy': spec('worker')}
     server = Server(root, agents)
     try:
         receipt = submit(server)
         before = fault(server)
+        legacy = server.rpc('records.latest', dict(stream='jobs', agent_name='worker', identity='job_id'), version=1)['result'][0]
+        legacy['provider_options'].pop('native_scope_proof', None)
+        server.rpc('records.append', dict(stream='jobs', agent_name='worker', record=legacy), version=1)
+
     finally:
         server.proc.kill(); server.proc.wait(timeout=5)
     restored = Server(root, agents)

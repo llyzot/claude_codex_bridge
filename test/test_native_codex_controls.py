@@ -59,7 +59,7 @@ def test_silent_cancel_is_durable_and_keeps_fifo_until_verified_terminal(tmp_pat
         server.close()
 
 
-def test_cancel_intent_survives_daemon_death_without_replaying_unknown_execution(tmp_path):
+def test_cancel_intent_reconciles_after_daemon_death_without_replay(tmp_path):
     root = tmp_path / 'state'
     agents = {'worker': cancel_spec(tmp_path, 'cancel-ack-only')}
     server = Server(root, agents)
@@ -75,11 +75,11 @@ def test_cancel_intent_survives_daemon_death_without_replaying_unknown_execution
             server.close()
     restored = Server(root, agents)
     try:
-        time.sleep(.2)
+        await_watch(restored, receipt['job_id'], lambda r:r['terminal'])
         row = restored.rpc('records.find_last', dict(stream='jobs', agent_name='worker', fields={'job_id': receipt['job_id']}), version=1)['result']
-        assert row['status'] == 'running'
+        assert row['status'] == 'cancelled'
         assert row['provider_options']['native_cancel_intent']['record_reply'] is False
-        assert restored.rpc('queue', {'target': 'worker'})['queues'][0]['active_job_id'] == receipt['job_id']
+        assert restored.rpc('queue', {'target': 'worker'})['queues'][0]['active_job_id'] is None
         assert len([c for c in trace_commands(tmp_path) if c['method'] == 'turn/start']) == 1
         assert restored.rpc('records.list', {'stream': 'replies'}, version=1)['result'] == []
     finally:

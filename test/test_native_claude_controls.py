@@ -142,7 +142,7 @@ def test_confirmed_process_exit_waits_for_eof_and_keeps_daemon_available(tmp_pat
         server.close()
 
 
-def test_cancel_intent_survives_daemon_death_without_replaying_running_work(tmp_path):
+def test_cancel_intent_reconciles_after_daemon_death_without_replay(tmp_path):
     root = tmp_path / 'state'
     configured = {'worker': spec(tmp_path, 'ack-only')}
     first = Server(root, configured)
@@ -158,9 +158,9 @@ def test_cancel_intent_survives_daemon_death_without_replaying_running_work(tmp_
             first.close()
     restored = Server(root, configured)
     try:
-        time.sleep(.15)
+        assert await_watch(restored, receipt['job_id'], lambda r:r['terminal'])['status'] == 'cancelled'
         assert job(restored, receipt['job_id'])['provider_options']['native_cancel_intent']['record_reply'] is False
-        assert restored.rpc('queue', {'target': 'worker'})['queues'][0]['active_job_id'] == receipt['job_id']
+        assert restored.rpc('queue', {'target': 'worker'})['queues'][0]['active_job_id'] is None
         assert len([r for r in controls(tmp_path) if r['type'] == 'user']) == 1
         assert restored.rpc('records.list', {'stream': 'replies'}, version=1)['result'] == []
     finally:

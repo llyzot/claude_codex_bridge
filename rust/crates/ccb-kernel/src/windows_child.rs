@@ -22,7 +22,8 @@ use windows_sys::Win32::{
     Security::SECURITY_ATTRIBUTES,
     Storage::FileSystem::*,
     System::{
-        Environment::*, JobObjects::*, Pipes::CreatePipe, SystemInformation::*, Threading::*,
+        Environment::*, JobObjects::*, Pipes::CreatePipe, RemoteDesktop::ProcessIdToSessionId,
+        SystemInformation::*, SystemServices::JOB_OBJECT_QUERY, Threading::*,
     },
 };
 
@@ -277,11 +278,14 @@ pub(crate) struct OwnedChild {
     job: OwnedHandle,
     pid: u32,
     scope: String,
+    recovery: serde_json::Value,
     status: Option<ExitStatus>,
 }
 impl OwnedChild {
     pub fn spawn(command: &mut Command) -> Result<Self> {
         let scope = uuid::Uuid::new_v4().to_string();
+        let owner_created = creation_time(unsafe { GetCurrentProcess() })?;
+        let namespace = current_session()?;
         let environment = env(command)?;
         let application = program(command)?;
         let application = wide(application.as_os_str())?;
@@ -310,9 +314,17 @@ impl OwnedChild {
                 HANDLE_FLAG_INHERIT,
                 0,
             ))?;
-            let raw_job = CreateJobObjectW(ptr::null(), ptr::null());
+            let job_name = scope_name(&scope);
+            let job_name_wide = wide(OsStr::new(&job_name))?;
+            SetLastError(0);
+            let raw_job = CreateJobObjectW(ptr::null(), job_name_wide.as_ptr());
+            let job_error = GetLastError();
             ensure!(!raw_job.is_null(), "native provider Job unavailable");
             let job = OwnedHandle::from_raw_handle(raw_job);
+            ensure!(
+                job_error != ERROR_ALREADY_EXISTS,
+                "native provider Job identity collision"
+            );
             let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = zeroed();
             limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
             check(SetInformationJobObject(
@@ -388,6 +400,10 @@ impl OwnedChild {
             let process = OwnedHandle::from_raw_handle(info.hProcess);
             let thread = OwnedHandle::from_raw_handle(info.hThread);
             drop(thread);
+            let recovery = serde_json::json!({"kind":"windows_job","scope_id":scope,"scope_name":job_name,
+                "owner_pid":std::process::id(),"owner_created":owner_created,"windows_session":namespace,
+                "provider_pid":info.dwProcessId,"provider_created":creation_time(process.as_raw_handle())?,
+                "kill_on_owner_exit":true});
             Ok(Self {
                 stdin: Some(File::from(input_write)),
                 stdout: Some(File::from(output_read)),
@@ -395,6 +411,7 @@ impl OwnedChild {
                 job,
                 pid: info.dwProcessId,
                 scope,
+                recovery,
                 status: None,
             })
         }
@@ -407,7 +424,7 @@ impl OwnedChild {
     }
     pub fn scope_info(&self) -> Result<serde_json::Value> {
         Ok(
-            serde_json::json!({"supported":true,"scope_id":self.scope_id(),"active_processes":self.active_processes()?}),
+            serde_json::json!({"supported":true,"scope_id":self.scope_id(),"active_processes":self.active_processes()?,"recovery":self.recovery}),
         )
     }
     pub fn tree_empty(&self) -> io::Result<bool> {
@@ -459,5 +476,110 @@ impl Drop for OwnedChild {
     fn drop(&mut self) {
         let _ = self.kill();
         let _ = self.wait();
+    }
+}
+
+fn creation_time(handle: HANDLE) -> io::Result<String> {
+    unsafe {
+        let (mut created, mut ended, mut kernel, mut user): (
+            FILETIME,
+            FILETIME,
+            FILETIME,
+            FILETIME,
+        ) = zeroed();
+        check(GetProcessTimes(
+            handle,
+            &mut created,
+            &mut ended,
+            &mut kernel,
+            &mut user,
+        ))?;
+        Ok((((created.dwHighDateTime as u64) << 32) | created.dwLowDateTime as u64).to_string())
+    }
+}
+fn current_session() -> io::Result<u32> {
+    let mut id = 0;
+    unsafe {
+        check(ProcessIdToSessionId(std::process::id(), &mut id))?;
+    }
+    Ok(id)
+}
+fn scope_name(scope: &str) -> String {
+    format!("Local\\CCB.Native.Provider.{scope}")
+}
+fn process_gone(pid: u32, created: &str) -> io::Result<bool> {
+    unsafe {
+        let raw = OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+            0,
+            pid,
+        );
+        if raw.is_null() {
+            let error = io::Error::last_os_error();
+            return if error.raw_os_error() == Some(ERROR_INVALID_PARAMETER as i32) {
+                Ok(true)
+            } else {
+                Err(error)
+            };
+        }
+        let handle = OwnedHandle::from_raw_handle(raw);
+        if creation_time(handle.as_raw_handle())? != created {
+            return Ok(true);
+        }
+        match WaitForSingleObject(handle.as_raw_handle(), 0) {
+            WAIT_OBJECT_0 => Ok(true),
+            WAIT_TIMEOUT => Ok(false),
+            _ => Err(io::Error::last_os_error()),
+        }
+    }
+}
+pub(crate) fn probe_recovery(proof: &serde_json::Value) -> serde_json::Value {
+    use serde_json::json;
+    let pending = |reason| json!({"status":"pending","reason":reason});
+    if current_session().ok().map(u64::from) != proof["windows_session"].as_u64() {
+        return pending("windows_namespace_unverified");
+    }
+    for (prefix, alive, unknown) in [
+        ("owner", "owner_alive", "owner_unverified"),
+        ("provider", "provider_alive", "provider_unverified"),
+    ] {
+        let pid = proof[format!("{prefix}_pid")].as_u64().unwrap_or(0) as u32;
+        let key = format!("{prefix}_created");
+        match process_gone(pid, proof[&key].as_str().unwrap_or("")) {
+            Ok(true) => {}
+            Ok(false) => return pending(alive),
+            Err(_) => return pending(unknown),
+        }
+    }
+    let name = scope_name(proof["scope_id"].as_str().unwrap_or(""));
+    let Ok(name) = wide(OsStr::new(&name)) else {
+        return pending("scope_unverified");
+    };
+    unsafe {
+        let raw = OpenJobObjectW(JOB_OBJECT_QUERY, 0, name.as_ptr());
+        if raw.is_null() {
+            return if GetLastError() == ERROR_FILE_NOT_FOUND {
+                json!({"status":"stopped","reason":"owned_scope_destroyed"})
+            } else {
+                pending("scope_unverified")
+            };
+        }
+        let handle = OwnedHandle::from_raw_handle(raw);
+        let mut info: JOBOBJECT_BASIC_ACCOUNTING_INFORMATION = zeroed();
+        if QueryInformationJobObject(
+            handle.as_raw_handle(),
+            JobObjectBasicAccountingInformation,
+            (&mut info as *mut JOBOBJECT_BASIC_ACCOUNTING_INFORMATION).cast(),
+            size_of::<JOBOBJECT_BASIC_ACCOUNTING_INFORMATION>() as u32,
+            ptr::null_mut(),
+        ) == 0
+        {
+            return pending("scope_unverified");
+        }
+        if info.ActiveProcesses == 0 {
+            json!({"status":"stopped","reason":"owned_scope_empty"})
+        } else {
+            pending("scope_has_live_processes")
+        }
     }
 }

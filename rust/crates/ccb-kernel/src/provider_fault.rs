@@ -13,12 +13,13 @@ pub fn validate(row: &Value, provider: &Value, agent: &str, project: &Value) -> 
             && row["provider"] == *provider
             && row["project_id"] == *project
             && ["blocked", "recovered"].contains(&row["status"].as_str().unwrap_or(""))
-            && ["startup", "poll", "start", "terminate"]
+            && ["startup", "poll", "start", "terminate", "recovery"]
                 .contains(&row["phase"].as_str().unwrap_or(""))
             && [
                 "provider_start_failed",
                 "provider_protocol_error",
-                "provider_terminated"
+                "provider_terminated",
+                "result_delivery_uncertain"
             ]
             .contains(&row["reason"].as_str().unwrap_or(""))
             && row["fault_id"]
@@ -44,5 +45,19 @@ pub fn validate(row: &Value, provider: &Value, agent: &str, project: &Value) -> 
                 .is_some_and(|time| chrono::DateTime::parse_from_rfc3339(time).is_ok()),
         "invalid native provider fault ownership"
     );
+    if !row["recovery_scope"].is_null() {
+        let proof = &row["recovery_scope"];
+        ensure!(
+            crate::execution_recovery::valid_shape(proof)
+                && proof["agent_name"] == row["agent_name"]
+                && proof["provider"] == row["provider"]
+                && proof["project_id"] == row["project_id"]
+                && proof["job_id"] == row["job_id"]
+                && proof["execution_instance_id"] == row["execution_instance_id"]
+                && proof["runtime_instance_id"] == row["runtime_instance_id"]
+                && proof["provider_pid"] == row["pid"],
+            "invalid provider recovery scope"
+        );
+    }
     Ok(())
 }

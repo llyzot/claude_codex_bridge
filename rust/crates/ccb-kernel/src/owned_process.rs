@@ -11,7 +11,7 @@ use std::{
 #[path = "windows_child.rs"]
 mod windows;
 #[cfg(windows)]
-pub(crate) use windows::OwnedChild;
+pub(crate) use windows::{probe_recovery, OwnedChild};
 
 #[cfg(not(windows))]
 pub(crate) struct OwnedChild(Child);
@@ -47,4 +47,9 @@ impl Drop for OwnedChild {
         let _ = self.0.kill();
         let _ = self.0.wait();
     }
+}
+
+#[cfg(not(windows))]
+pub(crate) fn probe_recovery(_: &serde_json::Value) -> serde_json::Value {
+    serde_json::json!({"status":"unavailable","reason":"platform_unsupported"})
 }

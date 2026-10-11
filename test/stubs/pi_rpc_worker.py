@@ -11,7 +11,8 @@ lock=threading.Lock()
 state=dict(sessionId=f'session-{os.getpid()}',sessionFile=None,isStreaming=False,isCompacting=False,pendingMessageCount=0,messageCount=0,
            model={'headers':{'Authorization':'never-persist-this'}})
 mode=sys.argv[1]
-session_file=Path(sys.argv[2]) if mode=='persist' else None
+session_file=Path(sys.argv[2]) if mode in {'persist','persist-lead'} else None
+if mode=='persist-lead': mode='lead'
 if session_file:
     if '--session' in sys.argv:session_file=Path(sys.argv[sys.argv.index('--session')+1])
     if session_file.exists():state.update(json.loads(session_file.read_text()))

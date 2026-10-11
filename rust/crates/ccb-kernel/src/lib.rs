@@ -14,6 +14,7 @@ pub mod config;
 pub mod control_plane;
 pub mod daemon;
 mod executables;
+mod execution_recovery;
 mod finalization;
 mod lifecycle;
 pub mod models;

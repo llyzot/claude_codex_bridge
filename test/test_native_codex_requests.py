@@ -226,13 +226,13 @@ def test_dead_provider_prompt_and_answer_are_not_replayed_after_restart(tmp_path
             server.close()
     restored = Server(root, agents)
     try:
-        time.sleep(.25)
+        assert await_watch(restored, old['job_id'], lambda r:r['terminal'])['status'] == 'incomplete'
         assert pending(restored) == []
         with pytest.raises(AssertionError, match='runtime identity mismatch'):
             restored.rpc('provider-respond', answer(old, {'decision': 'accept'}))
         assert not [row for row in wire(tmp_path) if 'method' not in row]
         assert len([row for row in wire(tmp_path) if row.get('method') == 'turn/start']) == 1
-        assert restored.rpc('queue', {'target': 'worker'})['queues'][0]['active_job_id'] == old['job_id']
+        assert restored.rpc('queue', {'target': 'worker'})['queues'][0]['active_job_id'] is None
     finally:
         restored.close()
 

@@ -366,6 +366,11 @@ impl Daemon {
             }
             "provider-recover" => self.recover_provider(p),
             "provider-terminate" => self.terminate_provider(p),
+            "job-recovery" => {
+                let job = self.get_job(records::string(p, "target")?)?;
+                Ok(self.recovery_view(&job))
+            }
+            "job-reconcile" => self.reconcile_execution(records::string(p, "target")?),
             "submit" => self.submit(p),
             "watch" => self.watch(p),
             "queue" => {
@@ -744,6 +749,109 @@ impl Daemon {
         )?;
         Ok(job)
     }
+    fn recovery_view(&self, job: &Value) -> Value {
+        let agent = job["agent_name"].as_str().unwrap_or("");
+        let mut view = if self.config["agents"][agent]["provider"] != job["provider"] {
+            json!({"status":"unavailable","reason":"provider_changed"})
+        } else if self.config["agents"][agent]["dispatch_disabled"] == true {
+            json!({"status":"unavailable","reason":"agent_disabled"})
+        } else {
+            crate::execution_recovery::inspect(job, &self.state)
+        };
+        view["job_id"] = job["job_id"].clone();
+        view
+    }
+    fn reconcile_execution(&mut self, id: &str) -> Result<Value> {
+        let current = self.get_job(id)?;
+        let mut view = self.recovery_view(&current);
+        if view["status"] != "stopped" {
+            return Ok(view);
+        }
+        let proof = &current["provider_options"]["native_scope_proof"];
+        let snapshot =
+            crate::completion::snapshot(&mut self.kernel, "load", &json!({"job_id":id}))?;
+        let candidate = &snapshot["latest_decision"];
+        let reusable = snapshot["job_id"] == current["job_id"]
+            && snapshot["agent_name"] == current["agent_name"]
+            && candidate["schema_version"] == 2
+            && candidate["record_type"] == "completion_decision"
+            && candidate["terminal"] == true
+            && ["completed", "failed", "incomplete", "cancelled"]
+                .contains(&candidate["status"].as_str().unwrap_or(""))
+            && candidate["diagnostics"]["runtime_instance_id"] == proof["runtime_instance_id"]
+            && candidate["diagnostics"]["native_execution_instance"]
+                == proof["execution_instance_id"];
+        let timestamp = now();
+        let mut decision = if reusable {
+            candidate.clone()
+        } else {
+            crate::execution_recovery::interrupted(&current, &view, &timestamp)
+        };
+        decision["diagnostics"]["recovery_no_replay"] = json!(true);
+        decision["diagnostics"]["automatic_replay"] = json!(false);
+        decision["diagnostics"]["owner_observation"] = view.clone();
+        decision["diagnostics"]["reused_terminal_snapshot"] = json!(reusable);
+        if reusable {
+            decision["diagnostics"]["recovered_original_finished_at"] =
+                decision["finished_at"].clone();
+            decision["finished_at"] = json!(timestamp);
+            if let Some(reply) =
+                current["provider_options"]["native_cancel_intent"]["record_reply"].as_bool()
+            {
+                decision["diagnostics"]["result_reply_enabled"] = json!(reply);
+                decision["diagnostics"]["cancel_requested"] = json!(true);
+            }
+        }
+        let uncertain_delivery = decision["status"] != "completed"
+            && (current["request"]["message_type"] == "reply_delivery"
+                || current["provider_options"]["reply_delivery"] == true);
+        let agent = records::string(&current, "agent_name")?;
+        let recovery_fault = if uncertain_delivery && !self.faults.contains_key(agent) {
+            Some(
+                json!({"schema_version":1,"record_type":"native_provider_fault","project_id":current["request"]["project_id"],
+                "agent_name":agent,"provider":current["provider"],"fault_id":uuid::Uuid::new_v4().to_string(),"status":"blocked",
+                "phase":"recovery","reason":"result_delivery_uncertain","pid":proof["provider_pid"],"runtime_instance_id":proof["runtime_instance_id"],
+                "daemon_instance_id":proof["daemon_instance_id"],"job_id":id,"execution_instance_id":proof["execution_instance_id"],
+                "observed_at":timestamp,"io_error_kind":null,"recovery_scope":proof}),
+            )
+        } else {
+            None
+        };
+        let checkpoint = self.kernel.memory_checkpoint();
+        let result = (|| -> Result<Value> {
+            let terminal = self.complete(&current, &decision)?;
+            admission::event(
+                &mut self.kernel,
+                &terminal,
+                "job_execution_reconciled",
+                json!({"scope_id":proof["scope_id"],"owner_observation":view,"reused_terminal_snapshot":reusable,"automatic_replay":false}),
+                &timestamp,
+            )?;
+            if let Some(fault) = &recovery_fault {
+                self.kernel.store.save(
+                    &crate::provider_fault::path(current["provider"].as_str().unwrap(), agent),
+                    fault,
+                )?;
+            }
+            self.kernel.store.commit()?;
+            Ok(terminal)
+        })();
+        match result {
+            Ok(job) => {
+                if let Some(fault) = recovery_fault {
+                    self.faults.insert(agent.to_owned(), fault);
+                }
+                view["status"] = json!("reconciled");
+                view["job"] = job;
+                Ok(view)
+            }
+            Err(error) => {
+                self.kernel.store.rollback();
+                self.kernel.restore_memory(checkpoint);
+                Err(error)
+            }
+        }
+    }
     fn owned_view(&self, agent: &str) -> Value {
         if let Some(s) = self.pi.get(agent) {
             return json!({"pid":s.pid(),"runtime_instance_id":s.runtime,"closed":s.closed,"ready":s.ready});
@@ -956,6 +1064,12 @@ impl Daemon {
                     && owned["runtime_instance_id"] == fault["runtime_instance_id"],
                 "owned provider is not confirmed closed"
             );
+        } else if !fault["recovery_scope"].is_null() {
+            ensure!(
+                crate::owned_process::probe_recovery(&fault["recovery_scope"])["status"]
+                    == "stopped",
+                "recovery scope is not confirmed stopped"
+            );
         } else if !fault["pid"].is_null() {
             ensure!(
                 owner_stopped(fault["pid"].as_u64().context("invalid fault PID")? as u32),
@@ -1077,6 +1191,11 @@ impl Daemon {
         job["provider_options"]["native_execution_instance"] =
             json!(uuid::Uuid::new_v4().to_string());
         job["provider_options"]["native_daemon_instance"] = json!(self.state);
+        let scope = self.owned_scope(agent)?;
+        let proof = crate::execution_recovery::seal(&job, &scope, &self.owned_view(agent));
+        if !proof.is_null() {
+            job["provider_options"]["native_scope_proof"] = proof;
+        }
         admission::append(&mut self.kernel, "jobs", &job)?;
         admission::event(
             &mut self.kernel,
@@ -1102,6 +1221,13 @@ impl Daemon {
             .filter(|s| !s.is_empty())
             .map(str::to_owned)
             .unwrap_or_else(now);
+        let mut decision = decision.clone();
+        let proof = &current["provider_options"]["native_scope_proof"];
+        if !proof.is_null() {
+            decision["diagnostics"]["native_execution_instance"] =
+                proof["execution_instance_id"].clone();
+            decision["diagnostics"]["runtime_instance_id"] = proof["runtime_instance_id"].clone();
+        }
         let persisted = finalization::persist(
             &mut self.kernel,
             &json!({"current":current,"decision":decision,"finished_at":timestamp,"state_id":self.state,"bureau_enabled":true,"tracker_group":null,"tracker_view":null,"profile_family":spec["profile_family"].as_str().unwrap_or("structured_result")}),
@@ -1195,6 +1321,16 @@ impl Daemon {
             self.kernel.store.commit()?;
             self.heartbeat = Instant::now();
         }
+        // Reconcile prior owners before spawning sessions or claiming further work.
+        let active = self
+            .kernel
+            .dispatch("scheduler.active_items", &json!({"state_id":self.state}))?;
+        for slot in active.as_array().unwrap() {
+            let id = slot[2]
+                .as_str()
+                .context("invalid active execution identity")?;
+            self.reconcile_execution(id)?;
+        }
         let mut finished = Vec::new();
         for (id, running) in &mut self.running {
             for _ in 0..64 {
@@ -1276,6 +1412,15 @@ impl Daemon {
         for agent in self.names() {
             if self.config["agents"][&agent]["dispatch_disabled"] == true {
                 continue;
+            }
+            let active = self.kernel.dispatch(
+                "scheduler.active_job_for",
+                &json!({"state_id":self.state,"target_kind":"agent","target_name":agent}),
+            )?;
+            if let Some(id) = active.as_str() {
+                if self.get_job(id)?["provider_options"]["native_daemon_instance"] != self.state {
+                    continue;
+                }
             }
             let spec = self.spec(&agent)?;
             if spec["driver_kind"] == "pi_rpc" {

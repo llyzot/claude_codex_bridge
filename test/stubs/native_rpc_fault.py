@@ -55,6 +55,17 @@ if provider == 'claude':
 
 for line in sys.stdin.buffer:
     command = json.loads(line)
+    if first and mode == 'hold' and (command.get('type') in {'prompt', 'user'} or command.get('method') == 'turn/start'):
+        root = Path(os.environ['CCB_NATIVE_TOKEN_FILE']).parent.parent
+        actor = os.environ['CCB_AGENT_NAME']
+        body = command.get('message')
+        if isinstance(body, dict): body = body['content']
+        if body is None: body = command['params']['input'][0]['text']
+        current_id = body.splitlines()[0].split(': ', 1)[1]
+        rows = [json.loads(line) for line in (root.parent / 'agents' / actor / 'jobs.jsonl').read_text(encoding='utf-8').splitlines()]
+        current = next(row for row in reversed(rows) if row['job_id'] == current_id)
+        (directory / 'observed-owner.json').write_text(json.dumps(current['provider_options'].get('native_scope_proof')), encoding='utf-8')
+        hold()
     if delayed and command.get('type') in {'prompt', 'user'} or delayed and command.get('method') == 'turn/start':
         while not (directory / 'release-error').exists(): time.sleep(.025)
     if first and mode == 'malformed' and command.get('type') == 'prompt' or (

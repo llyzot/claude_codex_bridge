@@ -119,7 +119,7 @@ def test_pi_silent_cancel_is_durable_idempotent_and_survives_provider_exit(tmp_p
         assert jobs[0]['terminal_decision']['diagnostics']['cancel_requested'] is True
     finally: server.close()
 
-def test_pi_cancel_intent_survives_daemon_death_without_replaying_uncertain_task(tmp_path):
+def test_pi_cancel_intent_reconciles_after_daemon_death_without_replay(tmp_path):
     root = tmp_path / 'state'
     agents = {'worker': config('pi', 'cancel-ack-only', tmp_path)}
     server = Server(root, agents)
@@ -134,9 +134,8 @@ def test_pi_cancel_intent_survives_daemon_death_without_replaying_uncertain_task
     restored = Server(root, agents)
     try:
         assert latest_job(restored, receipt['job_id'])['provider_options']['native_cancel_intent'] == before['provider_options']['native_cancel_intent']
-        time.sleep(.2)
-        assert restored.rpc('watch', {'target': receipt['job_id']})['status'] == 'running'
-        assert restored.rpc('queue', {'target': 'worker'})['queues'][0]['active_job_id'] == receipt['job_id']
+        assert await_watch(restored, receipt['job_id'], lambda r:r['terminal'])['status'] == 'cancelled'
+        assert restored.rpc('queue', {'target': 'worker'})['queues'][0]['active_job_id'] is None
         assert restored.rpc('records.list', {'stream': 'replies'}, version=1)['result'] == []
     finally: restored.close()
 

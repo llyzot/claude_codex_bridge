@@ -21,6 +21,7 @@ mod executables;
 mod execution_recovery;
 mod finalization;
 pub mod git_observation;
+mod installation;
 mod lifecycle;
 mod live_directory;
 pub mod models;

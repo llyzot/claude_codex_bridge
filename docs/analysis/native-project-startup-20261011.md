@@ -129,3 +129,68 @@ read-only executable discovery and Agent context routing. Existing Workspace,
 Remaining scope includes full CLI/config/worktree/role parity, Keeper/reload,
 Herdr integration, Unix process ownership, actual model startup validation,
 installer/default native activation and Python core retirement.
+
+## Native Windows installation lane
+
+The repository-built core can now install itself to a **new, explicit Windows
+x64 prefix**. No Python runtime, virtual environment, Git Bash, WezTerm or package
+manager is involved in this installation or native core execution. Provider
+programs retain their own prerequisites and authentication. Git workspace and
+review-tree features require Git. Herdr integration is still pending.
+
+```powershell
+# Parent directory must already exist. Preview creates no prefix:
+bin\ccb-native.exe install --prefix C:\tools\ccb-rust --dry-run
+bin\ccb-native.exe install --prefix C:\tools\ccb-rust
+
+# Equivalent Windows installer entry, with no account PATH/config changes:
+.\install.ps1 install -Runtime rust -InstallPrefix C:\tools\ccb-rust
+
+# These installed commands run Rust by default; no activation or selector needed:
+& C:\tools\ccb-rust\bin\ccb.exe --version
+& C:\tools\ccb-rust\bin\ccb.exe installation verify --prefix C:\tools\ccb-rust
+& C:\tools\ccb-rust\bin\ccb.exe start
+& C:\tools\ccb-rust\bin\ask.exe worker "Task description"
+```
+
+`ccb.exe`, `ask.exe` and `ccb-native.exe` share the native CLI implementation.
+Aliases use hard links within the new prefix where supported and a bounded file
+copy otherwise. `ask.exe` handles the ordinary ask syntax, global project/state
+options, redirected input and errors directly. The version output identifies
+both the CCB release and Rust core crate. The installation contains these native
+commands, license, version, usage guide and a manifest; it does not bundle the
+legacy Python implementation or its auxiliary commands.
+
+Provider subprocesses launched by an installed native core receive its `bin`
+directory first in their process-local PATH, preserving any explicit provider
+PATH after it. They also receive the matching install prefix and native launcher
+selector, so old account launchers cannot silently select Python. This does not
+modify account PATH or global provider skills, settings or credentials.
+
+Installation stages files beside the destination, verifies their hashes, then
+publishes a complete new directory. Existing unowned prefixes, reparse points,
+modified installed files and different builds are refused. Reinstalling the
+same verified build is idempotent. A creation lock fences simultaneous installs;
+an interrupted installer can leave that lock/stage for inspection. There is no
+automatic removal or overwrite recovery. For version changes, use a separate
+prefix and retain the prior one for explicit rollback, stopping owned services
+and checking state compatibility before switching. `installation verify` checks
+the fixed owned inventory; it is a corruption/provenance check, not a signature
+or malware verifier. It does not validate the account's external provider tools.
+
+The PowerShell entry also accepts local release archives and SHA256 verification.
+Rust mode requires an explicit prefix and bypasses legacy prerequisite checks,
+Python setup, user PATH edits, provider configuration and legacy cleanup. The
+legacy installer refuses a Rust-owned prefix. The normal installer default is
+still Python until migration parity is proved.
+
+Release packaging now compiles all native binaries from the exported, resolved
+commit rather than mixing an archived ref with the current checkout. Kernel and
+CLI builds share one Cargo target directory. Archives require both native core
+binaries, and metadata distinguishes the experimental Rust prerequisite set from
+the existing Python default. The actual binary's `--capabilities` version and
+installation contract determine whether the Rust install lane is advertised;
+older exported refs are not falsely marked as supporting it. The PowerShell
+entry checks this contract before installation. This is not a production/default rollout; full
+in-place upgrade/removal, installer-death recovery, signed release provenance,
+Herdr integration and the remaining core feature parity still need work.

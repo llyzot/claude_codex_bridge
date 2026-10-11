@@ -156,12 +156,14 @@ def _cargo_build(manifest: Path, target_dir: Path, binary_name: str) -> Path:
             "build",
             "--locked",
             "--release",
+            "--bin",
+            binary_name,
             "--manifest-path",
             str(manifest),
             "--target-dir",
             str(target_dir),
         ],
-        cwd=REPO_ROOT,
+        cwd=manifest.parent,
         check=True,
     )
     binary = target_dir / "release" / f"{binary_name}.exe"
@@ -172,12 +174,12 @@ def _cargo_build(manifest: Path, target_dir: Path, binary_name: str) -> Path:
     return binary
 
 
-def build_native_binaries(artifact_root: Path, build_root: Path) -> dict[str, str]:
+def build_native_binaries(artifact_root: Path, build_root: Path, source_root: Path) -> dict[str, str]:
     bin_dir = artifact_root / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
 
     launcher = _cargo_build(
-        REPO_ROOT / "platforms" / "windows" / "launcher" / "Cargo.toml",
+        source_root / "platforms" / "windows" / "launcher" / "Cargo.toml",
         build_root / "launcher",
         "ccb-windows-launcher",
     )
@@ -188,13 +190,14 @@ def build_native_binaries(artifact_root: Path, build_root: Path) -> dict[str, st
         entries[name] = destination.relative_to(artifact_root).as_posix()
 
     helpers = (
-        (REPO_ROOT / "rust" / "crates" / "ccb-kernel" / "Cargo.toml", "ccb-kernel"),
-        (REPO_ROOT / "rust" / "crates" / "ccb-kernel" / "Cargo.toml", "ccb-native"),
-        (REPO_ROOT / "tools" / "ccb-agent-sidebar" / "Cargo.toml", "ccb-agent-sidebar"),
-        (REPO_ROOT / "tools" / "ccb-rs-helper" / "Cargo.toml", "ccb-rs-helper"),
+        (source_root / "rust" / "crates" / "ccb-kernel" / "Cargo.toml", "ccb-kernel"),
+        (source_root / "rust" / "crates" / "ccb-kernel" / "Cargo.toml", "ccb-native"),
+        (source_root / "tools" / "ccb-agent-sidebar" / "Cargo.toml", "ccb-agent-sidebar"),
+        (source_root / "tools" / "ccb-rs-helper" / "Cargo.toml", "ccb-rs-helper"),
     )
     for manifest, binary_name in helpers:
-        binary = _cargo_build(manifest, build_root / binary_name, binary_name)
+        target_dir = build_root / ("core" if binary_name in {"ccb-kernel", "ccb-native"} else binary_name)
+        binary = _cargo_build(manifest, target_dir, binary_name)
         destination = bin_dir / f"{binary_name}.exe"
         shutil.copy2(binary, destination)
         entries[binary_name] = destination.relative_to(artifact_root).as_posix()
@@ -209,6 +212,7 @@ def write_metadata(
     commit_date: str,
     channel: str,
     bin_entries: dict[str, str],
+    native_installation: bool = False,
 ) -> None:
     build_info = {
         "version": version,
@@ -238,6 +242,20 @@ def write_metadata(
             "git_bash": "required",
             "herdr": ">=0.8.0",
         },
+        "default_runtime": "python",
+        "runtime_options": {
+            "rust": {
+                "installer_args": ["install", "-Runtime", "rust", "-InstallPrefix", "<new-directory>"],
+                "core_entry": "bin/ccb-native.exe",
+                "installed_commands": ["ccb.exe", "ask.exe", "ccb-native.exe"],
+                "python_required": False,
+                "terminal_required": False,
+                "provider_prerequisites": "Provider-specific runtimes and credentials remain required; Git features require Git.",
+                "support_tier": "experimental",
+                "herdr_integrated": False,
+                "updates_account_settings": False,
+            },
+        } if native_installation else {},
     }
     (artifact_root / "BUILD_INFO.json").write_text(
         json.dumps(build_info, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -245,6 +263,27 @@ def write_metadata(
     (artifact_root / "WINDOWS_MANIFEST.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+
+
+def probe_native_installation(artifact_root: Path, version: str) -> bool:
+    completed = subprocess.run(
+        [str(artifact_root / 'bin/ccb-native.exe'), '--capabilities'],
+        cwd=artifact_root, capture_output=True, text=True, encoding='utf-8',
+        timeout=10, creationflags=0x08000000 if os.name == 'nt' else 0,
+    )
+    if completed.returncode:
+        # Older exported refs have a core CLI but not the installation handshake.
+        return False
+    try:
+        capabilities = json.loads(completed.stdout)
+    except ValueError as error:
+        raise RuntimeError('native capability probe returned invalid JSON') from error
+    if capabilities.get('schema_version') != 1 or capabilities.get('service') != 'ccb-native':
+        raise RuntimeError('native capability probe returned an unknown contract')
+    if capabilities.get('version') != version:
+        raise RuntimeError('native binary version does not match the exported release')
+    installation = capabilities.get('native_prefix_installation') or {}
+    return installation.get('schema_version') == 1 and installation.get('supported') is True
 
 
 def create_zip(stage_root: Path, artifact_root: Path, artifact_path: Path) -> None:
@@ -268,6 +307,8 @@ def verify_archive(artifact_path: Path, *, version: str) -> None:
         f"{ARTIFACT_BASENAME}/install.ps1",
         f"{ARTIFACT_BASENAME}/bin/ccb.exe",
         f"{ARTIFACT_BASENAME}/bin/ask.exe",
+        f"{ARTIFACT_BASENAME}/bin/ccb-native.exe",
+        f"{ARTIFACT_BASENAME}/bin/ccb-kernel.exe",
         f"{ARTIFACT_BASENAME}/platforms/windows/ccb.py",
         f"{ARTIFACT_BASENAME}/platforms/windows/start.ps1",
         f"{ARTIFACT_BASENAME}/lib/platforms/windows/herdr/entrypoint.py",
@@ -280,7 +321,7 @@ def verify_archive(artifact_path: Path, *, version: str) -> None:
             raise RuntimeError("Windows archive is missing required entries: " + ", ".join(missing))
         if archive.read(f"{ARTIFACT_BASENAME}/VERSION").decode("utf-8").strip() != version:
             raise RuntimeError("Windows archive VERSION does not match release identity")
-        for name in ("ccb.exe", "ask.exe"):
+        for name in ("ccb.exe", "ask.exe", "ccb-native.exe", "ccb-kernel.exe"):
             if not archive.read(f"{ARTIFACT_BASENAME}/bin/{name}").startswith(b"MZ"):
                 raise RuntimeError(f"Windows archive entry is not a PE executable: {name}")
 
@@ -300,9 +341,10 @@ def build(args: argparse.Namespace) -> tuple[Path, Path]:
         export_root = temporary_root / "export"
         stage_root = temporary_root / "stage"
         artifact_root = stage_root / ARTIFACT_BASENAME
-        export_git_ref(args.git_ref, export_root)
+        export_git_ref(commit, export_root)
         copy_payload(export_root, artifact_root)
-        bin_entries = build_native_binaries(artifact_root, temporary_root / "cargo")
+        bin_entries = build_native_binaries(artifact_root, temporary_root / "cargo", export_root)
+        native_installation = probe_native_installation(artifact_root, version)
         write_metadata(
             artifact_root,
             version=version,
@@ -310,6 +352,7 @@ def build(args: argparse.Namespace) -> tuple[Path, Path]:
             commit_date=commit_date,
             channel=args.channel,
             bin_entries=bin_entries,
+            native_installation=native_installation,
         )
         create_zip(stage_root, artifact_root, artifact_path)
 

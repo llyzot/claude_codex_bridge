@@ -87,21 +87,27 @@ def test_native_launcher_is_projected_to_all_public_windows_commands(monkeypatch
     module = _load_module()
     artifact_root = tmp_path / "artifact"
     build_root = tmp_path / "build"
+    source_root = tmp_path / "exported-ref"
+    calls = []
 
     def fake_cargo_build(_manifest: Path, target_dir: Path, binary_name: str) -> Path:
+        assert _manifest.is_relative_to(source_root)
+        calls.append((_manifest,target_dir,binary_name))
         binary = target_dir / "release" / f"{binary_name}.exe"
         binary.parent.mkdir(parents=True, exist_ok=True)
         binary.write_bytes(b"MZfake")
         return binary
 
     monkeypatch.setattr(module, "_cargo_build", fake_cargo_build)
-    entries = module.build_native_binaries(artifact_root, build_root)
+    entries = module.build_native_binaries(artifact_root, build_root, source_root)
 
     for name in ("ccb", "ask", "autonew", "ctx-transfer"):
         assert entries[name] == f"bin/{name}.exe"
         assert (artifact_root / entries[name]).read_bytes().startswith(b"MZ")
     assert entries["ccb-agent-sidebar"] == "bin/ccb-agent-sidebar.exe"
     assert entries["ccb-rs-helper"] == "bin/ccb-rs-helper.exe"
+    assert entries['ccb-native']=='bin/ccb-native.exe'
+    assert len({target for _,target,name in calls if name in {'ccb-native','ccb-kernel'}})==1
 
 
 def test_metadata_archive_and_checksum_are_self_consistent(tmp_path: Path) -> None:
@@ -123,6 +129,8 @@ def test_metadata_archive_and_checksum_are_self_consistent(tmp_path: Path) -> No
         "ask": "bin/ask.exe",
         "autonew": "bin/autonew.exe",
         "ctx-transfer": "bin/ctx-transfer.exe",
+        "ccb-native": "bin/ccb-native.exe",
+        "ccb-kernel": "bin/ccb-kernel.exe",
     }
     for relative in entries.values():
         (artifact_root / relative).write_bytes(b"MZfake")
@@ -134,6 +142,7 @@ def test_metadata_archive_and_checksum_are_self_consistent(tmp_path: Path) -> No
         commit_date="2026-08-11",
         channel="beta",
         bin_entries=entries,
+        native_installation=True,
     )
     archive_path = tmp_path / module.ARTIFACT_NAME
     checksum_path = tmp_path / module.CHECKSUM_NAME
@@ -147,6 +156,9 @@ def test_metadata_archive_and_checksum_are_self_consistent(tmp_path: Path) -> No
     assert manifest["support_tier"] == "beta"
     assert manifest["executable_entry"] == "bin/ccb.exe"
     assert manifest["prerequisites"]["python"] == ">=3.10"
+    assert manifest['default_runtime']=='python'
+    assert not manifest['runtime_options']['rust']['python_required']
+    assert not manifest['runtime_options']['rust']['herdr_integrated']
 
 
 def test_windows_release_workflow_handles_stable_and_beta_tags() -> None:
@@ -162,3 +174,61 @@ def test_windows_release_workflow_handles_stable_and_beta_tags() -> None:
     assert "release_flags=(--prerelease)" in text
     assert text.count("--prerelease") == 1
     assert '--title "$title"' in text
+
+
+def test_cargo_uses_exported_manifest_directory_and_explicit_binary(monkeypatch, tmp_path):
+    module=_load_module()
+    manifest=tmp_path/'export/rust/crates/ccb-kernel/Cargo.toml'
+    manifest.parent.mkdir(parents=True);manifest.write_text('fixture')
+    target=tmp_path/'target'
+    calls=[]
+    def run(argv,**kwargs):
+        calls.append((argv,kwargs))
+        binary=target/'release/ccb-native.exe';binary.parent.mkdir(parents=True);binary.write_bytes(b'MZfixture')
+    monkeypatch.setattr(module.subprocess,'run',run)
+    binary=module._cargo_build(manifest,target,'ccb-native')
+    assert binary.read_bytes()==b'MZfixture'
+    argv,options=calls[0]
+    assert options['cwd']==manifest.parent
+    assert argv[argv.index('--manifest-path')+1]==str(manifest)
+    assert argv[argv.index('--bin')+1]=='ccb-native' and '--locked' in argv
+
+
+def test_build_exports_the_resolved_commit_and_compiles_that_export(monkeypatch,tmp_path):
+    from types import SimpleNamespace
+    module=_load_module();resolved='a'*40;seen={}
+    monkeypatch.setattr(module,'require_windows_x64_host',lambda:None)
+    monkeypatch.setattr(module,'ensure_clean_worktree',lambda:None)
+    monkeypatch.setattr(module,'release_identity',lambda ref:('8.7.10',resolved,'2026-10-11'))
+    def export(ref,path):
+        assert ref==resolved
+        seen['export']=path;path.mkdir()
+        (path/'identity').write_text(ref)
+    def binaries(artifact,build,source):
+        assert source==seen['export'] and (source/'identity').read_text()==resolved
+        seen['compiled']=True
+        return {}
+    monkeypatch.setattr(module,'export_git_ref',export)
+    monkeypatch.setattr(module,'copy_payload',lambda source,target:target.mkdir(parents=True))
+    monkeypatch.setattr(module,'build_native_binaries',binaries)
+    monkeypatch.setattr(module,'probe_native_installation',lambda path,version:True)
+    monkeypatch.setattr(module,'write_metadata',lambda *a,**k:None)
+    monkeypatch.setattr(module,'create_zip',lambda stage,artifact,path:path.write_bytes(b'fixture'))
+    monkeypatch.setattr(module,'verify_archive',lambda *a,**k:None)
+    module.build(SimpleNamespace(allow_dirty=False,git_ref='moving-branch',output_dir=tmp_path/'out',channel='beta'))
+    assert seen['compiled']
+
+
+@pytest.mark.parametrize('mode',['new','old','wrong-version','malformed'])
+def test_release_metadata_native_lane_requires_binary_capability_and_matching_version(monkeypatch,tmp_path,mode):
+    from types import SimpleNamespace
+    module=_load_module()
+    payload=dict(schema_version=1,service='ccb-native',version='8.7.10',native_prefix_installation=dict(schema_version=1,supported=True))
+    if mode=='wrong-version':payload['version']='different-release'
+    def probe(argv,**kwargs):
+        assert argv[-1]=='--capabilities' and kwargs['cwd']==tmp_path
+        return SimpleNamespace(returncode=1 if mode=='old' else 0,stdout='broken' if mode=='malformed' else json.dumps(payload))
+    monkeypatch.setattr(module.subprocess,'run',probe)
+    if mode in {'wrong-version','malformed'}:
+        with pytest.raises(RuntimeError):module.probe_native_installation(tmp_path,'8.7.10')
+    else:assert module.probe_native_installation(tmp_path,'8.7.10')==(mode=='new')

@@ -130,6 +130,7 @@ impl Session {
                 );
             }
         }
+        crate::installation::provider_commands(&mut command, spec)?;
         command
             .env("CCB_AGENT_NAME", agent)
             .env("CCB_NATIVE_ENDPOINT", endpoint.to_string())

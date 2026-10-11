@@ -2098,6 +2098,17 @@ impl Daemon {
             if let Some(cwd) = spec["workspace_path"].as_str() {
                 command.current_dir(cwd);
             }
+            if let Some(env) = spec["env"].as_object() {
+                for (key, value) in env {
+                    command.env(
+                        key,
+                        value
+                            .as_str()
+                            .context("command environment must contain strings")?,
+                    );
+                }
+            }
+            crate::installation::provider_commands(&mut command, &spec)?;
             command
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())

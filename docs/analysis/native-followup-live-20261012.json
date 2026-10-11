@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "base_commit": "1fcafc79",
+  "recorded_at": "2026-10-11T20:02:11.621966+00:00",
+  "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-followup-live-b_6ioc0z",
+  "source_evidence": "C:\\Users\\user\\Desktop\\work\\ccb-native-followup-live-b_6ioc0z\\result.json",
+  "real_models": true,
+  "models": {
+    "lead": "gpt-6-astra",
+    "worker": "gpt-6.1-sol"
+  },
+  "transport": {
+    "lead": "Pi RPC",
+    "worker": "native hosted Codex authenticated WebSocket"
+  },
+  "herdr_started": false,
+  "original_tui_started": false,
+  "production_install_changed": false,
+  "phases": [
+    {
+      "kind": "direct",
+      "worker_job_id": "job_abaa8b5b74ed",
+      "followup_id": "fup_d5234f93ab2d446989ba11727eef9871",
+      "operation_id": "d5234f93-ab2d-4469-89ba-11727eef9871",
+      "binding": {
+        "execution_instance_id": "87a91e20-0565-4f0c-bac5-27356e168433",
+        "job_id": "job_abaa8b5b74ed",
+        "runtime_instance_id": "4aa1a3c7-daca-4bef-9f80-5a5134314b29",
+        "thread_id": "01a12c8c-91b5-75a0-afd7-0561e859feb7",
+        "turn_id": "01a12c8c-9e5f-76e2-bf90-b1fd7da05e7b"
+      },
+      "sent_at": "2026-10-11T19:59:35.586397900Z",
+      "acknowledged_at": "2026-10-11T19:59:35.659613600Z",
+      "completed_at": "2026-10-11T19:59:42.279586500Z",
+      "completion_authority": "codex_app_server_turn_completed",
+      "final_reply": "67 × 71 = 4,757.\n\nFOLLOWUP_DIRECT_4757_a0c27bc4",
+      "supplemental_input_occurrences_in_native_history": 1
+    },
+    {
+      "kind": "pi_lead_callback",
+      "worker_job_id": "job_a44944276f36",
+      "followup_id": "fup_c2c33ef552ed4eb5a275c5c048ddf1cb",
+      "operation_id": "c2c33ef5-52ed-4eb5-a275-c5c048ddf1cb",
+      "binding": {
+        "execution_instance_id": "c3e7c113-24e2-4273-ba1e-ce1adfa4aaa7",
+        "job_id": "job_a44944276f36",
+        "runtime_instance_id": "4aa1a3c7-daca-4bef-9f80-5a5134314b29",
+        "thread_id": "01a12c8c-91b5-75a0-afd7-0561e859feb7",
+        "turn_id": "01a12c8d-5583-77d0-98dd-a66694f0ada0"
+      },
+      "sent_at": "2026-10-11T20:00:22.485782Z",
+      "acknowledged_at": "2026-10-11T20:00:22.562207Z",
+      "completed_at": "2026-10-11T20:00:26.701705900Z",
+      "completion_authority": "codex_app_server_turn_completed",
+      "final_reply": "67 × 71 = 4,757.\n\nFOLLOWUP_CHAIN_4757_a0c27bc4",
+      "supplemental_input_occurrences_in_native_history": 1
+    }
+  ],
+  "callback": {
+    "edge_id": "cb_ae66b24571df",
+    "state": "done",
+    "parent_job_id": "job_2b93e64cbdbd",
+    "continuation_job_id": "job_1f794fa7ce1e",
+    "initial_lead_finished_at": "2026-10-11T20:00:24.601459Z",
+    "worker_finished_at": "2026-10-11T20:00:26.701705900Z",
+    "lead_released_before_worker_seconds": 2.100246,
+    "same_pi_pid": 57776,
+    "same_pi_session": "01a12c8c-90ab-7337-adb9-af963d8acaa1",
+    "continuation_count": 1,
+    "lead_final": "The supplied arithmetic is correct: 67 × 71 = 4,757. However, the worker did not provide the requested two derivations of the sum of squares from 1 through 200, which equals 2,686,700.\n\nREVIEWED: FOLLOWUP_CHAIN_4757_a0c27bc4",
+    "review_note": "Lead correctly observed that the steered worker result no longer fulfilled the original sum-of-squares request; automatic callback success is not business-requirement approval."
+  },
+  "native_codex_history": {
+    "path": "C:\\Users\\user\\.codex\\sessions\\2026\\10\\12\\rollout-2026-10-12T03-59-34-01a12c8c-91b5-75a0-afd7-0561e859feb7.jsonl",
+    "sha256": "2e07c34a5754b55c8bdd65d0d801d90505a961c281603a3be5eaeceeafc11086",
+    "started_turns": [
+      "01a12c8c-9e5f-76e2-bf90-b1fd7da05e7b",
+      "01a12c8d-5583-77d0-98dd-a66694f0ada0"
+    ],
+    "completed_turns": [
+      "01a12c8c-9e5f-76e2-bf90-b1fd7da05e7b",
+      "01a12c8d-5583-77d0-98dd-a66694f0ada0"
+    ],
+    "tool_call_count": 0
+  },
+  "owned_test_pids_confirmed_absent": [
+    64552,
+    57776,
+    58640,
+    64120
+  ],
+  "binary_sha256": {
+    "ccb-kernel.exe": "447c66a2ab5e694c164aad785f3306be2e3e440d6feb3f4b0de59d8f624c0409",
+    "ccb-native.exe": "be5829c3d13a3ce8f47b83d1b1dac75a785cb66d60f2c1b80fbeb1f4759c37b7"
+  },
+  "limitations": [
+    "One model-backed happy-path run per direct/chain scenario, not a reliability benchmark",
+    "This acceptance used owned RPC/host sessions without opening Herdr or original TUIs",
+    "Original worker request text and parent requirements are not silently rewritten by followup",
+    "Other-provider steering, legacy socket adoption and outbox retention remain open"
+  ]
+}

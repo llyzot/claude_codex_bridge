@@ -55,6 +55,8 @@ host is additionally probed with a nonexistent turn in an empty temporary home;
 this negative protocol test does not request model inference or copy credentials.
 Exact results and binary hashes are recorded in the adjacent evidence file.
 
-This checkpoint does not establish model-backed active steering, legacy Unix
-socket adoption, other-provider steering, bounded log retention or production
-default promotion. It does not change the installed production prefix.
+Subsequent [real-model acceptance](native-followup-live-20261012.md) verified
+direct same-turn steering and automatic Pi review of a steered worker result.
+Legacy Unix socket adoption, other-provider steering, bounded log retention and
+production default promotion remain unfinished. The installed production prefix
+was not changed.

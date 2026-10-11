@@ -98,6 +98,13 @@ def test_json_rejection_is_not_success_when_legacy_caller_did_not_require_json(t
 def test_cli_stdin_is_closed_and_not_inherited_from_request_stream(tmp_path):
     assert run(request(tmp_path,'stdin-eof'))['ok']
 
+@pytest.mark.parametrize('mode,ok',[('server-status-running',True),('server-status-stopped',True),('server-status-conflict',False)])
+def test_real_flat_server_status_is_data_only_for_the_status_query(tmp_path,mode,ok):
+    result=run(request(tmp_path,mode,args=['status','server','--json']))
+    assert result['ok'] is ok
+    mutation=run(request(tmp_path,mode,args=['agent','prompt','worker','task']))
+    assert mutation['ok'] is False
+
 
 @pytest.mark.skipif(os.name!='nt',reason='Windows job-owned descendant lifetime')
 def test_parent_exit_and_json_are_not_enough_while_descendant_keeps_pipe_open(tmp_path):

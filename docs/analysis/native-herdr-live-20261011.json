@@ -1,0 +1,269 @@
+{
+  "schema_version": 1,
+  "base_commit": "d64a65aa",
+  "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-rust-live-6586638a",
+  "session": "ccb-rust-live-6586638a",
+  "herdr_version": "0.9.0",
+  "herdr_protocol": 22,
+  "models": {
+    "lead": "gpt-6-astra",
+    "worker": "gpt-6.1-sol"
+  },
+  "real_models": true,
+  "windows_terminal_client_pid": 18744,
+  "process_identities_before_cleanup": {
+    "43704": {
+      "created": "134362030648713763",
+      "pid": 43704,
+      "windows_session": 1
+    },
+    "37752": {
+      "created": "134362030680485716",
+      "pid": 37752,
+      "windows_session": 1
+    },
+    "63752": {
+      "created": "134362030621591296",
+      "pid": 63752,
+      "windows_session": 1
+    },
+    "18744": {
+      "created": "134362040590027831",
+      "pid": 18744,
+      "windows_session": 1
+    }
+  },
+  "jobs": [
+    {
+      "job_id": "job_2d5438edc6b6",
+      "agent": "lead",
+      "status": "completed",
+      "created_at": "2026-10-11T14:54:18.306892700Z",
+      "finished_at": "2026-10-11T14:54:35.146746500Z",
+      "completion_authority": "pi_extension_agent_settled",
+      "session_id": "01a12b65-f6f8-7261-b4f6-8c349d397297",
+      "execution_id": "4d71b7f7-b966-4335-9b71-0c53734655e1",
+      "unique_request_user_records": null,
+      "delegated": true,
+      "markers": []
+    },
+    {
+      "job_id": "job_6b043b03448b",
+      "agent": "lead",
+      "status": "completed",
+      "created_at": "2026-10-11T14:54:34.306175300Z",
+      "finished_at": "2026-10-11T14:54:42.407610100Z",
+      "completion_authority": "pi_extension_agent_settled",
+      "session_id": "01a12b65-f6f8-7261-b4f6-8c349d397297",
+      "execution_id": "3a218940-fdb8-42cc-9c60-2041cecbfcea",
+      "unique_request_user_records": null,
+      "delegated": false,
+      "markers": [
+        "REVIEW_OK_391"
+      ]
+    },
+    {
+      "job_id": "job_e360db18898d",
+      "agent": "lead",
+      "status": "completed",
+      "created_at": "2026-10-11T15:03:38.775663200Z",
+      "finished_at": "2026-10-11T15:03:51.897546900Z",
+      "completion_authority": "pi_extension_agent_settled",
+      "session_id": "01a12b65-f6f8-7261-b4f6-8c349d397297",
+      "execution_id": "6eb320ac-a7df-493c-9591-660c7278dc77",
+      "unique_request_user_records": null,
+      "delegated": true,
+      "markers": []
+    },
+    {
+      "job_id": "job_b809ea1d7a5c",
+      "agent": "lead",
+      "status": "completed",
+      "created_at": "2026-10-11T15:03:57.593135800Z",
+      "finished_at": "2026-10-11T15:04:02.853325900Z",
+      "completion_authority": "pi_extension_agent_settled",
+      "session_id": "01a12b65-f6f8-7261-b4f6-8c349d397297",
+      "execution_id": "71fca1b8-1ab0-4e15-ab29-e890407443eb",
+      "unique_request_user_records": null,
+      "delegated": false,
+      "markers": [
+        "helper_unknown_error"
+      ]
+    },
+    {
+      "job_id": "job_5c1de512b458",
+      "agent": "lead",
+      "status": "completed",
+      "created_at": "2026-10-11T15:06:18.434607300Z",
+      "finished_at": "2026-10-11T15:06:28.218044200Z",
+      "completion_authority": "pi_extension_agent_settled",
+      "session_id": "01a12b65-f6f8-7261-b4f6-8c349d397297",
+      "execution_id": "8e0d0c9c-28d5-47c5-99f4-2df72eb68bf5",
+      "unique_request_user_records": null,
+      "delegated": true,
+      "markers": [
+        "DELEGATED_LONG"
+      ]
+    },
+    {
+      "job_id": "job_2b5e32c2336b",
+      "agent": "lead",
+      "status": "completed",
+      "created_at": "2026-10-11T15:06:58.844898600Z",
+      "finished_at": "2026-10-11T15:07:04.327586400Z",
+      "completion_authority": "pi_extension_agent_settled",
+      "session_id": "01a12b65-f6f8-7261-b4f6-8c349d397297",
+      "execution_id": "fef34238-5f03-4d42-bb4f-7efde139b12e",
+      "unique_request_user_records": null,
+      "delegated": false,
+      "markers": [
+        "LONG_REVIEW_OK"
+      ]
+    },
+    {
+      "job_id": "job_ccd22aa8b329",
+      "agent": "worker",
+      "status": "completed",
+      "created_at": "2026-10-11T14:54:27.194155100Z",
+      "finished_at": "2026-10-11T14:54:34.306175300Z",
+      "completion_authority": "codex_history_task_complete",
+      "session_id": "01a12b66-91c2-73f2-a852-7ea7447673ad",
+      "execution_id": "b1d3ab79-9309-44bb-a85d-7887b6c121e8",
+      "unique_request_user_records": 1,
+      "delegated": false,
+      "markers": [
+        "WORKER_RESULT_391"
+      ]
+    },
+    {
+      "job_id": "job_9c3d036251dd",
+      "agent": "worker",
+      "status": "completed",
+      "created_at": "2026-10-11T14:57:47.398226500Z",
+      "finished_at": "2026-10-11T14:57:51.054260400Z",
+      "completion_authority": "codex_history_task_complete",
+      "session_id": "01a12b66-91c2-73f2-a852-7ea7447673ad",
+      "execution_id": "1ca763cc-5c1e-4903-90d9-5ea17edd8b20",
+      "unique_request_user_records": 1,
+      "delegated": false,
+      "markers": [
+        "WORKER_RESULT_437"
+      ]
+    },
+    {
+      "job_id": "job_dfe91b49fe4e",
+      "agent": "worker",
+      "status": "completed",
+      "created_at": "2026-10-11T14:59:02.000154700Z",
+      "finished_at": "2026-10-11T14:59:08.725525300Z",
+      "completion_authority": "codex_history_task_complete",
+      "session_id": "01a12b66-91c2-73f2-a852-7ea7447673ad",
+      "execution_id": "13b3445b-0567-4889-85f8-45b03ef7fee2",
+      "unique_request_user_records": 1,
+      "delegated": false,
+      "markers": [
+        "RECOVERY_OK"
+      ]
+    },
+    {
+      "job_id": "job_3f4d9610f18f",
+      "agent": "worker",
+      "status": "completed",
+      "created_at": "2026-10-11T15:00:05.937181100Z",
+      "finished_at": "2026-10-11T15:00:15.503434Z",
+      "completion_authority": "codex_history_task_complete",
+      "session_id": "01a12b66-91c2-73f2-a852-7ea7447673ad",
+      "execution_id": "62961c20-9874-49fa-b101-78f5d366175e",
+      "unique_request_user_records": 1,
+      "delegated": false,
+      "markers": [
+        "RECOVERY_LIVE_OK"
+      ]
+    },
+    {
+      "job_id": "job_43f7c21b2800",
+      "agent": "worker",
+      "status": "completed",
+      "created_at": "2026-10-11T15:03:46.934551300Z",
+      "finished_at": "2026-10-11T15:03:57.593135800Z",
+      "completion_authority": "codex_history_task_complete",
+      "session_id": "01a12b66-91c2-73f2-a852-7ea7447673ad",
+      "execution_id": "57ae3ad7-b73d-4619-8b4c-681f1e10d8dd",
+      "unique_request_user_records": 1,
+      "delegated": false,
+      "markers": [
+        "helper_unknown_error"
+      ]
+    },
+    {
+      "job_id": "job_0aa57040f7c0",
+      "agent": "worker",
+      "status": "completed",
+      "created_at": "2026-10-11T15:06:23.611582800Z",
+      "finished_at": "2026-10-11T15:06:58.844898600Z",
+      "completion_authority": "codex_history_task_complete",
+      "session_id": "01a12b66-91c2-73f2-a852-7ea7447673ad",
+      "execution_id": "5efc6725-30bf-4bb1-b3ba-473ece29aebc",
+      "unique_request_user_records": 1,
+      "delegated": false,
+      "markers": [
+        "LONG_WORKER_OK"
+      ]
+    }
+  ],
+  "callback_edges": [
+    {
+      "edge_id": "cb_59ae1cabe4e6",
+      "state": "done",
+      "parent_job_id": "job_2d5438edc6b6",
+      "child_job_id": "job_ccd22aa8b329",
+      "continuation_job_id": "job_6b043b03448b"
+    },
+    {
+      "edge_id": "cb_6f7be4d2515e",
+      "state": "done",
+      "parent_job_id": "job_e360db18898d",
+      "child_job_id": "job_43f7c21b2800",
+      "continuation_job_id": "job_b809ea1d7a5c"
+    },
+    {
+      "edge_id": "cb_a9d3f25db98b",
+      "state": "done",
+      "parent_job_id": "job_5c1de512b458",
+      "child_job_id": "job_0aa57040f7c0",
+      "continuation_job_id": "job_2b5e32c2336b"
+    }
+  ],
+  "long_worker_seconds": 35.233316,
+  "lead_released_before_worker_seconds": 30.626854,
+  "inflight_recovery": {
+    "job_id": "job_3f4d9610f18f",
+    "observed_working_before_daemon_stop": true,
+    "replacement_daemon_pid": 58244,
+    "provider_pid_unchanged": 37752,
+    "result_marker": "RECOVERY_LIVE_OK"
+  },
+  "limitations": [
+    "Codex sandbox shell execution returned helper_unknown_error; sandbox was not loosened.",
+    "Windows Terminal client launched and stayed attached; no pixel-level UI inspection was performed.",
+    "Pi retained its existing formatting prefixes."
+  ],
+  "scope": {
+    "existing_user_workspaces_controlled": false,
+    "production_prefix_changed": false,
+    "account_path_changed": false,
+    "credentials_copied": false,
+    "saved_trust_decision_for_new_test_project": true
+  },
+  "cleanup": {
+    "named_server_status": "not_running",
+    "pids_no_longer_observable": [
+      43704,
+      37752,
+      63752,
+      18744,
+      58244
+    ],
+    "trial_files_retained": true
+  }
+}

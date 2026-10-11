@@ -32,6 +32,9 @@ elif mode=='missing-server':
 elif mode=='failed-envelope':print(json.dumps({'ok':True,'result':{'status':'failed','error':secret}}))
 elif mode=='unknown-status':print(json.dumps({'result':{'status':'uncertain-new-status'}}))
 elif mode=='boolean-error':print(json.dumps({'error':True}))
+elif mode.startswith('server-status-'):
+    running=mode=='server-status-running'
+    print(json.dumps({'status':'running' if running or mode=='server-status-conflict' else 'not_running','running':running,'session':'test 独立 session'}))
 elif mode=='bad-json':print(secret)
 elif mode=='bad-utf8':sys.stdout.buffer.write(b'\xff'+secret.encode())
 elif mode=='stdin-eof':

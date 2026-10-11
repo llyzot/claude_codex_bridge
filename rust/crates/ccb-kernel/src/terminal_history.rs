@@ -187,6 +187,23 @@ pub(crate) fn baseline(binding: &Binding) -> Result<Baseline> {
         producer,
     })
 }
+pub(crate) fn from_header(binding: &Binding) -> Result<Baseline> {
+    binding.validate()?;
+    let mut file = File::open(&binding.path)?;
+    let first = line(&mut BufReader::new(&mut file))?.context("history header is incomplete")?;
+    let value: Value = serde_json::from_slice(&first)?;
+    binding.header(&value)?;
+    ensure!(
+        value["payload"]["source"] != "ccb_native_pi",
+        "discovery requires a Codex rollout"
+    );
+    Ok(Baseline {
+        identity: identity(&file)?,
+        offset: first.len() as u64,
+        digest: boundary_digest(&mut file, first.len() as u64)?,
+        producer: None,
+    })
+}
 
 pub(crate) struct Reader {
     binding: Binding,
@@ -202,6 +219,9 @@ pub(crate) struct Reader {
     sequence: Option<u64>,
 }
 impl Reader {
+    pub(crate) fn anchored(&self) -> bool {
+        self.anchored
+    }
     pub fn new(binding: Binding, baseline: Baseline, request: String) -> Result<Self> {
         binding.validate()?;
         ensure!(

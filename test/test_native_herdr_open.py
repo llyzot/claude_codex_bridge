@@ -105,7 +105,9 @@ def test_delayed_native_session_binding_continues_in_background(project):
     result=p['open'](200);assert result.returncode==0,result.stderr
     ledger=p['native']/'herdr/herdr-agents.json'
     wait_for(lambda:ledger.exists() and len(server(p['backend']).get('agents',{}))==2)
-    assert p['ready']() is None
+    # Fresh Codex can publish its first rollout only after a real input. The
+    # daemon admits that input using its mounted process and a unique anchor.
+    wait_for(p['ready'],timeout=20)
     worker=json.loads(ledger.read_text())['agents']['worker']['herdr_name']
     change(p['backend'],lambda s:s['agents'][worker].update(agent_session={'agent':'codex','kind':'id','value':p['session'],'source':'fixture'}))
     wait_for(p['ready'],timeout=20)

@@ -197,7 +197,10 @@
     "Idle Pi extension reload rotates an atomic current-state pointer to a new event file in the same process; in-flight recovery uses the original committed event binding without resending or adopting a new generation",
     "Experimental native herdr open now composes a named Herdr server, native workspaces/layout, original Pi/Codex TUI mounting, exact session bindings and standalone Rust daemon startup; foreground observation expiry leaves one reusable background coordinator",
     "Native Herdr open journals server/session-report permissions, preserves expected daemon configuration before launch, resumes after coordinator process death, reuses busy bound Agents and rejects conflicting live ownership/configuration",
-    "Agent shell routing now supplies native state-root and Agent identity, with native-prefix PATH precedence and stale inherited endpoint/token clearing; native ask can infer its caller and service outside the project directory"
+    "Agent shell routing now supplies native state-root and Agent identity, with native-prefix PATH precedence and stale inherited endpoint/token clearing; native ask can infer its caller and service outside the project directory",
+    "Real Herdr 0.9.0 / Windows Terminal / pwsh validation completed Pi Lead and Codex Worker model-backed callback review, including a 35.233-second Worker task after the Lead released its initial turn 30.627 seconds earlier",
+    "Deferred Codex rollout binding admits the first real task against its exact mounted process, correlates a unique structured execution marker and turn, persists observed history and recovers without replay; no warm-up model request is required",
+    "Real Herdr flat running/not_running status data is accepted only by the explicit server-status query; matching real-shape fixtures now protect cold startup"
   ],
   "remaining": [
     "Complete legacy/provider-history and cross-Windows-session recovery where new ownership proof is unavailable; verify non-Windows scoped process-tree termination and recovery",
@@ -205,7 +208,7 @@
     "Complete public API-2/CLI/config-schema/worktree parity, full native shared/private project memory, role skills/permissions/activation hooks and full Keeper/Herdr reload integration and busy-agent drain orchestration; verify non-Windows process lifetime and default native routing",
     "Finish remaining native CLI/provider command composition and production installer/default promotion after interface parity; explicit fresh Rust prefix installation is now available",
     "Finish interrupted-running-task reconciliation and Herdr attachment; add Claude hooks/interactive requests; validate real Codex/Claude interruption and interactive requests plus graphical approval UI integration",
-    "Verify actual Claude Lead callback with credentials and actual Herdr-integrated Pi/Codex execution in isolated Windows projects",
+    "Verify actual Claude Lead callback with credentials and broader actual Herdr-integrated execution/tool/foreground-attach acceptance beyond the now-verified isolated Pi/Codex model-backed result chain",
     "Measure startup, idle CPU/RSS, receipt and callback p50/p95 against Python baseline",
     "Validate state compatibility, crash points, rollback and default Rust ownership",
     "Remove transitional Python core dependencies after native runtime parity is proven",
@@ -215,10 +218,11 @@
     "Complete native copy-mode and controller worktree lifecycle/retirement/reload parity, explicit workspace setup hooks and broader project-target/config-schema compatibility; validate cross-platform workspace behavior and production startup performance before default rollout",
     "Complete remaining workgroup Git operations and integration controller migration, evaluate asynchronous/bounded Git observation latency and content-filter behavior on production repositories, and extend explicitly rejected sparse/conflicted/submodule states where safe",
     "Complete native prefix removal and explicit orphan/retained-version cleanup, extend active-runtime coexistence beyond stopped-prefix exclusion, and verify cross-version project-state rollback; complete signed release/distribution validation and production/default Rust promotion",
-    "Complete live native Herdr startup/UI acceptance and stopped-server recovery, Claude terminal history adapters and fresh-session publication timing, external active cancellation/context controls, idle-fault recovery and Agent migration/retirement, multi-workspace reload and cross-server-generation recovery; explicitly bound Pi/Codex terminal dispatch/history/callback wiring now has offline coverage, but the native open composition has offline coverage, while actual Herdr/provider/UI acceptance remains incomplete",
+    "Complete native automatic foreground-attach acceptance and stopped-server recovery, Claude terminal history adapters and fresh-session publication timing, external active cancellation/context controls, idle-fault recovery and Agent migration/retirement, multi-workspace reload and cross-server-generation recovery; explicitly bound Pi/Codex terminal dispatch/history/callback wiring now has offline coverage, but the native open composition has offline coverage, with real Pi/Codex result-chain acceptance now verified; broader UI/tool/provider acceptance remains incomplete",
     "Complete native sidebar focus/recovery/config UI and packaging/installer integration, verify actual terminal/Herdr interaction, and benchmark helper-per-request polling against direct transport before production promotion",
     "Complete operator-directed repair/reassignment for ambiguous legacy Agent-journal parents and verify older mixed-version/cross-platform migration; current cooperative ownership checks do not govern arbitrary direct filesystem edits or unmodified alternate-root writers",
-    "Complete other-provider native clear/compact, graphical context controls and authenticated Claude model/cancellation/error scenarios; verify general empty-startup recovery, explicit Codex old-thread unloading, large-history compaction, real-model restart continuity, broader retained-history migration and runtime/context-control journal retention"
+    "Complete other-provider native clear/compact, graphical context controls and authenticated Claude model/cancellation/error scenarios; verify general empty-startup recovery, explicit Codex old-thread unloading, large-history compaction, real-model restart continuity, broader retained-history migration and runtime/context-control journal retention",
+    "Diagnose the actual Codex read-only sandbox shell process failure helper_unknown_error observed in the scoped live Herdr test; do not weaken sandbox policy to claim success"
   ],
   "verification": {
     "native_role_addressing": "20 final-release cases passed: compact canonical/legacy role expansion against the existing parser, project/user/current-directory precedence, adapter and source-home naming, managed-HOME avoidance, hybrid/rich binding, invalid IDs/manifests/names, duplicate default names, unambiguous/ambiguous/disabled targeting, agents listing, and actual native project startup plus role-addressed fixture work",
@@ -490,6 +494,15 @@
     "native_herdr_open_release_sha256": {
       "ccb-kernel.exe": "5c5c8abbaa1d41fca358739ba979bbbdf71c1a5d6426d891921cb1100c79a74c",
       "ccb-native.exe": "29e8831f956cdf5c6697e81bbb92dd91d13f809351bb180528aedded62c63fbb",
+      "repository_core_bin_matches_release": true
+    },
+    "native_herdr_live_evidence": "docs/analysis/native-herdr-live-20261011.json",
+    "native_herdr_live_scope": "Used prior explicit human authorization for an independent Windows Terminal/pwsh Pi Lead + Codex Worker test. HERDR_ENV remained absent and was not forged; all live controls targeted only the new named session and owned Agents. Production prefix/account PATH and existing user workspaces/Agents were not changed. A folder-trust decision was saved for the new test repository; provider session history was written normally. Test daemon/server/client/Agents were stopped and their recorded PIDs confirmed no longer observable.",
+    "native_herdr_live_results": "Real arithmetic result WORKER_RESULT_391 automatically resumed the same Pi process/session to REVIEW_OK_391. A working Codex survived native-daemon stop/reopen and delivered RECOVERY_LIVE_OK with one matching transcript user record. A 35.233-second no-tool Worker result automatically returned to a Lead that had released its first turn 30.627 seconds earlier; final LONG_REVIEW_OK and all three callback edges done were verified. A failed sandbox shell sleep also returned automatically and was correctly reported as failure by the Lead.",
+    "native_herdr_live_regression": "The real flat-status failure was reproduced through the installed prefix and a corrected cold-open fixture before the narrow transport fix. Initial deferred-history/transport selection passed 43 cases in 30.83s. Final deferred-history/open/transport/known-history selection passed all 77 cases in 209.84s, including cold recovery and duplicate-anchor refusal. Rust tests 25 passed with one ignored subprocess helper invoked by its parent; formatting, clippy all-targets with warnings denied and diff checks passed. The real model/Windows Terminal evidence is recorded separately; no complete curated-suite rerun is claimed.",
+    "native_herdr_live_release_sha256": {
+      "ccb-kernel.exe": "a40de2f974f2e990acd3ddec40fe205d1ec03eb2914a1325374e70c6c8859a98",
+      "ccb-native.exe": "38819755680a789f6735eafb335f417f2bc96f15416eec4455d32d45dded0a7e",
       "repository_core_bin_matches_release": true
     }
   }

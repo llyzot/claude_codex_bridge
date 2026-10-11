@@ -27,7 +27,7 @@ if args==['server']:
     while not (root/'stop-server').exists():time.sleep(.1)
     sys.exit(0)
 elif args==['status','server','--json']:
-    result={'server':{'running':state.get('server_running',True),'session':'native-namespace-test','compatible':state.get('server_compatible',True)}}
+    result={'status':'running' if state.get('server_running',True) else 'not_running','running':state.get('server_running',True),'session':'native-namespace-test','compatible':state.get('server_compatible',True)}
 elif args==['api','schema','--json']:result={'title':'Herdr API'}
 elif args==['workspace','list']:result={'workspaces':list(state['workspaces'].values())}
 elif args==['api','snapshot']:

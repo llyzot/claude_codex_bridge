@@ -388,12 +388,27 @@ fn binding(
         ));
     }
     let native = &live["agent_session"];
+    let cwd = Path::new(crate::records::string(spec, "workspace_path")?);
     if native["agent"] != "codex" || native["kind"] != "id" {
-        return Ok(None);
+        ensure!(
+            native.is_null(),
+            "unexpected Codex native session reference"
+        );
+        let discovery = if let Some(explicit) = options["bindings"].get(agent) {
+            let binding: crate::terminal_history::Binding =
+                serde_json::from_value(explicit.clone())?;
+            ensure!(
+                binding.cwd == cwd,
+                "explicit deferred history workspace mismatch"
+            );
+            json!({"root":binding.root,"cwd":cwd,"session_id":binding.session_id})
+        } else {
+            json!({"root":codex_root(spec,options,agent)?,"cwd":cwd})
+        };
+        return Ok(Some(json!({"discovery":discovery})));
     }
     let id = crate::records::string(native, "value")?;
     uuid::Uuid::parse_str(id).context("Herdr did not report a native Codex session UUID")?;
-    let cwd = Path::new(crate::records::string(spec, "workspace_path")?);
     if let Some(explicit) = options["bindings"].get(agent) {
         let binding: crate::terminal_history::Binding = serde_json::from_value(explicit.clone())?;
         ensure!(
@@ -403,8 +418,12 @@ fn binding(
         crate::terminal_history::baseline(&binding)?;
         return Ok(Some(json!({"history":binding})));
     }
-    Ok(find_codex(&codex_root(spec, options, agent)?, id, cwd)?
-        .map(|history| json!({"history":history})))
+    let root = codex_root(spec, options, agent)?;
+    Ok(Some(if let Some(history) = find_codex(&root, id, cwd)? {
+        json!({"history":history})
+    } else {
+        json!({"discovery":{"root":root,"cwd":cwd,"session_id":id}})
+    }))
 }
 pub(crate) fn open(
     project: &Path,
@@ -577,6 +596,16 @@ pub(crate) fn open(
                                                 )),
                                     "cached Pi session changed"
                                 );
+                            } else if saved["discovery"].is_object() {
+                                ensure!(
+                                    live["agent_session"].is_null()
+                                        || live["agent_session"]["agent"] == "codex"
+                                            && live["agent_session"]["kind"] == "id"
+                                            && (saved["discovery"]["session_id"].is_null()
+                                                || live["agent_session"]["value"]
+                                                    == saved["discovery"]["session_id"]),
+                                    "deferred Codex session scope changed"
+                                );
                             } else {
                                 ensure!(
                                     live["agent_session"]["agent"] == "codex"
@@ -597,6 +626,10 @@ pub(crate) fn open(
                             spec["driver_kind"] = json!("herdr_tui");
                             spec["profile_family"] = json!("protocol_turn");
                             spec["herdr_history"] = record["bindings"][name]["history"].clone();
+                            if record["bindings"][name]["discovery"].is_object() {
+                                spec["herdr_discovery"] =
+                                    record["bindings"][name]["discovery"].clone();
+                            }
                             if spec["provider"] == "pi" {
                                 spec["pi_bridge_owner"] =
                                     record["bindings"][name]["pi_bridge_owner"].clone();

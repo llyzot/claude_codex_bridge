@@ -112,3 +112,11 @@ startup/idle performance. Negative history discovery can repeat while waiting;
 very large homes should use an explicit binding. The native provider-specific
 active cancellation/context/retirement limits from earlier checkpoints remain.
 Production installation and default routing are unchanged.
+
+The subsequent [real Windows validation](native-herdr-live-20261011.md) found that
+fresh Codex sessions can have no persisted rollout before their first real input.
+The current runtime can therefore start a process-bound deferred Codex driver and
+bind its history using that input's unique structured request/turn evidence. This
+supersedes the earlier requirement to keep all fresh sessions pending at step 4.
+That validation also records real automatic Pi review after a 35-second Worker
+task, controller restart recovery, and the remaining shell-helper limitation.

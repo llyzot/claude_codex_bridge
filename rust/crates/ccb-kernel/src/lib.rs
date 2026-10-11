@@ -27,6 +27,7 @@ mod execution_recovery;
 mod finalization;
 pub mod git_observation;
 mod herdr_agents;
+mod herdr_discovery;
 mod herdr_namespace;
 mod herdr_open;
 mod herdr_transport;

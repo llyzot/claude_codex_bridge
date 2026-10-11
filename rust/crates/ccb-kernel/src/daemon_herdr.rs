@@ -21,6 +21,19 @@ impl Daemon {
             let id = self.herdr[agent].job.clone();
             let mut job = self.get_job(&id)?;
             match event {
+                Event::Bound(binding) => {
+                    ensure!(
+                        job["status"] == "running"
+                            && binding["identity"]
+                                == job["provider_options"]["herdr_dispatch"]["identity"],
+                        "discovered history execution mismatch"
+                    );
+                    self.kernel.store.save(
+                        &format!("providers/codex/{agent}/herdr-history.json"),
+                        &binding,
+                    )?;
+                    self.kernel.store.commit()?;
+                }
                 Event::Prepared(proof) => {
                     ensure!(
                         job["status"] == "running"
@@ -89,7 +102,14 @@ impl Daemon {
         {
             return Ok(());
         }
-        let spec = self.spec(agent)?;
+        let mut spec = self.spec(agent)?;
+        if spec["herdr_discovery"].is_object() {
+            spec["_herdr_history_cache"] = self
+                .kernel
+                .store
+                .json(&format!("providers/codex/{agent}/herdr-history.json"))?
+                .unwrap_or(Value::Null);
+        }
         let job = if let Some(id) = active.as_str() {
             let job = self.get_job(id)?;
             // `active` is the start-of-tick snapshot and may have completed above.

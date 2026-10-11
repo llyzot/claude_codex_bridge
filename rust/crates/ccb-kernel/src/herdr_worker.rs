@@ -16,6 +16,7 @@ use std::{
 
 pub(crate) enum Event {
     Prepared(Value),
+    Bound(Value),
     Completed(Value),
     Ready,
     Fault,
@@ -54,6 +55,21 @@ pub(crate) fn validate(config: &Value, name: &str, spec: &Value) -> Result<()> {
             && request["config"]["agents"][name]["workspace_path"] == spec["workspace_path"],
         "Herdr mount and driver provider/workspace differ"
     );
+    if spec["herdr_discovery"].is_object() {
+        ensure!(
+            spec["provider"] == "codex" && spec["herdr_history"].is_null(),
+            "deferred history is only supported for unbound Codex"
+        );
+        crate::herdr_discovery::validate(&spec["herdr_discovery"], &spec["workspace_path"])?;
+        ensure!(
+            spec["timeout_s"].is_null()
+                || spec["timeout_s"]
+                    .as_f64()
+                    .is_some_and(|t| t.is_finite() && t > 0.0 && t <= 86400.0),
+            "invalid deferred history timeout"
+        );
+        return Ok(());
+    }
     let binding: Binding = serde_json::from_value(spec["herdr_history"].clone())
         .context("invalid Herdr Codex history binding")?;
     binding.validate()?;
@@ -121,7 +137,11 @@ impl Worker {
         job: &Value,
         prompt: String,
     ) -> Result<Self> {
-        let binding: Binding = serde_json::from_value(spec["herdr_history"].clone())?;
+        let binding: Option<Binding> = if spec["herdr_discovery"].is_object() {
+            None
+        } else {
+            Some(serde_json::from_value(spec["herdr_history"].clone())?)
+        };
         let job_id = crate::records::string(job, "job_id")?.to_owned();
         let execution =
             crate::records::string(&job["provider_options"], "native_execution_instance")?
@@ -138,22 +158,37 @@ impl Worker {
             .name(format!("herdr-{agent}"))
             .spawn(move || {
                 let mut permitted = !saved.is_null();
-                if run(
-                    &request,
-                    &agent,
-                    &spec,
-                    &binding,
-                    &task,
-                    &execution,
-                    &saved,
-                    &prompt,
-                    &send,
-                    &granted,
-                    &thread_alive,
-                    &mut permitted,
-                )
-                .is_err()
-                {
+                let result = if let Some(binding) = binding {
+                    run(
+                        &request,
+                        &agent,
+                        &spec,
+                        &binding,
+                        &task,
+                        &execution,
+                        &saved,
+                        &prompt,
+                        &send,
+                        &granted,
+                        &thread_alive,
+                        &mut permitted,
+                    )
+                } else {
+                    crate::herdr_discovery::run(
+                        &request,
+                        &agent,
+                        &spec,
+                        &task,
+                        &execution,
+                        &saved,
+                        &prompt,
+                        &send,
+                        &granted,
+                        &thread_alive,
+                        &mut permitted,
+                    )
+                };
+                if result.is_err() {
                     let _ = send.send(if permitted {
                         Event::Fault
                     } else {

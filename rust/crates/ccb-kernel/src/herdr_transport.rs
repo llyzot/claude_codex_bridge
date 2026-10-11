@@ -92,7 +92,7 @@ fn read_stream(
         let _ = sender.send((stderr, result));
     });
 }
-fn failed_envelope(value: &Value) -> bool {
+fn failed_envelope(value: &Value, server_status: bool) -> bool {
     if !value.is_object() {
         return true;
     }
@@ -102,6 +102,9 @@ fn failed_envelope(value: &Value) -> bool {
             || !v["error"].is_null() && v["error"] != false && v["error"] != ""
             || !v["status"].is_null()
                 && !matches!(v["status"].as_str().map(str::trim), Some("" | "ok"))
+                && !(server_status
+                    && (v["status"] == "running" && v["running"] == true
+                        || v["status"] == "not_running" && v["running"] == false))
             || !v["command_status"].is_null()
                 && !matches!(
                     v["command_status"].as_str().map(str::trim),
@@ -234,16 +237,19 @@ pub fn execute(request: &Value) -> Result<Value> {
         Ok(text) => text,
         Err(_) => return Ok(reply(base, false, "invalid_utf8", code, None, started)),
     };
+    let server_status =
+        args.len() == 3 && args[0] == "status" && args[1] == "server" && args[2] == "--json";
     if request["expect_json"] == true {
         match serde_json::from_str::<Value>(&stdout) {
-            Ok(value) if !failed_envelope(&value) => {}
+            Ok(value) if !failed_envelope(&value, server_status) => {}
             Ok(_) => return Ok(reply(base, false, "server_rejected", code, None, started)),
             Err(_) => return Ok(reply(base, false, "invalid_json", code, None, started)),
         }
     } else if stdout.trim_start().starts_with('{') {
         // A provider rejection must not become success merely because the
         // legacy caller did not require JSON for that particular mutation.
-        if serde_json::from_str::<Value>(&stdout).is_ok_and(|v| failed_envelope(&v)) {
+        if serde_json::from_str::<Value>(&stdout).is_ok_and(|v| failed_envelope(&v, server_status))
+        {
             return Ok(reply(base, false, "server_rejected", code, None, started));
         }
     }

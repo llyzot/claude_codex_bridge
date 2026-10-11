@@ -113,7 +113,7 @@ impl Store {
         let provider_state = parts.len() == 4
             && parts[0] == "providers"
             && ["pi", "codex", "claude"].contains(&parts[1])
-            && parts[3] == "session.json";
+            && ["session.json", "fault.json"].contains(&parts[3]);
         if provider_state {
             crate::models::validate_agent(parts[2])?;
         }

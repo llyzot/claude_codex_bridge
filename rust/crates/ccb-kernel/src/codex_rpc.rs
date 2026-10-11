@@ -3,7 +3,7 @@ use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
 use std::{
     io::{BufRead, BufReader, Read, Write},
-    process::{Child, Command, Stdio},
+    process::{Command, Stdio},
     sync::mpsc,
     time::Instant,
 };
@@ -34,10 +34,11 @@ struct Pending {
 }
 enum StreamEvent {
     Record(Value),
+    Fault,
     End,
 }
 pub struct Session {
-    child: Child,
+    child: crate::owned_process::OwnedChild,
     commands: mpsc::SyncSender<Value>,
     events: mpsc::Receiver<StreamEvent>,
     init: String,
@@ -48,17 +49,12 @@ pub struct Session {
     pub state: Value,
     pub ready: bool,
     pub closed: bool,
+    pub quarantined: bool,
     stdout_closed: bool,
     input_closed: bool,
     saved_state: Value,
     pub dirty: bool,
     active: Option<Active>,
-}
-impl Drop for Session {
-    fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
 }
 impl Session {
     pub fn spawn(
@@ -120,7 +116,7 @@ impl Session {
             use std::os::windows::process::CommandExt;
             command.creation_flags(0x08000000);
         }
-        let mut child = command.spawn()?;
+        let mut child = crate::owned_process::OwnedChild::spawn(&mut command)?;
         let mut stdin = child.stdin.take().context("missing Codex stdin")?;
         let stdout = child.stdout.take().context("missing Codex stdout")?;
         let (commands, input) = mpsc::sync_channel::<Value>(16);
@@ -146,13 +142,24 @@ impl Session {
                 {
                     Ok(0) => break,
                     Ok(_) if line.len() <= 8 * 1024 * 1024 => {
-                        if let Ok(value) = serde_json::from_slice::<Value>(&line) {
+                        if let Ok(value) = serde_json::from_slice::<Value>(&line).and_then(|v| {
+                            if v.is_object() {
+                                Ok(v)
+                            } else {
+                                Err(serde::de::Error::custom("non-object provider record"))
+                            }
+                        }) {
                             if sender.send(StreamEvent::Record(value)).is_err() {
                                 break;
                             }
+                        } else if sender.send(StreamEvent::Fault).is_err() {
+                            break;
                         }
                     }
-                    _ => break,
+                    _ => {
+                        let _ = sender.send(StreamEvent::Fault);
+                        break;
+                    }
                 }
             }
             let _ = sender.send(StreamEvent::End);
@@ -181,6 +188,7 @@ impl Session {
             state: Value::Null,
             ready: false,
             closed: false,
+            quarantined: false,
             stdout_closed: false,
             input_closed: false,
             saved_state: saved["state"].clone(),
@@ -249,7 +257,16 @@ impl Session {
                 break;
             };
             match record {
-                StreamEvent::Record(record) => self.ingest(record)?,
+                StreamEvent::Record(record) => {
+                    if !self.quarantined {
+                        self.ingest(record)?;
+                    }
+                }
+                StreamEvent::Fault => {
+                    if !self.quarantined {
+                        anyhow::bail!("invalid provider protocol frame");
+                    }
+                }
                 StreamEvent::End => self.stdout_closed = true,
             }
         }
@@ -269,7 +286,8 @@ impl Session {
             let active = self.active.take().unwrap();
             self.refresh_pending_metadata();
             self.closed = exit.is_some() && self.stdout_closed;
-            self.ready = exit.is_none() && !self.stdout_closed && !self.input_closed;
+            self.ready =
+                !self.quarantined && exit.is_none() && !self.stdout_closed && !self.input_closed;
             let mut decision = active.decision.clone().unwrap();
             control_diagnostics(&active, &mut decision);
             return Ok(Some((active.job, decision)));
@@ -279,8 +297,16 @@ impl Session {
             if let Some(active) = self.active.take() {
                 let mut decision = active.decision.clone().unwrap_or_else(|| {
                     failure(
-                        "incomplete",
-                        "codex_process_exit",
+                        if self.quarantined {
+                            "failed"
+                        } else {
+                            "incomplete"
+                        },
+                        if self.quarantined {
+                            "provider_protocol_error"
+                        } else {
+                            "codex_process_exit"
+                        },
                         &format!("Codex exited before turn completion: {exit}"),
                     )
                 });
@@ -290,7 +316,7 @@ impl Session {
             }
             return Ok(None);
         }
-        if exit.is_none() && !self.stdout_closed && !self.input_closed {
+        if !self.quarantined && exit.is_none() && !self.stdout_closed && !self.input_closed {
             self.send_pending_interrupt()?;
         }
         Ok(None)
@@ -685,6 +711,15 @@ impl Session {
             self.send(json!({"id":check,"method":"thread/read","params":{"threadId":thread,"includeTurns":true}}))?;
         }
         Ok(())
+    }
+    pub fn quarantine(&mut self, previous_state: Value) {
+        self.state = previous_state;
+        if let Some(active) = self.active.as_mut() {
+            active.requests.clear();
+        }
+        self.quarantined = true;
+        self.ready = false;
+        self.dirty = false;
     }
     pub fn pid(&self) -> u32 {
         self.child.id()

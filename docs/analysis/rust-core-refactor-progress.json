@@ -100,10 +100,14 @@
     "Windows startup fences caller standard handle inheritance, preserves background lifetime, rejects invalid configuration before runtime writes and protects live foreign or changed-config owners",
     "Owned Pi/Codex process exit leaves the daemon and other Agents available, preserves buffered verified results, and waits for observed exit plus drained output before missing-result fallback or process replacement",
     "Mailbox-aware dispatch restarts closed Pi/Codex/Claude sessions for ordinary reply delivery as well as queued tasks, while old running executions and live or uncertain transport failures remain fenced",
-    "Pi cancellation/deadlines commit Job/Event intent before abort IO, synchronize immutable execution identity, send abort once, preserve silent policy on provider exit and retain intent across daemon death without uncertain-task replay"
+    "Pi cancellation/deadlines commit Job/Event intent before abort IO, synchronize immutable execution identity, send abort once, preserve silent policy on provider exit and retain intent across daemon death without uncertain-task replay",
+    "Owned Pi/Codex/Claude startup, initialization and malformed/semantic protocol failures persist provider-local fault identity while other Agents and the authority daemon continue; rejected frames cannot replace validated session metadata",
+    "Faulted providers fence new prompts and retries, fail preaccepted unsent task requests without replay, retain ordinary reply-delivery heads and allow failed Worker results to automatically continue the same persistent Pi Lead",
+    "Native provider-status/provider-recover API and CLI expose safe fault identity, recheck durable authority, require closed owned sessions and idle execution slots, commit recovery before retiring handles, and preserve blocked faults across daemon restart",
+    "Owned process cleanup covers post-spawn transport setup failures; quarantined live/uncertain executions remain fenced without automatic termination or replacement"
   ],
   "remaining": [
-    "Finish ordinary terminal-result recovery, provider startup/protocol-error isolation and explicit cancellation/forced-termination orchestration; reconcile uncertain running executions after daemon restart",
+    "Finish ordinary terminal-result recovery and explicit cancellation/scoped process-tree termination orchestration; reconcile uncertain running executions after daemon restart",
     "Migrate Git tree observation, provider completion/control adapters and remaining failure-notice orchestration",
     "Complete public API-2/CLI/config-schema/worktree/role parity and full Keeper/reload integration; verify non-Windows process lifetime and default native routing",
     "Finish native CLI/provider command composition and installer integration after interface parity",
@@ -115,6 +119,9 @@
     "Reconcile legacy Python provider test assumptions with the user-approved live-resource behavior and Windows fixtures; wider repository regression is not yet green"
   ],
   "verification": {
+    "native_provider_faults": "27 final-release fixture cases passed: spawn and initialization failure isolation for Pi/Codex/Claude, malformed and active protocol quarantine, independent healthy Agent work, exact/durable fault recovery fences, persisted blocked startup faults, preaccepted FIFO failure without prompt replay, same-Pi-Lead failure callbacks, error-secret exclusion, native CLI controls, daemon-death active-slot fencing and retention/delivery of faulted Lead reply heads",
+    "native_fault_current_suite": "All 251 selected Rust kernel/CLI contracts passed on final release artifacts in 392.01s; Rust tests 7 passed, fmt check and clippy all-targets with warnings denied passed. Repository bin hashes match release builds; no remaining native_rpc_fault fixture process was observed after suite termination. Production install and existing Workspace/agents remain unchanged",
+    "native_fault_red_loop": "The preceding release failed all 12 initial fault cases, including confirmed daemon exits on spawn/initialization failure and missing malformed-frame fault handling. First debug implementation passed 12, expanded debug coverage passed 22. Final release expansion initially passed 26/27 because a test observer mistook an invisible claimed mailbox head for completed delivery; observer now waits for the same receiver Job terminal result, and final 251-case run passed",
     "native_provider_lifetime": "18 final-release fixture cases passed: idle/active Pi and Codex exits isolate the daemon and continue FIFO on a new owned process, buffered correlated completion survives exit and bounded reader batches, explicit stdout-holder release fences fallback, Pi silent/idempotent cancellation and deadlines read committed intent/events at abort IO, daemon death retains cancellation without replay, failed Workers automatically resume a persistent Pi Lead, and ordinary mailbox replies wake closed Pi/Codex/Claude Leads",
     "native_lifetime_current_suite": "All 224 selected Rust kernel/CLI contract cases passed against final release artifacts in 335.73s; Rust tests 7 passed, fmt check and clippy all-targets with warnings denied passed. Repository bin hashes match release builds; production installation and existing agents were unchanged",
     "native_test_artifact_selection": "Six older admission/completion/control-plane/kernel/lifecycle/record harnesses now honor CCB_TEST_KERNEL_BIN. A preceding focused release run passed 81 cases; the final 224-case run covers all selected contracts after the mailbox wake fix",
@@ -146,7 +153,7 @@
     "result_policy_differential": "14 retry/notice cases match the existing Python oracle, including boolean policy opt-out and structured permission code precedence over auth message text",
     "result_policy_integration": "56 existing retry/empty-result/callback/finalization cases passed in native mode",
     "daemon_scope": "Real model-backed Pi Lead/Codex Worker automatic callback verified; native Claude protocol and actual unauthenticated failure verified, but successful Claude inference and Herdr execution remain unverified. Unknown prior running executions remain fenced, not automatically replayed",
-    "native_contract_tests": 224,
+    "native_contract_tests": 251,
     "native_claude_release": "All 6 Claude stream contracts passed on final release; complete debug contract suite 130 passed; Rust tests 5 passed and clippy warnings denied",
     "native_provider_suite": "Complete debug suite 123 passed before adding delayed-idle case; all 15 final Pi/Codex provider contracts passed on final release; Rust 5 passed and clippy warnings denied",
     "native_cli_pi_release": "8 CLI/security/Pi RPC cases passed on final release executables, including installed Pi get_state handshake; final debug contract suite 114 passed",

@@ -3,7 +3,7 @@ use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
 use std::{
     io::{BufRead, BufReader, Read, Write},
-    process::{Child, Command, Stdio},
+    process::{Command, Stdio},
     sync::mpsc,
     time::Instant,
 };
@@ -24,10 +24,11 @@ struct Turn {
 }
 enum StreamEvent {
     Record(Value),
+    Fault,
     End,
 }
 pub struct Session {
-    child: Child,
+    child: crate::owned_process::OwnedChild,
     commands: mpsc::SyncSender<Value>,
     events: mpsc::Receiver<StreamEvent>,
     init: String,
@@ -35,6 +36,7 @@ pub struct Session {
     pub state: Value,
     pub ready: bool,
     pub closed: bool,
+    pub quarantined: bool,
     stdout_closed: bool,
     input_closed: bool,
     saved_state: Value,
@@ -42,12 +44,6 @@ pub struct Session {
     pub dirty: bool,
     expected_session: String,
     timeout_s: f64,
-}
-impl Drop for Session {
-    fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
 }
 impl Session {
     pub fn spawn(
@@ -111,7 +107,7 @@ impl Session {
             use std::os::windows::process::CommandExt;
             command.creation_flags(0x08000000);
         }
-        let mut child = command.spawn()?;
+        let mut child = crate::owned_process::OwnedChild::spawn(&mut command)?;
         let mut stdin = child.stdin.take().context("missing Pi stdin")?;
         let stdout = child.stdout.take().context("missing Pi stdout")?;
         let (commands, input) = mpsc::sync_channel::<Value>(16);
@@ -137,13 +133,24 @@ impl Session {
                 {
                     Ok(0) => break,
                     Ok(_) if line.len() <= 8 * 1024 * 1024 => {
-                        if let Ok(record) = serde_json::from_slice::<Value>(&line) {
+                        if let Ok(record) = serde_json::from_slice::<Value>(&line).and_then(|v| {
+                            if v.is_object() {
+                                Ok(v)
+                            } else {
+                                Err(serde::de::Error::custom("non-object provider record"))
+                            }
+                        }) {
                             if sender.send(StreamEvent::Record(record)).is_err() {
                                 break;
                             }
+                        } else if sender.send(StreamEvent::Fault).is_err() {
+                            break;
                         }
                     }
-                    _ => break,
+                    _ => {
+                        let _ = sender.send(StreamEvent::Fault);
+                        break;
+                    }
                 }
             }
             let _ = sender.send(StreamEvent::End);
@@ -162,6 +169,7 @@ impl Session {
             state: Value::Null,
             ready: false,
             closed: false,
+            quarantined: false,
             stdout_closed: false,
             input_closed: false,
             saved_state: saved["state"].clone(),
@@ -223,7 +231,16 @@ impl Session {
                 break;
             };
             match record {
-                StreamEvent::Record(record) => self.ingest(&record)?,
+                StreamEvent::Record(record) => {
+                    if !self.quarantined {
+                        self.ingest(&record)?;
+                    }
+                }
+                StreamEvent::Fault => {
+                    if !self.quarantined {
+                        anyhow::bail!("invalid provider protocol frame");
+                    }
+                }
                 StreamEvent::End => self.stdout_closed = true,
             }
         }
@@ -245,7 +262,8 @@ impl Session {
         {
             let turn = self.active.take().unwrap();
             self.closed = exit.is_some() && self.stdout_closed;
-            self.ready = exit.is_none() && !self.stdout_closed && !self.input_closed;
+            self.ready =
+                !self.quarantined && exit.is_none() && !self.stdout_closed && !self.input_closed;
             let mut decision = turn.decision.clone().unwrap();
             control_diagnostics(&turn, &mut decision);
             return Ok(Some((turn.job, decision)));
@@ -256,8 +274,16 @@ impl Session {
             self.closed = true;
             if let Some(turn) = self.active.take() {
                 let mut decision = failure(
-                    "incomplete",
-                    "pi_process_exit",
+                    if self.quarantined {
+                        "failed"
+                    } else {
+                        "incomplete"
+                    },
+                    if self.quarantined {
+                        "provider_protocol_error"
+                    } else {
+                        "pi_process_exit"
+                    },
                     &format!("Pi exited before settled completion: {exit}"),
                 );
                 control_diagnostics(&turn, &mut decision);
@@ -265,7 +291,7 @@ impl Session {
             }
             return Ok(None);
         }
-        if exit.is_none() && !self.stdout_closed && !self.input_closed {
+        if !self.quarantined && exit.is_none() && !self.stdout_closed && !self.input_closed {
             if let Some(turn) = self.active.as_mut() {
                 if turn.cancel.is_some() && !turn.abort_sent {
                     turn.abort_sent = enqueue(
@@ -284,13 +310,14 @@ impl Session {
             .and_then(|turn| turn.job["job_id"].as_str())
     }
     pub fn deadline_due(&self) -> bool {
-        self.active.as_ref().is_some_and(|turn| {
-            self.timeout_s.is_finite()
-                && self.timeout_s > 0.0
-                && turn.started.elapsed().as_secs_f64() > self.timeout_s
-                && turn.cancel.is_none()
-                && turn.decision.is_none()
-        })
+        !self.quarantined
+            && self.active.as_ref().is_some_and(|turn| {
+                self.timeout_s.is_finite()
+                    && self.timeout_s > 0.0
+                    && turn.started.elapsed().as_secs_f64() > self.timeout_s
+                    && turn.cancel.is_none()
+                    && turn.decision.is_none()
+            })
     }
     pub fn validate_interrupt(&self, job_id: &str, record_reply: bool) -> Result<()> {
         let turn = self.active.as_ref().context("Pi has no active task")?;
@@ -456,6 +483,12 @@ impl Session {
             }
         }
         Ok(())
+    }
+    pub fn quarantine(&mut self, previous_state: Value) {
+        self.state = previous_state;
+        self.quarantined = true;
+        self.ready = false;
+        self.dirty = false;
     }
     pub fn pid(&self) -> u32 {
         self.child.id()

@@ -61,6 +61,7 @@ pub struct Daemon {
     pi: HashMap<String, crate::pi_rpc::Session>,
     codex: HashMap<String, crate::codex_rpc::Session>,
     claude: HashMap<String, crate::claude_stream::Session>,
+    faults: HashMap<String, Value>,
     pub stopping: bool,
     heartbeat: Instant,
 }
@@ -189,6 +190,21 @@ impl Daemon {
             "scheduler.rebuild",
             &json!({"state_id":state,"agent_names":names,"records":rows,"mailbox_order":order}),
         )?;
+        let mut faults = HashMap::new();
+        for agent in &names {
+            let provider = &config["agents"][agent]["provider"];
+            if ["pi", "codex", "claude"].contains(&provider.as_str().unwrap_or("")) {
+                if let Some(row) = kernel.store.json(&crate::provider_fault::path(
+                    provider.as_str().unwrap(),
+                    agent,
+                ))? {
+                    crate::provider_fault::validate(&row, provider, agent, &config["project_id"])?;
+                    if row["status"] == "blocked" {
+                        faults.insert(agent.clone(), row);
+                    }
+                }
+            }
+        }
         Ok(Self {
             kernel,
             config,
@@ -197,6 +213,7 @@ impl Daemon {
             pi: HashMap::new(),
             codex: HashMap::new(),
             claude: HashMap::new(),
+            faults,
             stopping: false,
             heartbeat: Instant::now(),
         })
@@ -319,8 +336,31 @@ impl Daemon {
         match op {
             "ping" => Ok(
                 json!({"service":"ccbd","runtime":"rust","project_id":self.config["project_id"],"pid":std::process::id(),"status":"running",
-                    "startup_id":self.config["startup_id"],"config_fingerprint":crate::config::fingerprint(&self.config)?}),
+                    "startup_id":self.config["startup_id"],"config_fingerprint":crate::config::fingerprint(&self.config)?,"degraded":!self.faults.is_empty()}),
             ),
+            "provider-status" => {
+                let agent = records::string(p, "agent_name")?;
+                self.spec(agent)?;
+                let owned = self.owned_view(agent);
+                let fault = self.faults.get(agent).cloned().unwrap_or(Value::Null);
+                let state = if !owned.is_null() {
+                    if owned["closed"] == true {
+                        "closed"
+                    } else if !fault.is_null() {
+                        "quarantined"
+                    } else {
+                        "live"
+                    }
+                } else if fault["pid"].is_null() {
+                    "not_started"
+                } else if owner_stopped(fault["pid"].as_u64().unwrap_or(0) as u32) {
+                    "closed"
+                } else {
+                    "unknown"
+                };
+                Ok(json!({"agent_name":agent,"fault":fault,"owned":owned,"process_state":state}))
+            }
+            "provider-recover" => self.recover_provider(p),
             "submit" => self.submit(p),
             "watch" => self.watch(p),
             "queue" => {
@@ -344,11 +384,14 @@ impl Daemon {
                     self.spec(agent)?["driver_kind"] == "codex_app_server",
                     "interactive requests require an owned Codex session"
                 );
-                Ok(json!({"agent_name":agent,"requests":self.codex.get(agent)
-                    .map(|s|s.pending_requests()).unwrap_or_else(||json!([]))}))
+                Ok(
+                    json!({"agent_name":agent,"requests":if self.faults.contains_key(agent) { json!([]) } else { self.codex.get(agent)
+                    .map(|s|s.pending_requests()).unwrap_or_else(||json!([])) }}),
+                )
             }
             "provider-respond" => {
                 let agent = records::string(p, "agent_name")?;
+                ensure!(!self.faults.contains_key(agent), "provider is faulted");
                 let session = self
                     .codex
                     .get(agent)
@@ -383,6 +426,12 @@ impl Daemon {
             "retry" => {
                 let target = records::string(p, "target")?;
                 let attempt = retry::source(&mut self.kernel, target)?;
+                ensure!(
+                    !self
+                        .faults
+                        .contains_key(records::string(&attempt, "agent_name")?),
+                    "provider is faulted"
+                );
                 let spec = &self.config["agents"][records::string(&attempt, "agent_name")?];
                 retry::admit(
                     &mut self.kernel,
@@ -548,6 +597,7 @@ impl Daemon {
         };
         let mut drafts = Vec::new();
         for agent in &targets {
+            ensure!(!self.faults.contains_key(agent), "provider is faulted: {agent}; inspect provider-status and recover its fault identity");
             let spec = self.spec(agent)?;
             let mut child = request.clone();
             child["to_agent"] = json!(agent);
@@ -682,6 +732,166 @@ impl Daemon {
             &json!({"state_id":self.state,"jobs":[job]}),
         )?;
         Ok(job)
+    }
+    fn owned_view(&self, agent: &str) -> Value {
+        if let Some(s) = self.pi.get(agent) {
+            return json!({"pid":s.pid(),"runtime_instance_id":s.runtime,"closed":s.closed,"ready":s.ready});
+        }
+        if let Some(s) = self.codex.get(agent) {
+            return json!({"pid":s.pid(),"runtime_instance_id":s.runtime,"closed":s.closed,"ready":s.ready});
+        }
+        if let Some(s) = self.claude.get(agent) {
+            return json!({"pid":s.pid(),"runtime_instance_id":s.runtime,"closed":s.closed,"ready":s.ready});
+        }
+        Value::Null
+    }
+    fn record_provider_fault(
+        &mut self,
+        agent: &str,
+        phase: &str,
+        error: &anyhow::Error,
+    ) -> Result<()> {
+        if self.faults.contains_key(agent) {
+            return Ok(());
+        }
+        let spec = self.spec(agent)?;
+        let owned = self.owned_view(agent);
+        let slot = json!({"state_id":self.state,"target_kind":"agent","target_name":agent});
+        let active = self.kernel.dispatch("scheduler.active_job_for", &slot)?;
+        let job = if active.is_null() {
+            Value::Null
+        } else {
+            self.get_job(active.as_str().context("invalid active identity")?)?
+        };
+        let row = json!({"schema_version":1,"record_type":"native_provider_fault","project_id":self.config["project_id"],
+            "agent_name":agent,"provider":spec["provider"],"fault_id":uuid::Uuid::new_v4().to_string(),
+            "status":"blocked","phase":phase,"reason":if phase == "startup" { "provider_start_failed" } else { "provider_protocol_error" },
+            "pid":owned["pid"],"runtime_instance_id":owned["runtime_instance_id"],"daemon_instance_id":self.state,
+            "job_id":job["job_id"],"execution_instance_id":job["provider_options"]["native_execution_instance"],"observed_at":now(),
+            "io_error_kind":error.chain().find_map(|e| e.downcast_ref::<std::io::Error>()).map(|e|format!("{:?}", e.kind()))});
+        self.kernel.store.save(
+            &crate::provider_fault::path(spec["provider"].as_str().unwrap(), agent),
+            &row,
+        )?;
+        if !job.is_null() {
+            admission::event(
+                &mut self.kernel,
+                &job,
+                "provider_fault_observed",
+                json!({"fault_id":row["fault_id"],"phase":phase,"reason":row["reason"]}),
+                &now(),
+            )?;
+        }
+        self.kernel.store.commit()?;
+        self.faults.insert(agent.to_owned(), row);
+        Ok(())
+    }
+    fn recover_provider(&mut self, p: &Value) -> Result<Value> {
+        let agent = records::string(p, "agent_name")?;
+        let spec = self.spec(agent)?;
+        let mut fault = self
+            .faults
+            .get(agent)
+            .cloned()
+            .context("provider has no blocked fault")?;
+        ensure!(
+            fault["fault_id"] == p["fault_id"],
+            "provider fault identity mismatch"
+        );
+        let durable = self
+            .kernel
+            .store
+            .json(&crate::provider_fault::path(
+                spec["provider"].as_str().unwrap(),
+                agent,
+            ))?
+            .context("durable provider fault is missing")?;
+        crate::provider_fault::validate(
+            &durable,
+            &spec["provider"],
+            agent,
+            &self.config["project_id"],
+        )?;
+        ensure!(durable == fault, "durable provider fault identity changed");
+        let slot = json!({"state_id":self.state,"target_kind":"agent","target_name":agent});
+        ensure!(
+            self.kernel
+                .dispatch("scheduler.active_job_for", &slot)?
+                .is_null(),
+            "active execution must be reconciled before provider recovery"
+        );
+        let owned = self.owned_view(agent);
+        if !owned.is_null() {
+            ensure!(
+                owned["closed"] == true
+                    && owned["pid"] == fault["pid"]
+                    && owned["runtime_instance_id"] == fault["runtime_instance_id"],
+                "owned provider is not confirmed closed"
+            );
+        } else if !fault["pid"].is_null() {
+            ensure!(
+                owner_stopped(fault["pid"].as_u64().context("invalid fault PID")? as u32),
+                "prior owned provider is not confirmed closed"
+            );
+        }
+        fault["status"] = json!("recovered");
+        fault["recovered_at"] = json!(now());
+        self.kernel.store.save(
+            &crate::provider_fault::path(spec["provider"].as_str().unwrap(), agent),
+            &fault,
+        )?;
+        // Clear authority only after the recovery identity is durable.
+        self.kernel.store.commit()?;
+        self.faults.remove(agent);
+        self.pi.remove(agent);
+        self.codex.remove(agent);
+        self.claude.remove(agent);
+        Ok(json!({"agent_name":agent,"fault_id":fault["fault_id"],"status":"recovered"}))
+    }
+    fn fail_pending_provider_job(&mut self, agent: &str) -> Result<()> {
+        if !self.has_dispatchable_work(agent)? {
+            return Ok(());
+        }
+        let head = self
+            .kernel
+            .dispatch("peek_next", &json!({"agent_name":agent}))?;
+        // Result delivery keeps its existing head until the receiver recovers.
+        if ["task_reply", "completion_notice"].contains(&head["event_type"].as_str().unwrap_or(""))
+        {
+            return Ok(());
+        }
+        let pending = self.get_job(
+            &payload(&head["payload_ref"], "job:").context("faulted pending head has no job")?,
+        )?;
+        if pending["request"]["message_type"] == "reply_delivery" {
+            return Ok(());
+        }
+        let checkpoint = self.kernel.memory_checkpoint();
+        let job = match self.start(agent) {
+            Ok(job) => {
+                self.kernel.store.commit()?;
+                job
+            }
+            Err(error) => {
+                self.kernel.store.rollback();
+                self.kernel.restore_memory(checkpoint);
+                return Err(error);
+            }
+        };
+        if job.is_null() {
+            return Ok(());
+        }
+        let fault = &self.faults[agent];
+        let mut decision = failure("failed", fault["reason"].as_str().unwrap(), "Provider is faulted; inspect provider-status and recover its fault identity before resubmitting.");
+        decision["diagnostics"] = json!({"completion_authority":"native_provider_not_started","fault_id":fault["fault_id"],"provider_prompt_sent":false});
+        let checkpoint = self.kernel.memory_checkpoint();
+        if let Err(error) = self.complete(&job, &decision) {
+            self.kernel.store.rollback();
+            self.kernel.restore_memory(checkpoint);
+            return Err(error);
+        }
+        self.kernel.store.commit()?;
+        Ok(())
     }
     fn has_dispatchable_work(&mut self, agent: &str) -> Result<bool> {
         let slot = json!({"state_id":self.state,"target_kind":"agent","target_name":agent});
@@ -942,9 +1152,14 @@ impl Daemon {
             let spec = self.spec(&agent)?;
             if spec["driver_kind"] == "pi_rpc" {
                 if self.pi.get(&agent).is_some_and(|session| session.closed)
+                    && !self.faults.contains_key(&agent)
                     && self.has_dispatchable_work(&agent)?
                 {
                     self.pi.remove(&agent);
+                }
+                if !self.pi.contains_key(&agent) && self.faults.contains_key(&agent) {
+                    self.fail_pending_provider_job(&agent)?;
+                    continue;
                 }
                 if !self.pi.contains_key(&agent) {
                     let saved = self
@@ -959,17 +1174,34 @@ impl Daemon {
                     } else {
                         saved
                     };
-                    let session =
-                        crate::pi_rpc::Session::spawn(&agent, &spec, endpoint, token_path, &saved)?;
+                    let session = match crate::pi_rpc::Session::spawn(
+                        &agent, &spec, endpoint, token_path, &saved,
+                    ) {
+                        Ok(session) => session,
+                        Err(error) => {
+                            self.record_provider_fault(&agent, "startup", &error)?;
+                            self.fail_pending_provider_job(&agent)?;
+                            continue;
+                        }
+                    };
                     self.pi.insert(agent.clone(), session);
                 }
                 if let Some(id) = self.pi[&agent].active_job_id().map(str::to_owned) {
                     let job = self.get_job(&id)?;
                     self.pi.get_mut(&agent).unwrap().sync_job(&job)?;
                 }
+                let prior_state = self.pi[&agent].state.clone();
+                let completion = match self.pi.get_mut(&agent).unwrap().poll() {
+                    Ok(result) => result,
+                    Err(error) => {
+                        self.record_provider_fault(&agent, "poll", &error)?;
+                        let session = self.pi.get_mut(&agent).unwrap();
+                        session.quarantine(prior_state);
+                        None
+                    }
+                };
                 let (completion, metadata, ready) = {
                     let session = self.pi.get_mut(&agent).unwrap();
-                    let completion = session.poll()?;
                     let metadata = if session.dirty {
                         session.dirty = false;
                         Some(
@@ -1001,7 +1233,10 @@ impl Daemon {
                     self.kernel.store.commit()?;
                     self.pi.get_mut(&agent).unwrap().sync_job(&marked)?;
                 }
-                if ready {
+                if self.faults.contains_key(&agent) {
+                    self.fail_pending_provider_job(&agent)?;
+                }
+                if ready && !self.faults.contains_key(&agent) {
                     let checkpoint = self.kernel.memory_checkpoint();
                     let job = match self.start(&agent) {
                         Ok(job) => {
@@ -1015,16 +1250,32 @@ impl Daemon {
                         }
                     };
                     if !job.is_null() {
-                        self.pi.get_mut(&agent).unwrap().start(&job)?;
+                        if let Err(error) = self.pi.get_mut(&agent).unwrap().start(&job) {
+                            self.record_provider_fault(&agent, "start", &error)?;
+                            let session = self.pi.get_mut(&agent).unwrap();
+                            session.quarantine(session.state.clone());
+                            let decision = failure(
+                                "failed",
+                                "provider_protocol_error",
+                                "Provider could not admit the prompt into its owned input queue.",
+                            );
+                            self.complete(&job, &decision)?;
+                            self.kernel.store.commit()?;
+                        }
                     }
                 }
                 continue;
             }
             if spec["driver_kind"] == "codex_app_server" {
                 if self.codex.get(&agent).is_some_and(|session| session.closed)
+                    && !self.faults.contains_key(&agent)
                     && self.has_dispatchable_work(&agent)?
                 {
                     self.codex.remove(&agent);
+                }
+                if !self.codex.contains_key(&agent) && self.faults.contains_key(&agent) {
+                    self.fail_pending_provider_job(&agent)?;
+                    continue;
                 }
                 if !self.codex.contains_key(&agent) {
                     let saved = self
@@ -1032,18 +1283,34 @@ impl Daemon {
                         .store
                         .json(&format!("providers/codex/{agent}/session.json"))?
                         .unwrap_or(Value::Null);
-                    let session = crate::codex_rpc::Session::spawn(
+                    let session = match crate::codex_rpc::Session::spawn(
                         &agent, &spec, endpoint, token_path, &saved,
-                    )?;
+                    ) {
+                        Ok(session) => session,
+                        Err(error) => {
+                            self.record_provider_fault(&agent, "startup", &error)?;
+                            self.fail_pending_provider_job(&agent)?;
+                            continue;
+                        }
+                    };
                     self.codex.insert(agent.clone(), session);
                 }
                 if let Some(id) = self.codex[&agent].active_job_id().map(str::to_owned) {
                     let job = self.get_job(&id)?;
                     self.codex.get_mut(&agent).unwrap().sync_job(&job)?;
                 }
+                let prior_state = self.codex[&agent].state.clone();
+                let completion = match self.codex.get_mut(&agent).unwrap().poll() {
+                    Ok(result) => result,
+                    Err(error) => {
+                        self.record_provider_fault(&agent, "poll", &error)?;
+                        let session = self.codex.get_mut(&agent).unwrap();
+                        session.quarantine(prior_state);
+                        None
+                    }
+                };
                 let (completion, metadata, ready) = {
                     let session = self.codex.get_mut(&agent).unwrap();
-                    let completion = session.poll()?;
                     let metadata = if session.dirty {
                         session.dirty = false;
                         Some(
@@ -1076,7 +1343,10 @@ impl Daemon {
                     self.kernel.store.commit()?;
                     self.codex.get_mut(&agent).unwrap().sync_job(&marked)?;
                 }
-                if ready {
+                if self.faults.contains_key(&agent) {
+                    self.fail_pending_provider_job(&agent)?;
+                }
+                if ready && !self.faults.contains_key(&agent) {
                     let checkpoint = self.kernel.memory_checkpoint();
                     let job = match self.start(&agent) {
                         Ok(job) => {
@@ -1090,7 +1360,18 @@ impl Daemon {
                         }
                     };
                     if !job.is_null() {
-                        self.codex.get_mut(&agent).unwrap().start(&job)?;
+                        if let Err(error) = self.codex.get_mut(&agent).unwrap().start(&job) {
+                            self.record_provider_fault(&agent, "start", &error)?;
+                            let session = self.codex.get_mut(&agent).unwrap();
+                            session.quarantine(session.state.clone());
+                            let decision = failure(
+                                "failed",
+                                "provider_protocol_error",
+                                "Provider could not admit the prompt into its owned input queue.",
+                            );
+                            self.complete(&job, &decision)?;
+                            self.kernel.store.commit()?;
+                        }
                     }
                 }
                 continue;
@@ -1100,9 +1381,14 @@ impl Daemon {
                     .claude
                     .get(&agent)
                     .is_some_and(|session| session.closed)
+                    && !self.faults.contains_key(&agent)
                     && self.has_dispatchable_work(&agent)?
                 {
                     self.claude.remove(&agent);
+                }
+                if !self.claude.contains_key(&agent) && self.faults.contains_key(&agent) {
+                    self.fail_pending_provider_job(&agent)?;
+                    continue;
                 }
                 if !self.claude.contains_key(&agent) {
                     let saved = self
@@ -1110,18 +1396,34 @@ impl Daemon {
                         .store
                         .json(&format!("providers/claude/{agent}/session.json"))?
                         .unwrap_or(Value::Null);
-                    let session = crate::claude_stream::Session::spawn(
+                    let session = match crate::claude_stream::Session::spawn(
                         &agent, &spec, endpoint, token_path, &saved,
-                    )?;
+                    ) {
+                        Ok(session) => session,
+                        Err(error) => {
+                            self.record_provider_fault(&agent, "startup", &error)?;
+                            self.fail_pending_provider_job(&agent)?;
+                            continue;
+                        }
+                    };
                     self.claude.insert(agent.clone(), session);
                 }
                 if let Some(id) = self.claude[&agent].active_job_id().map(str::to_owned) {
                     let job = self.get_job(&id)?;
                     self.claude.get_mut(&agent).unwrap().sync_job(&job)?;
                 }
+                let prior_state = self.claude[&agent].state.clone();
+                let completion = match self.claude.get_mut(&agent).unwrap().poll() {
+                    Ok(result) => result,
+                    Err(error) => {
+                        self.record_provider_fault(&agent, "poll", &error)?;
+                        let session = self.claude.get_mut(&agent).unwrap();
+                        session.quarantine(prior_state);
+                        None
+                    }
+                };
                 let (completion, metadata, ready) = {
                     let session = self.claude.get_mut(&agent).unwrap();
-                    let completion = session.poll()?;
                     let metadata = if session.dirty {
                         session.dirty = false;
                         Some(
@@ -1153,7 +1455,10 @@ impl Daemon {
                     self.kernel.store.commit()?;
                     self.claude.get_mut(&agent).unwrap().sync_job(&marked)?;
                 }
-                if ready {
+                if self.faults.contains_key(&agent) {
+                    self.fail_pending_provider_job(&agent)?;
+                }
+                if ready && !self.faults.contains_key(&agent) {
                     let checkpoint = self.kernel.memory_checkpoint();
                     let job = match self.start(&agent) {
                         Ok(job) => {
@@ -1167,7 +1472,18 @@ impl Daemon {
                         }
                     };
                     if !job.is_null() {
-                        self.claude.get_mut(&agent).unwrap().start(&job)?;
+                        if let Err(error) = self.claude.get_mut(&agent).unwrap().start(&job) {
+                            self.record_provider_fault(&agent, "start", &error)?;
+                            let session = self.claude.get_mut(&agent).unwrap();
+                            session.quarantine(session.state.clone());
+                            let decision = failure(
+                                "failed",
+                                "provider_protocol_error",
+                                "Provider could not admit the prompt into its owned input queue.",
+                            );
+                            self.complete(&job, &decision)?;
+                            self.kernel.store.commit()?;
+                        }
                     }
                 }
                 continue;

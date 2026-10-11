@@ -46,7 +46,7 @@ pub(crate) fn current(runtime: &Path, agent: &str, expected_root: &Path) -> Resu
     let mut host: Value = serde_json::from_slice(&fs::read(root.join("host.json"))?)?;
     ensure!(
         host["schema_version"] == 1
-            && host["status"] == "running"
+            && [json!("running"), json!("stopped")].contains(&host["status"])
             && value["agent_name"] == agent
             && value["pid"] == host["host_process"]["pid"]
             && value["state"]["thread_id"] == host["thread_id"],
@@ -57,10 +57,15 @@ pub(crate) fn current(runtime: &Path, agent: &str, expected_root: &Path) -> Resu
             .as_u64()
             .filter(|p| *p > 0 && *p <= u32::MAX as u64)
             .context("invalid host process")?;
-        ensure!(
-            crate::owned_process::observe_external_process(pid as u32)? == host[key],
-            "Codex host lifetime changed"
-        );
+        match crate::owned_process::observe_external_process(pid as u32) {
+            Ok(current) if current != host[key] => return Ok(None),
+            Ok(_) => {}
+            Err(_) if crate::daemon::owner_stopped(pid as u32) => return Ok(None),
+            Err(error) => return Err(error),
+        }
+    }
+    if host["status"] == "stopped" {
+        return Ok(None);
     }
     host["path"] = json!(root);
     Ok(Some(host))

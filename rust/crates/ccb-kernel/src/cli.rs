@@ -111,7 +111,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             "{}",
             json!({"schema_version":1,"service":"ccb-native","runtime":"rust",
             "version":crate::installation::version(),"core_version":env!("CARGO_PKG_VERSION"),
-            "codex_tui_host":{"experimental":true,"supported":cfg!(windows),"input":"authenticated_websocket","herdr_open_integrated":true,"stopped_server_recovery":false},
+            "codex_tui_host":{"experimental":true,"supported":cfg!(windows),"input":"authenticated_websocket","herdr_open_integrated":true,"stopped_server_recovery":true,"dead_display_reattachment":true},
             "public_api_version":2,"herdr_open":{"experimental":true,"supported":cfg!(windows),"terminal_providers":["pi","codex"],"background_startup":true,"quiescent_stopped_recovery":true},"native_prefix_installation":{"schema_version":1,
                 "supported":cfg!(all(windows,target_arch="x86_64")),"commands":["ccb","ask","ccb-native"],
                 "modifies_account_settings":false,"in_place_upgrade":true,"upgrade_requires_stopped_commands":true,

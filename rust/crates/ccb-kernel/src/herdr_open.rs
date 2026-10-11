@@ -506,10 +506,6 @@ pub(crate) fn open(
     }
     let runtime = crate::config::state_root(project)?;
     let has_host = config["agents"].as_object().unwrap().values().any(hosted);
-    ensure!(
-        !has_host || options["recover_stopped"] != true,
-        "native Codex host stopped-server recovery is not integrated yet"
-    );
     let root = runtime.join("herdr");
     if options["dry_run"] == true {
         let agents=config["agents"].as_object().unwrap().iter().map(|(name,spec)|json!({"name":name,"provider":spec["provider"],"workspace_path":spec["workspace_path"]})).collect::<Vec<_>>();

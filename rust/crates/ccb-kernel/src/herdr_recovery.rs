@@ -126,6 +126,38 @@ fn resumes(
                 "Pi recovery history/session/workspace mismatch"
             );
             result[name] = json!({"provider":"pi","session_id":state["session_id"],"path":path,"args":["--session",path]});
+        } else if super::hosted(spec) {
+            ensure!(
+                spec["resume_session"] != false,
+                "hosted recovery requires session resumption"
+            );
+            let saved = read(runtime, &format!("providers/codex/{name}/session.json"))?
+                .context("native Codex session record is missing")?;
+            let host = &agents["agents"][name]["host_launch"];
+            ensure!(
+                saved["schema_version"] == 1
+                    && saved["record_type"] == "codex_app_server_session"
+                    && saved["agent_name"] == *name
+                    && saved["pid"] == host["host_process"]["pid"]
+                    && saved["state"]["tui_host"]["path"] == host["path"],
+                "native Codex recovery belongs to another host"
+            );
+            ended(&host["host_process"])?;
+            ended(&host["server_process"])?;
+            let path = PathBuf::from(crate::records::string(&saved["state"], "path")?);
+            let header = native_header(&path)?;
+            let id = crate::records::string(&saved["state"], "thread_id")?;
+            uuid::Uuid::parse_str(id)?;
+            ensure!(
+                header["type"] == "session_meta"
+                    && header["payload"]["id"] == id
+                    && crate::pi_terminal::same_session_path(
+                        &header["payload"]["cwd"],
+                        &spec["workspace_path"]
+                    ),
+                "native Codex recovery history/session/workspace mismatch"
+            );
+            result[name] = json!({"provider":"codex","native_host":true,"session_id":id,"path":path,"args":[]});
         } else {
             let cache = read(
                 runtime,

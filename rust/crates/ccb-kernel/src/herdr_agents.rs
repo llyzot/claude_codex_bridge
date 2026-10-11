@@ -595,6 +595,9 @@ impl Manager<'_> {
             self.save()?;
         }
         for name in &names {
+            if mount {
+                self.reset_dead_host_display(name)?;
+            }
             self.refresh(name, mount)?;
             if mount && self.record["agents"][name]["sent"] == false {
                 let host = if !self.plan["agents"][name]["native_host"].is_null() {
@@ -724,6 +727,54 @@ impl Manager<'_> {
         self.record["status"] = json!(status);
         self.save()?;
         Ok(json!({"mount":self.record,"daemon_connected":false,"task_completion_supported":false}))
+    }
+    fn reset_dead_host_display(&mut self, name: &str) -> Result<()> {
+        let row = self.record["agents"][name].clone();
+        if row["host_launch"].is_null() || row["binding"].is_null() {
+            return Ok(());
+        }
+        let previous = &row["binding"]["process"];
+        let pid = previous["pid"]
+            .as_u64()
+            .context("missing prior display PID")? as u32;
+        let ended = match crate::owned_process::observe_external_process(pid) {
+            Ok(current) => current != *previous,
+            Err(_) => crate::daemon::owner_stopped(pid),
+        };
+        if !ended {
+            return Ok(());
+        }
+        let snapshot = self.snapshot()?;
+        let shell = self.shell(&snapshot, name)?;
+        for key in ["pane_id", "terminal_id", "shell"] {
+            ensure!(
+                shell[key] == row[key],
+                "closed Codex display's original shell changed"
+            );
+        }
+        let runtime =
+            crate::config::state_root(Path::new(text(&self.request["config"], "project_root")?))?;
+        let host = crate::codex_tui_host::current(
+            &runtime,
+            name,
+            Path::new(text(&self.plan["agents"][name]["native_host"], "root")?),
+        )?
+        .context("Codex host unavailable for display reattachment")?;
+        ensure!(
+            host == row["host_launch"],
+            "Codex host/thread changed; explicit recovery required"
+        );
+        let operation = uuid::Uuid::new_v4();
+        let mut next = shell;
+        next["operation_id"] = json!(operation.to_string());
+        next["herdr_name"] = json!(format!("ccb-{}", &operation.simple().to_string()[..24]));
+        next["sent"] = json!(false);
+        next["status"] = json!("prepared");
+        next["binding"] = Value::Null;
+        self.store.as_mut().context("read-only observer cannot reattach")?.append("herdr-attachments.jsonl",
+            &json!({"schema_version":1,"agent_name":name,"namespace_owner":self.namespace["owner_id"],"previous":row,"next_operation_id":next["operation_id"]}))?;
+        self.record["agents"][name] = next;
+        self.save()
     }
 }
 

@@ -1,0 +1,324 @@
+{
+  "schema_version": 1,
+  "base_commit": "d4256592",
+  "recorded_at": "2026-10-11T17:34:26.696742+00:00",
+  "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it",
+  "session": "ccb-herdr-host-final-qtj6_4it",
+  "real_models": true,
+  "native_pi_session_unchanged": true,
+  "native_codex_thread_unchanged": true,
+  "pi_session": {
+    "agent": "pi",
+    "kind": "path",
+    "source": "herdr:pi",
+    "value": "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-herdr-host-final-qtj6_4it-project--\\2026-10-11T17-19-09-863Z_01a12bf9-be26-7746-8911-398194b6f18f.jsonl"
+  },
+  "codex_thread_id": "01a12bf9-cc30-7b11-a395-6ab02a4ff10e",
+  "recovery_cycles": [
+    {
+      "operation_id": "8ef709b8-03e2-4961-ade2-fd6b3fbb05e2",
+      "old_workspace": "w1",
+      "phase_at_archive": "reset",
+      "sessions": {
+        "lead": {
+          "args": [
+            "--session",
+            "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-herdr-host-final-qtj6_4it-project--\\2026-10-11T17-19-09-863Z_01a12bf9-be26-7746-8911-398194b6f18f.jsonl"
+          ],
+          "path": "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-herdr-host-final-qtj6_4it-project--\\2026-10-11T17-19-09-863Z_01a12bf9-be26-7746-8911-398194b6f18f.jsonl",
+          "provider": "pi",
+          "session_id": "01a12bf9-be26-7746-8911-398194b6f18f"
+        },
+        "worker": {
+          "args": [],
+          "native_host": true,
+          "path": "C:\\Users\\user\\.codex\\sessions\\2026\\10\\12\\rollout-2026-10-12T01-19-15-01a12bf9-cc30-7b11-a395-6ab02a4ff10e.jsonl",
+          "provider": "codex",
+          "session_id": "01a12bf9-cc30-7b11-a395-6ab02a4ff10e"
+        }
+      }
+    },
+    {
+      "operation_id": "a142a1fc-334b-42e4-9ea6-5603632c59ca",
+      "old_workspace": "w2",
+      "phase_at_archive": "reset",
+      "sessions": {
+        "lead": {
+          "args": [
+            "--session",
+            "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-herdr-host-final-qtj6_4it-project--\\2026-10-11T17-19-09-863Z_01a12bf9-be26-7746-8911-398194b6f18f.jsonl"
+          ],
+          "path": "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-herdr-host-final-qtj6_4it-project--\\2026-10-11T17-19-09-863Z_01a12bf9-be26-7746-8911-398194b6f18f.jsonl",
+          "provider": "pi",
+          "session_id": "01a12bf9-be26-7746-8911-398194b6f18f"
+        },
+        "worker": {
+          "args": [],
+          "native_host": true,
+          "path": "\\\\?\\C:\\Users\\user\\.codex\\sessions\\2026\\10\\12\\rollout-2026-10-12T01-19-15-01a12bf9-cc30-7b11-a395-6ab02a4ff10e.jsonl",
+          "provider": "codex",
+          "session_id": "01a12bf9-cc30-7b11-a395-6ab02a4ff10e"
+        }
+      }
+    }
+  ],
+  "latest_recovery": {
+    "phase": "complete",
+    "workspace": "w3"
+  },
+  "reattachment": {
+    "before": {
+      "agent_session": null,
+      "binding": {
+        "process": {
+          "created": "134362134356705855",
+          "pid": 34456,
+          "windows_session": 1
+        }
+      },
+      "herdr_name": "ccb-b370fac25f2e4aa2baf595ed",
+      "host_launch": {
+        "cwd": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project",
+        "endpoint": "ws://127.0.0.1:61126",
+        "executable": "C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe",
+        "host_process": {
+          "created": "134362134321069688",
+          "pid": 10580,
+          "windows_session": 1
+        },
+        "path": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\hosts\\0f942297-0ec9-4f9b-8c2f-6085cdfccfc6",
+        "schema_version": 1,
+        "server_process": {
+          "created": "134362134321547038",
+          "pid": 55868,
+          "windows_session": 1
+        },
+        "status": "running",
+        "thread_id": "01a12bf9-cc30-7b11-a395-6ab02a4ff10e"
+      },
+      "interactive_ready": true,
+      "name_repair": {
+        "host_process": {
+          "created": "134362134321069688",
+          "pid": 10580,
+          "windows_session": 1
+        },
+        "kind": "codex_host",
+        "pane_id": "w2:p2",
+        "permitted": true,
+        "process": {
+          "created": "134362134356705855",
+          "pid": 34456,
+          "windows_session": 1
+        },
+        "terminal_id": "term_65d93eff877164"
+      },
+      "observed_lifecycle": "idle",
+      "operation_id": "b370fac2-5f2e-4aa2-baf5-95ed54c5cbaa",
+      "pane_id": "w2:p2",
+      "sent": true,
+      "shell": {
+        "created": "134362134278741135",
+        "pid": 60716,
+        "windows_session": 1
+      },
+      "status": "ready",
+      "terminal_id": "term_65d93eff877164"
+    },
+    "after": {
+      "agent_session": null,
+      "binding": {
+        "process": {
+          "created": "134362135288708466",
+          "pid": 34128,
+          "windows_session": 1
+        }
+      },
+      "herdr_name": "ccb-35abd3c24ba1435a87e7d0ff",
+      "host_launch": {
+        "cwd": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project",
+        "endpoint": "ws://127.0.0.1:61126",
+        "executable": "C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe",
+        "host_process": {
+          "created": "134362134321069688",
+          "pid": 10580,
+          "windows_session": 1
+        },
+        "path": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\hosts\\0f942297-0ec9-4f9b-8c2f-6085cdfccfc6",
+        "schema_version": 1,
+        "server_process": {
+          "created": "134362134321547038",
+          "pid": 55868,
+          "windows_session": 1
+        },
+        "status": "running",
+        "thread_id": "01a12bf9-cc30-7b11-a395-6ab02a4ff10e"
+      },
+      "interactive_ready": true,
+      "name_repair": {
+        "host_process": {
+          "created": "134362134321069688",
+          "pid": 10580,
+          "windows_session": 1
+        },
+        "kind": "codex_host",
+        "pane_id": "w2:p2",
+        "permitted": true,
+        "process": {
+          "created": "134362135288708466",
+          "pid": 34128,
+          "windows_session": 1
+        },
+        "terminal_id": "term_65d93eff877164"
+      },
+      "observed_lifecycle": "idle",
+      "operation_id": "35abd3c2-4ba1-435a-87e7-d0ff7c3e194d",
+      "pane_id": "w2:p2",
+      "sent": true,
+      "shell": {
+        "created": "134362134278741135",
+        "pid": 60716,
+        "windows_session": 1
+      },
+      "status": "ready",
+      "terminal_id": "term_65d93eff877164"
+    },
+    "archive_count": 1
+  },
+  "jobs": [
+    {
+      "job_id": "job_437e2ea0b350",
+      "agent": "lead",
+      "request": "Recovery acceptance: without reading files, recall the exact final review marker you returned before this server restart. Use bash to run C:/Users/user/Desktop/work/4.user/2.github/claude_codex_bridge/bin/ccb-native.exe ask --chain worker with this task: Without using tools or reading files, recall the exact ALL_CAPS marker you most recently returned before the restart. Reply with that marker and WORKER_NATIVE_MEMORY_OK. You need the child result for review. End the first turn after submission without polling. On automatic continuation, return your remembered review marker, the Worker response, and BOTH_NATIVE_SESSIONS_RESUMED_OK. If memory is missing, say MEMORY_UNKNOWN instead of guessing.",
+      "created_at": "2026-10-11T17:30:58.931865700Z",
+      "updated_at": "2026-10-11T17:31:08.944615300Z",
+      "result": {
+        "status": "completed",
+        "reply": "§15§ HERDR_CLOSED_UI_REVIEW_OK_4087\nHEADLESS_HOST_4087 WORKER_NATIVE_MEMORY_OK\nBOTH_NATIVE_SESSIONS_RESUMED_OK",
+        "completion_reason": "pi_agent_settled",
+        "visible_reply_source": "message_bureau_reply"
+      }
+    },
+    {
+      "job_id": "job_8903fec53105",
+      "agent": "lead",
+      "request": "CCB result-chain continuation.\n\nOriginal caller: user\nParent job: job_437e2ea0b350\nChild job: job_ca962b8e088c\nChild agent: worker\nChild status: completed\n\nOriginal task context:\nRecovery acceptance: without reading files, recall the exact final review marker you returned before this server restart. Use bash to run C:/Users/user/Desktop/work/4.user/2.github/claude_codex_bridge/bin/ccb-native.exe ask --chain worker with this task: Without using tools or reading files, recall the exact ALL_CAPS marker you most recently returned before the restart. Reply with that marker and WORKER_NATIVE_MEMORY_OK. You need the child result for review. End the first turn after submission without polling. On automatic continuation, return your remembered review marker, the Worker response, and BOTH_NATIVE_SESSIONS_RESUMED_OK. If memory is missing, say MEMORY_UNKNOWN instead of guessing.\n\nDelegated child task:\nWithout using tools or reading files, recall the exact ALL_CAPS marker you most recently returned before the restart. Reply with that marker and WORKER_NATIVE_MEMORY_OK.\n\nChild result:\nHEADLESS_HOST_4087 WORKER_NATIVE_MEMORY_OK\n\nContinue the original task using the child result.\nFinish this current response with the final result.\nDo not call ask, --chain, or --silence to the original caller; CCB will deliver this chain result upstream.",
+      "created_at": "2026-10-11T17:31:09.105161600Z",
+      "updated_at": "2026-10-11T17:31:15.550748300Z",
+      "result": {
+        "status": "completed",
+        "reply": "§15§ HERDR_CLOSED_UI_REVIEW_OK_4087\nHEADLESS_HOST_4087 WORKER_NATIVE_MEMORY_OK\nBOTH_NATIVE_SESSIONS_RESUMED_OK",
+        "completion_reason": "pi_agent_settled",
+        "visible_reply_source": "job_terminal_decision"
+      }
+    },
+    {
+      "job_id": "job_ca962b8e088c",
+      "agent": "worker",
+      "request": "Without using tools or reading files, recall the exact ALL_CAPS marker you most recently returned before the restart. Reply with that marker and WORKER_NATIVE_MEMORY_OK.",
+      "created_at": "2026-10-11T17:31:05.330392700Z",
+      "updated_at": "2026-10-11T17:31:09.105161600Z",
+      "result": {
+        "status": "completed",
+        "reply": "HEADLESS_HOST_4087 WORKER_NATIVE_MEMORY_OK",
+        "completion_reason": "codex_turn_completed",
+        "visible_reply_source": "job_terminal_decision"
+      }
+    }
+  ],
+  "processes_before_cleanup": {
+    "daemon_pid": 25812,
+    "server": {
+      "created": "134362135901513490",
+      "pid": 37388,
+      "windows_session": 1
+    },
+    "agents": {
+      "lead": {
+        "created": "134362135929973586",
+        "pid": 47120,
+        "windows_session": 1
+      },
+      "worker": {
+        "created": "134362135973007725",
+        "pid": 47728,
+        "windows_session": 1
+      }
+    },
+    "host": {
+      "cwd": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\project",
+      "endpoint": "ws://127.0.0.1:55616",
+      "executable": "C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe",
+      "host_process": {
+        "created": "134362135961763596",
+        "pid": 60864,
+        "windows_session": 1
+      },
+      "path": "C:\\Users\\user\\Desktop\\work\\ccb-herdr-host-final-qtj6_4it\\hosts\\c526c799-f98d-46af-9cb8-b33f904d5ebf",
+      "schema_version": 1,
+      "server_process": {
+        "created": "134362135962270903",
+        "pid": 49216,
+        "windows_session": 1
+      },
+      "status": "running",
+      "thread_id": "01a12bf9-cc30-7b11-a395-6ab02a4ff10e"
+    }
+  },
+  "production_install_changed": false,
+  "credentials_copied": false,
+  "new_trust_decisions": false,
+  "cleanup": {
+    "pending": false,
+    "native_daemon_stopped": true,
+    "named_herdr_server_stopped": true,
+    "process_observations": {
+      "37388": {
+        "probe_exit_code": 1,
+        "same_lifetime": false
+      },
+      "60864": {
+        "probe_exit_code": 1,
+        "same_lifetime": false
+      },
+      "49216": {
+        "probe_exit_code": 1,
+        "same_lifetime": false
+      },
+      "47120": {
+        "probe_exit_code": 1,
+        "same_lifetime": false
+      },
+      "47728": {
+        "probe_exit_code": 1,
+        "same_lifetime": false
+      },
+      "25812": {
+        "probe_exit_code": 1
+      }
+    }
+  },
+  "live_release_sha256": {
+    "ccb-kernel.exe": "53f56c45de049d592941b2a77aaf6dde05062384407cea5675570f4673104131",
+    "ccb-native.exe": "b994060891f0fb1620ec7f7ce8f1ea7225d977585bad7e6b08de2f0b1059dd8c"
+  },
+  "capabilities": {
+    "dead_display_reattachment": true,
+    "experimental": true,
+    "herdr_open_integrated": true,
+    "input": "authenticated_websocket",
+    "stopped_server_recovery": true,
+    "supported": true
+  },
+  "final_release_sha256": {
+    "ccb-kernel.exe": "b5de2ed67a46399ea18a778513abb40300ac6efbf0aa989149e3b40b30699887",
+    "ccb-native.exe": "a132729aab2f1d35ecd88533a87ddba90cfd099a6f26936de804e15318857515"
+  },
+  "repository_bin_matches_release": true,
+  "verification": {
+    "recovery_selection": "14 passed in 105.67s",
+    "expanded_selection": "39 passed in 190.43s (includes added live-display/missing-inventory case)",
+    "rust_unit_tests": "25 passed; one subprocess helper invoked by its parent",
+    "format_clippy_diff": "passed"
+  }
+}

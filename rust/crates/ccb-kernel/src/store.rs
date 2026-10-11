@@ -158,6 +158,7 @@ impl Store {
                     "herdr-open-start.json",
                     "herdr-recovery.json",
                     "herdr-recoveries.jsonl",
+                    "herdr-attachments.jsonl",
                     "project-view.json",
                     "runtime-controls.jsonl",
                     "context-operations.jsonl"

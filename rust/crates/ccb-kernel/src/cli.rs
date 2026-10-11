@@ -232,7 +232,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     if args.is_empty() {
         args.push("start".into());
     }
-    if args[0] == "herdr-transport" || args[0] == "herdr-namespace" {
+    if args[0] == "herdr-transport" || args[0] == "herdr-namespace" || args[0] == "herdr-agents" {
         ensure!(
             args.len() == 1,
             "herdr-transport reads one JSON request from stdin"
@@ -252,6 +252,8 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             "{}",
             if args[0] == "herdr-transport" {
                 crate::herdr_transport::execute(&request)?
+            } else if args[0] == "herdr-agents" {
+                crate::herdr_agents::execute(&request)?
             } else {
                 crate::herdr_namespace::execute(&request)?
             }

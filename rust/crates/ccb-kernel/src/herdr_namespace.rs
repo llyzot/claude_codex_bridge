@@ -11,7 +11,7 @@ use std::{
 };
 
 const RECORD: &str = "namespace.json";
-fn unlinked(path: &Path) -> Result<()> {
+pub(crate) fn unlinked(path: &Path) -> Result<()> {
     match std::fs::symlink_metadata(path) {
         Ok(metadata) => {
             ensure!(
@@ -132,6 +132,57 @@ impl std::fmt::Display for Persistence {
 impl std::error::Error for Persistence {}
 fn hash(v: &Value) -> Result<String> {
     Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(v)?)))
+}
+pub(crate) fn launch_env(request: &Value, slot: &str) -> Result<serde_json::Map<String, Value>> {
+    let mut env = match &request["config"]["agents"][slot]["env"] {
+        Value::Null => serde_json::Map::new(),
+        Value::Object(env) => env.clone(),
+        _ => anyhow::bail!("invalid namespace environment"),
+    };
+    if !request["slot_env"].is_null() {
+        let slots = request["slot_env"]
+            .as_object()
+            .context("slot_env must be an object")?;
+        if let Some(value) = slots.get(slot) {
+            env.extend(
+                value
+                    .as_object()
+                    .context("slot environment must be an object")?
+                    .clone(),
+            );
+        }
+    }
+    ensure!(
+        env.len() <= 32,
+        "namespace environment has too many entries"
+    );
+    let mut seen = BTreeSet::new();
+    let mut size = 0;
+    for (key, value) in &env {
+        let value = value
+            .as_str()
+            .context("namespace environment values must be strings")?;
+        ensure!(
+            !key.is_empty()
+                && key.len() <= 128
+                && key.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_')
+                && !key.as_bytes()[0].is_ascii_digit()
+                && !key.to_ascii_uppercase().starts_with("HERDR_")
+                && !value.contains('\0'),
+            "invalid or Herdr-owned environment variable"
+        );
+        ensure!(
+            seen.insert(if cfg!(windows) {
+                key.to_ascii_uppercase()
+            } else {
+                key.clone()
+            }),
+            "ambiguous namespace environment names"
+        );
+        size += key.len() + value.len();
+    }
+    ensure!(size <= 16384, "namespace environment is too large");
+    Ok(env)
 }
 fn text<'a>(v: &'a Value, k: &str) -> Result<&'a str> {
     v[k].as_str().context("invalid namespace string field")
@@ -291,6 +342,12 @@ pub fn plan(request: &Value) -> Result<Value> {
         );
     }
     let mut slots = json!({});
+    if let Some(env) = request["slot_env"].as_object() {
+        ensure!(
+            env.keys().all(|name| visible.contains(name)),
+            "environment targets an unknown namespace slot"
+        );
+    }
     for name in &visible {
         let spec = &config["agents"][name];
         let cwd = spec["workspace_path"]
@@ -299,6 +356,10 @@ pub fn plan(request: &Value) -> Result<Value> {
             .unwrap_or_else(|| root.clone());
         ensure!(cwd.is_absolute(), "namespace workspace must be absolute");
         slots[name] = json!({"cwd":portable(&cwd),"provider":spec["provider"],"role":spec["role"]});
+        let env = launch_env(request, name)?;
+        if !env.is_empty() {
+            slots[name]["environment_hash"] = json!(hash(&json!(env))?);
+        }
     }
     let mut steps = Vec::new();
     splits(&tree, &mut steps);
@@ -514,12 +575,12 @@ impl Controller<'_> {
         let pending = self.record["pending"].clone();
         let kind = text(&pending, "kind")?;
         let slot = pending["slot"].as_str();
-        let args = match kind {
+        let mut args = match kind {
             "create_workspace" => vec![
                 "workspace".into(),
                 "create".into(),
                 "--cwd".into(),
-                text(&self.plan, "project_root")?.into(),
+                text(&self.plan["slots"][text(&self.plan, "root_slot")?], "cwd")?.into(),
                 "--label".into(),
                 text(&self.record, "label")?.into(),
                 "--no-focus".into(),
@@ -584,6 +645,16 @@ impl Controller<'_> {
             }
             _ => anyhow::bail!("unknown namespace mutation"),
         };
+        let environment_slot = match kind {
+            "create_workspace" => Some(text(&self.plan, "root_slot")?),
+            "split" => slot,
+            _ => None,
+        };
+        if let Some(slot) = environment_slot {
+            for (key, value) in launch_env(self.request, slot)? {
+                args.extend(["--env".into(), format!("{key}={}", value.as_str().unwrap())]);
+            }
+        }
         self.record["pending"]["sent"] = json!(true);
         self.save()?;
         let result = self.rpc(args)?;
@@ -720,6 +791,39 @@ impl Controller<'_> {
         self.record["pending"] = Value::Null;
         self.save()
     }
+}
+
+pub(crate) fn with_prepared(
+    request: &Value,
+    action: impl FnOnce(&mut Store, &Value, &Value) -> Result<Value>,
+) -> Result<Value> {
+    let plan = plan(request)?;
+    let signature = hash(&plan)?;
+    let runtime = crate::config::state_root(Path::new(text(&plan, "project_root")?))?;
+    let state = runtime.join("herdr");
+    unlinked(&runtime)?;
+    unlinked(&state)?;
+    ensure!(
+        state.join(RECORD).is_file(),
+        "prepare the native Herdr namespace first"
+    );
+    let store = Store::open(&state)?;
+    let record = store
+        .json(RECORD)?
+        .context("native Herdr namespace missing")?;
+    validate_record(&record, &plan, &signature)?;
+    ensure!(
+        record["status"] == "prepared",
+        "Herdr namespace preparation is incomplete"
+    );
+    let mut controller = Controller {
+        store,
+        request,
+        plan,
+        record,
+    };
+    controller.validate_bound()?;
+    action(&mut controller.store, &controller.plan, &controller.record)
 }
 pub fn execute(request: &Value) -> Result<Value> {
     let plan = plan(request)?;

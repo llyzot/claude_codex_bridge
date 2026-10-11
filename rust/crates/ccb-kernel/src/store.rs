@@ -146,6 +146,7 @@ impl Store {
                     "configuration.json",
                     "reload.json",
                     "namespace.json",
+                    "herdr-agents.json",
                     "project-view.json",
                     "runtime-controls.jsonl",
                     "context-operations.jsonl"

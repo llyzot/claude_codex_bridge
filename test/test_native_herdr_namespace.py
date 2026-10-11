@@ -88,6 +88,28 @@ def test_balanced_default_layout_and_weighted_rounding(setup):
     assert run(request)['plan']['splits'][0]['percent']==62
 
 
+def test_root_agent_uses_its_workspace_and_launch_environment_is_not_persisted(setup):
+    project,backend,request=setup
+    work=project/'worktree';work.mkdir()
+    request['config']['agents']['lead']['workspace_path']=str(work)
+    request['config']['agents']['lead']['env']={'SOURCE_HOME':'live-resources'}
+    request['slot_env']={'lead':{'PRIVATE_TOKEN':'not-for-the-ledger'},'worker':{'CCB_AGENT_NAME':'worker'}}
+    result=run(request)['namespace'];root=server(backend)['panes'][result['bindings']['lead']['pane_id']]
+    assert Path(root['cwd']).samefile(work)
+    assert root['env']=={'SOURCE_HOME':'live-resources','PRIVATE_TOKEN':'not-for-the-ledger'}
+    assert server(backend)['panes'][result['bindings']['worker']['pane_id']]['env']['CCB_AGENT_NAME']=='worker'
+    assert 'not-for-the-ledger' not in journal(project).read_text()
+    request['slot_env']['lead']['PRIVATE_TOKEN']='changed'
+    assert call(request).returncode!=0
+
+
+@pytest.mark.parametrize('env',[{'HERDR_ENV':'1'},{'herdr_session':'foreign'},{'BAD=KEY':'x'},{'VALUE':'bad\0value'}])
+def test_launch_environment_cannot_override_herdr_context_or_invalid_fields(setup,env):
+    project,backend,request=setup;request['slot_env']={'lead':env}
+    assert call(request).returncode!=0
+    assert not journal(project).exists() and not calls(backend)
+
+
 def test_preparation_is_persistent_idempotent_and_does_not_touch_existing_workspace(setup):
     project,backend,request=setup;before=server(backend)
     result=run(request);record=result['namespace']

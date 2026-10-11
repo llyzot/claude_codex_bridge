@@ -11,7 +11,7 @@ use std::{
 #[path = "windows_child.rs"]
 mod windows;
 #[cfg(windows)]
-pub(crate) use windows::{probe_recovery, OwnedChild};
+pub(crate) use windows::{observe_external_process, probe_recovery, OwnedChild};
 
 #[cfg(not(windows))]
 pub(crate) struct OwnedChild(Child);
@@ -55,4 +55,8 @@ impl Drop for OwnedChild {
 #[cfg(not(windows))]
 pub(crate) fn probe_recovery(_: &serde_json::Value) -> serde_json::Value {
     serde_json::json!({"status":"unavailable","reason":"platform_unsupported"})
+}
+#[cfg(not(windows))]
+pub(crate) fn observe_external_process(_: u32) -> anyhow::Result<serde_json::Value> {
+    anyhow::bail!("external process identity observation currently requires Windows")
 }

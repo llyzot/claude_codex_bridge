@@ -33,7 +33,15 @@ fn classify(args: &[String]) -> Result<bool> {
         ("agent", "start" | "stop" | "prompt" | "send-keys") => false,
         _ => anyhow::bail!("unsupported Herdr transport command; server/session lifecycle and interactive attachment are separate"),
     };
-    for token in args {
+    let control_args = if first == "agent" && second == "start" {
+        &args[..args
+            .iter()
+            .position(|arg| arg == "--")
+            .unwrap_or(args.len())]
+    } else {
+        args
+    };
+    for token in control_args {
         ensure!(
             !["--session", "--machine", "--remote", "--current"]
                 .iter()

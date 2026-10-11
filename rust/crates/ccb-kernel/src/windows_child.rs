@@ -528,6 +528,30 @@ fn current_session() -> io::Result<u32> {
     }
     Ok(id)
 }
+/// Observe an external process without adopting it or acquiring termination rights.
+pub(crate) fn observe_external_process(pid: u32) -> anyhow::Result<serde_json::Value> {
+    anyhow::ensure!(pid > 0, "invalid external process identity");
+    unsafe {
+        let raw = OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+            0,
+            pid,
+        );
+        if raw.is_null() {
+            return Err(io::Error::last_os_error().into());
+        }
+        let handle = OwnedHandle::from_raw_handle(raw);
+        anyhow::ensure!(
+            WaitForSingleObject(handle.as_raw_handle(), 0) == WAIT_TIMEOUT,
+            "external process is no longer running"
+        );
+        let mut session = 0;
+        check(ProcessIdToSessionId(pid, &mut session))?;
+        Ok(
+            serde_json::json!({"pid":pid,"created":creation_time(handle.as_raw_handle())?,"windows_session":session}),
+        )
+    }
+}
 fn scope_name(scope: &str) -> String {
     format!("Local\\CCB.Native.Provider.{scope}")
 }

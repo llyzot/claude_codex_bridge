@@ -1964,7 +1964,15 @@ impl Daemon {
                         .json(&format!("providers/codex/{agent}/session.json"))?
                         .unwrap_or(Value::Null);
                     let session = match crate::codex_rpc::Session::spawn(
-                        &agent, &spec, endpoint, token_path, &saved,
+                        &agent,
+                        &spec,
+                        endpoint,
+                        token_path,
+                        &saved,
+                        &self
+                            .kernel
+                            .store
+                            .owned_path(&format!("providers/codex/{agent}/session.json"))?,
                     ) {
                         Ok(session) => session,
                         Err(error) => {

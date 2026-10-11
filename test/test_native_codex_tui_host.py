@@ -131,3 +131,30 @@ def test_installed_pi_accepts_canonical_windows_workspace(tmp_path):
         assert state.get('sessionId'),state
         assert '?' not in state['sessionFile'],state
     finally:server.close()
+
+def test_clear_persists_hosted_thread_for_immediate_display_resume(tmp_path):
+    from test_native_context import control,settled
+    home=tmp_path/'home';home.mkdir()
+    spec=dict(provider='codex',driver_kind='codex_app_server',profile_family='protocol_turn',
+              command=[str(CODEX),'app-server','--stdio'],workspace_path=str(tmp_path),
+              tui_host_root=str(tmp_path/'hosts'),env={'CODEX_HOME':str(home)})
+    server=Server(tmp_path/'state',{'worker':spec})
+    try:
+        path=server.root/'providers/codex/worker/session.json';wait_for(path.exists)
+        before=json.loads(path.read_text(encoding='utf-8'))
+        result=settled(server,control(server),timeout=20);assert result['status']=='completed',result
+        after=json.loads(path.read_text(encoding='utf-8'))
+        assert after['pid']==before['pid'] and after['state']['thread_id']!=before['state']['thread_id']
+        assert Path(before['state']['path']).is_file()
+        assert Path(after['state']['path']).is_file(), 'Clear succeeded but its new thread cannot be resumed by a TUI'
+        host=json.loads((Path(after['state']['tui_host']['path'])/'host.json').read_text(encoding='utf-8'))
+        assert host['thread_id']==after['state']['thread_id']
+    finally:server.close()
+    restored=Server(tmp_path/'state',{'worker':spec})
+    try:
+        def resumed():
+            value=json.loads(path.read_text(encoding='utf-8'))
+            return value if value['runtime_instance_id']!=after['runtime_instance_id'] else None
+        resumed_state=wait_for(resumed)
+        assert resumed_state['state']['thread_id']==after['state']['thread_id']
+    finally:restored.close()

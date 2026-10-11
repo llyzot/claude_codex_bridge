@@ -23,9 +23,17 @@ pub(crate) struct Control {
     terminal: Value,
     accepted: bool,
     rejected: bool,
+    host_name: Option<String>,
+    publish: String,
 }
 impl Control {
-    pub fn new(action: &str, id: &str, state: &Value, spec: &Value) -> Result<Self> {
+    pub fn new(
+        action: &str,
+        id: &str,
+        state: &Value,
+        spec: &Value,
+        host_name: Option<&str>,
+    ) -> Result<Self> {
         ensure!(
             ["clear", "compact"].contains(&action),
             "invalid Codex context action"
@@ -58,6 +66,10 @@ impl Control {
             terminal: Value::Null,
             accepted: false,
             rejected: false,
+            host_name: host_name
+                .filter(|_| spec["thread_options"]["ephemeral"] != true)
+                .map(str::to_owned),
+            publish: format!("context-publish-{id}"),
         })
     }
     fn read(&self, id: &str) -> Value {
@@ -79,6 +91,14 @@ impl Control {
         json!({"thread_id":thread["id"],"path":thread["path"],"status":thread["status"]})
     }
     pub fn ingest(&mut self, record: &Value, cancelled: bool) -> Result<Option<Step>> {
+        if record["id"] == self.publish && self.phase == "publish" {
+            ensure!(
+                record["error"].is_null() && record["result"].is_object(),
+                "Codex cleared thread publication failed"
+            );
+            self.phase = "verify";
+            return Ok(Some(Step::Send(self.read(&self.check))));
+        }
         if record["id"] == self.baseline && self.phase == "baseline" {
             if !record["error"].is_null() {
                 return Ok(Some(self.finish(
@@ -150,6 +170,12 @@ impl Control {
                     "Codex did not create a fresh idle thread"
                 );
                 self.thread = id.into();
+                if let Some(name) = &self.host_name {
+                    self.phase = "publish";
+                    return Ok(Some(Step::Send(
+                        json!({"id":self.publish,"method":"thread/name/set","params":{"threadId":self.thread,"name":name}}),
+                    )));
+                }
                 self.phase = "verify";
                 return Ok(Some(Step::Send(self.read(&self.check))));
             }
@@ -176,6 +202,14 @@ impl Control {
                 )));
             }
             if self.action == "clear" {
+                if self.host_name.is_some() {
+                    ensure!(
+                        thread["path"]
+                            .as_str()
+                            .is_some_and(|p| std::path::Path::new(p).is_file()),
+                        "Codex cleared thread history was not persisted"
+                    );
+                }
                 return Ok(Some(self.finish(
                     self.observed(thread),
                     "completed",

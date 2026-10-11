@@ -308,14 +308,16 @@ impl Manager<'_> {
             ["idle", "done", "working", "blocked", "unknown"].contains(&status),
             "unknown Herdr agent lifecycle"
         );
-        let ready = (agent["interactive_ready"] == true
-            || pi_hook_ready(agent)
-            || row["host_launch"].is_object())
-            && ["idle", "done"].contains(&status);
+        let hosted = row["host_launch"].is_object();
+        // Hosted input belongs to the RPC driver. A busy display is still a
+        // usable attachment and must not hold open until the model becomes idle.
+        let ready = hosted
+            || (agent["interactive_ready"] == true || pi_hook_ready(agent))
+                && ["idle", "done"].contains(&status);
         // A tool can temporarily own the PTY foreground while the recognized
         // provider remains alive. Keep its previously bound process identity;
         // fresh readiness still requires the same provider back in foreground.
-        let process = if row["binding"].is_object() && !ready {
+        let process = if row["binding"].is_object() && (!ready || hosted) {
             crate::owned_process::observe_external_process(
                 row["binding"]["process"]["pid"].as_u64().unwrap() as u32,
             )?
@@ -341,7 +343,7 @@ impl Manager<'_> {
         };
         Ok(
             json!({"status":if ready {"ready"} else if status=="blocked" {"blocked"} else if status=="working" {"working"} else {"starting"},
-            "binding":{"process":process},"agent_session":session,"observed_lifecycle":status,"interactive_ready":ready}),
+            "binding":{"process":process},"agent_session":session,"observed_lifecycle":status,"interactive_ready":if hosted {agent["interactive_ready"]==true && ["idle","done"].contains(&status)} else {ready}}),
         )
     }
     fn pi_bridge(&self, name: &str) -> Result<Option<Value>> {
@@ -495,9 +497,7 @@ impl Manager<'_> {
             return Ok(false);
         }
         let agent = candidates[0];
-        if !agent["name"].is_null()
-            || agent["agent"] != "codex"
-            || !["idle", "done"].contains(&agent["agent_status"].as_str().unwrap_or(""))
+        if !agent["name"].is_null() || agent["agent"] != "codex" || agent["launch_pending"] == true
         {
             return Ok(false);
         }
@@ -595,6 +595,9 @@ impl Manager<'_> {
             self.save()?;
         }
         for name in &names {
+            if mount && self.sync_host_display(name)? {
+                continue;
+            }
             if mount {
                 self.reset_dead_host_display(name)?;
             }
@@ -649,9 +652,10 @@ impl Manager<'_> {
                     let native = std::env::current_exe()?.with_file_name("ccb-native.exe");
                     let quote = |s: &str| format!("'{}'", s.replace('\'', "''"));
                     let line = format!(
-                        "& {} codex-tui-attach {}",
+                        "& {} codex-tui-attach {} {}",
                         quote(&native.to_string_lossy()),
-                        quote(text(&host, "path")?)
+                        quote(text(&host, "path")?),
+                        quote(text(&row, "operation_id")?)
                     );
                     self.record["agents"][name]["host_launch"] = host;
                     self.record["agents"][name]["sent"] = json!(true);
@@ -761,7 +765,7 @@ impl Manager<'_> {
         )?
         .context("Codex host unavailable for display reattachment")?;
         ensure!(
-            host == row["host_launch"],
+            crate::codex_tui_host::same_owner(&host, &row["host_launch"]),
             "Codex host/thread changed; explicit recovery required"
         );
         let operation = uuid::Uuid::new_v4();
@@ -775,6 +779,100 @@ impl Manager<'_> {
             &json!({"schema_version":1,"agent_name":name,"namespace_owner":self.namespace["owner_id"],"previous":row,"next_operation_id":next["operation_id"]}))?;
         self.record["agents"][name] = next;
         self.save()
+    }
+    fn sync_host_display(&mut self, name: &str) -> Result<bool> {
+        let row = self.record["agents"][name].clone();
+        if row["host_launch"].is_null() || row["binding"].is_null() {
+            return Ok(false);
+        }
+        let runtime =
+            crate::config::state_root(Path::new(text(&self.request["config"], "project_root")?))?;
+        let Some(host) = crate::codex_tui_host::current(
+            &runtime,
+            name,
+            Path::new(text(&self.plan["agents"][name]["native_host"], "root")?),
+        )?
+        else {
+            return Ok(false);
+        };
+        if host["thread_id"] == row["host_launch"]["thread_id"]
+            || !crate::codex_tui_host::same_owner(&host, &row["host_launch"])
+        {
+            return Ok(false);
+        }
+        let path = Path::new(text(&host, "path")?)
+            .join(format!("display-{}.json", text(&row, "operation_id")?));
+        herdr_namespace::unlinked(&path)?;
+        if !path.exists() {
+            return Ok(false);
+        }
+        let proof: Value = serde_json::from_slice(&std::fs::read(path)?)?;
+        ensure!(
+            proof["schema_version"] == 1
+                && proof["attachment_id"] == row["operation_id"]
+                && proof["host_process"] == host["host_process"]
+                && proof["server_process"] == host["server_process"],
+            "Codex display switch proof changed owner"
+        );
+        let supervisor = proof["supervisor"]["pid"]
+            .as_u64()
+            .filter(|p| *p > 0 && *p <= u32::MAX as u64)
+            .context("missing display supervisor")? as u32;
+        match crate::owned_process::observe_external_process(supervisor) {
+            Ok(current) if current != proof["supervisor"] => return Ok(false),
+            Ok(_) => {}
+            Err(_) if crate::daemon::owner_stopped(supervisor) => return Ok(false),
+            Err(error) => return Err(error),
+        }
+        let snapshot = self.snapshot()?;
+        let agents = snapshot["agents"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|a| a["pane_id"] == row["pane_id"])
+            .collect::<Vec<_>>();
+        if proof["thread_id"] != host["thread_id"] || agents.is_empty() {
+            self.record["agents"][name]["status"] = json!("starting");
+            self.save()?;
+            return Ok(true);
+        }
+        ensure!(
+            proof["status"] == "running" && proof["epoch"].as_u64().is_some_and(|n| n > 0),
+            "invalid Codex display switch epoch"
+        );
+        let old = &row["binding"]["process"];
+        let old_pid = old["pid"].as_u64().unwrap() as u32;
+        match crate::owned_process::observe_external_process(old_pid) {
+            Ok(current) => ensure!(current != *old, "previous Codex display is still alive"),
+            Err(_) => ensure!(
+                crate::daemon::owner_stopped(old_pid),
+                "previous display exit cannot be confirmed"
+            ),
+        }
+        ensure!(
+            agents.len() == 1
+                && agents[0]["agent"] == "codex"
+                && (agents[0]["name"].is_null() || agents[0]["name"] == row["herdr_name"])
+                && agents[0]["terminal_id"] == row["terminal_id"]
+                && self.owns(agents[0], Some(name)),
+            "Codex display switch has a foreign occupant"
+        );
+        ensure!(
+            self.foreground(self.pane(&snapshot, name)?)?.0 == proof["process"],
+            "Codex switched foreground does not match supervisor proof"
+        );
+        ensure!(
+            proof["process"] != row["binding"]["process"],
+            "Codex thread switch retained its old display process"
+        );
+        self.store.as_mut().context("read-only observer cannot bind display switch")?.append("herdr-attachments.jsonl",
+            &json!({"schema_version":1,"reason":"context_switch","agent_name":name,"previous":row,"thread_id":host["thread_id"]}))?;
+        self.record["agents"][name]["host_launch"] = host;
+        self.record["agents"][name]["binding"] = Value::Null;
+        self.record["agents"][name]["name_repair"] = Value::Null;
+        self.record["agents"][name]["status"] = json!("starting");
+        self.save()?;
+        Ok(false)
     }
 }
 

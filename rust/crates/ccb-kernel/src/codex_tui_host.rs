@@ -188,6 +188,7 @@ pub(crate) fn run(root: &Path, executable: &Path) -> Result<()> {
     };
     let mut state = json!({"schema_version":1,"endpoint":endpoint,"executable":executable,
         "cwd":crate::workspaces::portable(&std::env::current_dir()?)?,
+        "session_record":std::env::var("CCB_CODEX_HOST_SESSION_RECORD").ok(),
         "host_process":crate::owned_process::observe_external_process(std::process::id())?,
         "server_process":crate::owned_process::observe_external_process(child.id())?,
         "thread_id":null,"status":"running"});
@@ -278,7 +279,71 @@ pub(crate) fn run(root: &Path, executable: &Path) -> Result<()> {
     result
 }
 
-pub(crate) fn attach(root: &Path) -> Result<()> {
+pub(crate) fn same_owner(a: &Value, b: &Value) -> bool {
+    [
+        "path",
+        "host_process",
+        "server_process",
+        "endpoint",
+        "cwd",
+        "executable",
+        "session_record",
+    ]
+    .iter()
+    .all(|key| a[*key] == b[*key])
+}
+fn confirmed_thread(root: &Path, state: &Value) -> Result<Option<String>> {
+    let Some(record) = state["session_record"].as_str() else {
+        return Ok(state["thread_id"].as_str().map(str::to_owned));
+    };
+    let current: Value = serde_json::from_slice(&fs::read(root.join("host.json"))?)?;
+    ensure!(
+        same_owner(&current, state),
+        "Codex attachment host identity changed"
+    );
+    let saved: Value = serde_json::from_slice(&fs::read(record)?)?;
+    ensure!(
+        saved["schema_version"] == 1
+            && saved["record_type"] == "codex_app_server_session"
+            && saved["pid"] == state["host_process"]["pid"]
+            && crate::pi_terminal::same_session_path(
+                &saved["state"]["tui_host"]["path"],
+                &json!(root)
+            ),
+        "Codex attachment controller record changed"
+    );
+    if saved["state"]["thread_id"] != current["thread_id"] {
+        return Ok(None);
+    }
+    let id = crate::records::string(&saved["state"], "thread_id")?;
+    uuid::Uuid::parse_str(id)?;
+    if !saved["state"]["path"]
+        .as_str()
+        .is_some_and(|p| Path::new(p).is_file())
+    {
+        return Ok(None);
+    }
+    Ok(Some(id.into()))
+}
+fn display_record(
+    root: &Path,
+    id: &str,
+    state: &Value,
+    child: u32,
+    thread: &str,
+    epoch: u64,
+) -> Result<()> {
+    let value = json!({"schema_version":1,"attachment_id":id,"epoch":epoch,"thread_id":thread,"status":"running",
+        "host_process":state["host_process"],"server_process":state["server_process"],
+        "supervisor":crate::owned_process::observe_external_process(std::process::id())?,
+        "process":crate::owned_process::observe_external_process(child)?});
+    let mut file = tempfile::NamedTempFile::new_in(root)?;
+    serde_json::to_writer(&mut file, &value)?;
+    file.as_file().sync_all()?;
+    file.persist(root.join(format!("display-{id}.json")))?;
+    Ok(())
+}
+pub(crate) fn attach(root: &Path, operation: Option<&str>) -> Result<()> {
     crate::security::own_process_tree()?;
     let state: Value = serde_json::from_slice(&fs::read(root.join("host.json"))?)?;
     ensure!(
@@ -295,27 +360,37 @@ pub(crate) fn attach(root: &Path) -> Result<()> {
             "Codex host lifetime changed"
         );
     }
-    let thread = crate::records::string(&state, "thread_id")?;
-    uuid::Uuid::parse_str(thread)?;
+    let attachment = operation
+        .map(str::to_owned)
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    uuid::Uuid::parse_str(&attachment)?;
+    let mut thread = confirmed_thread(root, &state)?
+        .context("Codex controller has not published a resumable thread")?;
+    uuid::Uuid::parse_str(&thread)?;
     let endpoint = crate::records::string(&state, "endpoint")?;
     let token = token(root)?;
     // Authenticate before starting a UI; never fall back to a local/new session.
     let mut proof = connect(endpoint, &token)?;
     let _ = proof.close(None);
-    let mut child = Command::new(crate::records::string(&state, "executable")?)
-        .current_dir(crate::records::string(&state, "cwd")?)
-        .args([
-            "--cd",
-            crate::records::string(&state, "cwd")?,
-            "--remote",
-            endpoint,
-            "--remote-auth-token-env",
-            TOKEN_ENV,
-            "resume",
-            thread,
-        ])
-        .env(TOKEN_ENV, token)
-        .spawn()?;
+    let launch = |thread: &str| -> Result<std::process::Child> {
+        Ok(Command::new(crate::records::string(&state, "executable")?)
+            .current_dir(crate::records::string(&state, "cwd")?)
+            .args([
+                "--cd",
+                crate::records::string(&state, "cwd")?,
+                "--remote",
+                endpoint,
+                "--remote-auth-token-env",
+                TOKEN_ENV,
+                "resume",
+                thread,
+            ])
+            .env(TOKEN_ENV, &token)
+            .spawn()?)
+    };
+    let mut child = launch(&thread)?;
+    let mut epoch = 0;
+    display_record(root, &attachment, &state, child.id(), &thread, epoch)?;
     let status = loop {
         if let Some(status) = child.try_wait()? {
             break status;
@@ -329,6 +404,16 @@ pub(crate) fn attach(root: &Path) -> Result<()> {
             let _ = child.kill();
             let _ = child.wait();
             anyhow::bail!("Codex TUI host stopped; attachment closed");
+        }
+        if let Some(next) = confirmed_thread(root, &state)? {
+            if next != thread {
+                child.kill()?;
+                child.wait()?;
+                thread = next;
+                child = launch(&thread)?;
+                epoch += 1;
+                display_record(root, &attachment, &state, child.id(), &thread, epoch)?;
+            }
         }
         std::thread::sleep(Duration::from_millis(250));
     };

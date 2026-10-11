@@ -72,6 +72,7 @@ impl Session {
         endpoint: &Value,
         token: &std::path::Path,
         saved: &Value,
+        session_record: &std::path::Path,
     ) -> Result<Self> {
         let argv = spec["command"]
             .as_array()
@@ -137,7 +138,8 @@ impl Session {
         command
             .env("CCB_AGENT_NAME", agent)
             .env("CCB_NATIVE_ENDPOINT", endpoint.to_string())
-            .env("CCB_NATIVE_TOKEN_FILE", token);
+            .env("CCB_NATIVE_TOKEN_FILE", token)
+            .env("CCB_CODEX_HOST_SESSION_RECORD", session_record);
         command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -293,6 +295,7 @@ impl Session {
                 &start,
                 &self.state,
                 &self.spec,
+                self.tui_host.as_ref().map(|_| self.host_name.as_str()),
             )?)
         } else {
             None

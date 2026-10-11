@@ -75,6 +75,45 @@ def test_missing_inventory_does_not_relaunch_a_live_display(hosted):
     assert p['codex'].poll() is None and mutate_count(p['backend'],['pane','run'])==1
     assert not (p['native']/'herdr/herdr-attachments.jsonl').exists()
 
+def test_working_host_display_does_not_block_open_or_relaunch(hosted):
+    p=hosted;row=read(p['native']/'herdr/herdr-agents.json')['agents']['worker']
+    def busy(s):
+        for agent in s['agents'].values():agent.update(agent_status='working',interactive_ready=False)
+    change(p['backend'],busy)
+    result=p['open'](1000);assert result.returncode==0,result.stderr
+    wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=5)
+    assert mutate_count(p['backend'],['pane','run'])==1
+
+@pytest.mark.parametrize('forged_process',[False,True])
+def test_clear_rebinds_only_the_supervised_new_display_without_another_launch(hosted,forged_process):
+    p=hosted;row=read(p['native']/'herdr/herdr-agents.json')['agents']['worker']
+    before=read(p['native']/'providers/codex/worker/session.json')
+    result=cli('--state-root',p['native'],'clear','worker','--wait','--timeout-ms','10000');assert result.returncode==0,result.stderr
+    after=read(p['native']/'providers/codex/worker/session.json');thread=after['state']['thread_id']
+    assert thread!=before['state']['thread_id'] and Path(after['state']['path']).is_file()
+    p['codex'].kill();p['codex'].wait(timeout=5);replacement=p['helper']()
+    identity=json.loads(cli('process-identity',replacement.pid).stdout)
+    supervisor=json.loads(cli('process-identity',os.getpid()).stdout)
+    proof=dict(schema_version=1,attachment_id=row['operation_id'],epoch=1,status='running',thread_id=thread,
+               host_process=row['host_launch']['host_process'],server_process=row['host_launch']['server_process'],supervisor=supervisor,process=identity)
+    if forged_process:proof['process']['created']='1'
+    host=Path(after['state']['tui_host']['path']);(host/f"display-{row['operation_id']}.json").write_text(json.dumps(proof),encoding='utf-8')
+    def switched(s):
+        agent=s['agents'].pop(row['herdr_name']);agent['name']=None;s['agents']['switched']=agent
+        s['panes'][row['pane_id']].update(foreground_pid=replacement.pid,argv=[str(CODEX),'--remote',row['host_launch']['endpoint'],'resume',thread])
+    change(p['backend'],switched)
+    result=p['open']()
+    assert mutate_count(p['backend'],['pane','run'])==1
+    if forged_process:
+        assert result.returncode!=0 and 'supervisor proof' in result.stderr
+        assert not (p['native']/'herdr/herdr-attachments.jsonl').exists()
+    else:
+        assert result.returncode==0,result.stderr
+        rebound=read(p['native']/'herdr/herdr-agents.json')['agents']['worker']
+        assert rebound['binding']['process']['pid']==replacement.pid and rebound['host_launch']['thread_id']==thread
+        assert read(p['native']/'providers/codex/worker/session.json')['pid']==before['pid']
+        assert p['open']().returncode==0 and mutate_count(p['backend'],['pane','run'])==1
+
 @pytest.fixture
 def stopped_host(setup):
     project,backend,request=setup;(project/'.ccb').mkdir();(project/'.ccb/ccb.config').write_text('worker:codex',encoding='utf-8')

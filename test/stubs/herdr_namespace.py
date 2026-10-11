@@ -45,7 +45,7 @@ elif args[:2]==['pane','run']:
     import re
     pane=state['panes'][args[2]]
     assert 'codex-tui-attach' in args[3]
-    quoted=re.findall(r"'((?:[^']|'')*)'",args[3]);host=json.loads((Path(quoted[-1].replace("''","'"))/'host.json').read_text(encoding='utf-8'))
+    quoted=re.findall(r"'((?:[^']|'')*)'",args[3]);host=json.loads((Path(quoted[1].replace("''","'"))/'host.json').read_text(encoding='utf-8'))
     pid=state['provider_pids'].pop(0);pane['foreground_pid']=pid;pane['agent']='codex'
     pane['argv']=[host['executable'],'--remote',host['endpoint'],'resume',host['thread_id']]
     row={'name':None,'agent':'codex','agent_status':'idle','pane_id':pane['pane_id'],'workspace_id':pane['workspace_id'],

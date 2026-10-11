@@ -297,10 +297,13 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     }
     if args[0] == "codex-tui-attach" {
         ensure!(
-            args.len() == 2,
-            "codex-tui-attach requires a host directory"
+            args.len() == 2 || args.len() == 3,
+            "codex-tui-attach requires a host directory and optional attachment UUID"
         );
-        return crate::codex_tui_host::attach(Path::new(&args[1]));
+        return crate::codex_tui_host::attach(
+            Path::new(&args[1]),
+            args.get(2).and_then(|s| s.to_str()),
+        );
     }
     if args[0] == "private-copy" {
         ensure!(

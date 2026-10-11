@@ -705,7 +705,13 @@ pub(crate) fn open(
                             deadline.saturating_duration_since(Instant::now()),
                         )?;
                         record["phase"] = json!(if started["status"] == "running"
-                            && (!has_host || mounted["status"] == "ready")
+                            && (!has_host
+                                || request["config"]["agents"]
+                                    .as_object()
+                                    .unwrap()
+                                    .iter()
+                                    .all(|(name, spec)| !hosted(spec)
+                                        || mounted["agents"][name]["status"] == "ready"))
                         {
                             "running"
                         } else if started["status"] == "running" {

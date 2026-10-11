@@ -230,7 +230,8 @@
     "Codex bound-thread status notifications are retained without an active CCB job; observed external activity pauses new dispatch until idle, while foreign-thread status is ignored and idle alone cannot complete work",
     "Observed Pi/Codex/Claude output EOF while the owned process remains alive now publishes a durable transport fault; active work remains fenced until verified exit, unsent queued work fails without replay, and receiver reply heads survive explicit recovery",
     "Claude idle retirement carries explicit shutdown intent so restart/reload stdout EOF drains through the expected transcript-flush path instead of being misclassified as a provider fault",
-    "Pi/Codex/Claude share a bounded UTF-8 JSONL input writer with immediate write/flush failure observation; the first failed enqueue reaches durable transport quarantine without requiring another command, while intentional stdin EOF drains normally"
+    "Pi/Codex/Claude share a bounded UTF-8 JSONL input writer with immediate write/flush failure observation; the first failed enqueue reaches durable transport quarantine without requiring another command, while intentional stdin EOF drains normally",
+    "Native provider faults retain independent Windows process/Job lifetime proof even while idle; explicit cold recovery checks controller/provider creation identities, namespace and remaining scope members without inventing a task identity or acting on reused PIDs"
   ],
   "remaining": [
     "Complete legacy/provider-history and cross-Windows-session recovery where new ownership proof is unavailable; verify non-Windows scoped process-tree termination and recovery",
@@ -256,7 +257,7 @@
     "Finish running-task recovery, partially bound/uncertain startup repair and server launch-argument parity; migrate legacy terminal configurations before native default/production promotion",
     "Complete original Claude TUI support and remaining TUI context-switch/approval/interactive-input coordination; the new explicit native Codex path avoids task-to-shell input, while legacy terminal dispatch remains available pending migration",
     "Broaden real-model native Codex followup acceptance beyond the verified direct and Pi-callback happy paths; evaluate other-provider steering/legacy socket adoption and implement outbox retention; uncertain sends remain intentionally non-replayed",
-    "Broaden transport acceptance to inherited open pipes/blocked writers/silent hangs and idle fault recovery across PID reuse or Windows sessions; observed output EOF and first-write input failures now have three-provider coverage"
+    "Broaden transport acceptance to inherited open pipes/blocked writers/silent hangs and legacy idle fault lifetime repair and cross-Windows-session recovery; observed output EOF and first-write input failures now have three-provider coverage"
   ],
   "verification": {
     "native_role_addressing": "20 final-release cases passed: compact canonical/legacy role expansion against the existing parser, project/user/current-directory precedence, adapter and source-home naming, managed-HOME avoidance, hybrid/rich binding, invalid IDs/manifests/names, duplicate default names, unambiguous/ambiguous/disabled targeting, agents listing, and actual native project startup plus role-addressed fixture work",
@@ -593,6 +594,8 @@
     "native_transport_eof_evidence": "docs/analysis/native-transport-eof-20261012.json",
     "native_transport_eof_validation": "The idle Pi EOF publication test failed before implementation. Final 110 EOF/fault/ping/context cases passed in 213.48s, including three providers, active unknown work, unsent FIFO, receiver reply retention, adjacent validated completion/EOF and fault persistence after restart. Claude deliberate idle shutdown now uses its drain path. Rust 28 plus parent-invoked helper, formatting, Clippy, diff and binary hashes passed. No real model inference or production/default promotion claimed.",
     "native_input_failure_evidence": "docs/analysis/native-input-failure-20261012.json",
-    "native_input_failure_validation": "A single-input Pi test failed to observe a fault before the shared writer flag was added. All three stdin-failure cases passed, followed by 123 transport/fault/context/followup/ping cases in 244.31s. Rust 30 plus parent-invoked helper passed, including short UTF-8 writes, orderly EOF and write/flush failures. Formatting, Clippy, diff and binary equality passed. Active work remains uncertain until existing terminal/exit handling; no replay, model inference or production promotion claimed."
+    "native_input_failure_validation": "A single-input Pi test failed to observe a fault before the shared writer flag was added. All three stdin-failure cases passed, followed by 123 transport/fault/context/followup/ping cases in 244.31s. Rust 30 plus parent-invoked helper passed, including short UTF-8 writes, orderly EOF and write/flush failures. Formatting, Clippy, diff and binary equality passed. Active work remains uncertain until existing terminal/exit handling; no replay, model inference or production promotion claimed.",
+    "native_idle_fault_recovery_evidence": "docs/analysis/native-idle-fault-recovery-20261012.json",
+    "native_idle_fault_recovery_validation": "Missing idle provider scope reproduced before implementation. Focused 12 cases and final 94 fault/recovery/transport/ping cases passed in 217.20s. Three-provider cold recovery, simulated PID reuse preserving an unrelated test process, live named-scope member refusal, namespace mismatch, malformed-proof rejection and legacy PID-only conservatism verified. Rust 30 plus parent-invoked helper, formatting, Clippy, diff and binary equality passed. No real model or production/default change."
   }
 }

@@ -455,6 +455,11 @@ impl Daemon {
                 let scope = self.owned_scope(agent)?;
                 let active = self.active_provider_view(agent)?;
                 let fault = self.faults.get(agent).cloned().unwrap_or(Value::Null);
+                let recovery_observation = if owned.is_null() && !fault.is_null() {
+                    crate::provider_fault::scope_observation(&fault)
+                } else {
+                    Value::Null
+                };
                 let state = if !owned.is_null() {
                     if owned["closed"] == true {
                         "closed"
@@ -465,13 +470,19 @@ impl Daemon {
                     }
                 } else if fault["pid"].is_null() {
                     "not_started"
+                } else if !fault["provider_scope"].is_null() || !fault["recovery_scope"].is_null() {
+                    if recovery_observation["status"] == "stopped" {
+                        "closed"
+                    } else {
+                        "unknown"
+                    }
                 } else if owner_stopped(fault["pid"].as_u64().unwrap_or(0) as u32) {
                     "closed"
                 } else {
                     "unknown"
                 };
                 Ok(
-                    json!({"agent_name":agent,"fault":fault,"owned":owned,"scope":scope,"active":active,"process_state":state}),
+                    json!({"agent_name":agent,"fault":fault,"owned":owned,"scope":scope,"active":active,"process_state":state,"recovery_observation":recovery_observation}),
                 )
             }
             "provider-recover" => self.recover_provider(p),
@@ -1262,13 +1273,18 @@ impl Daemon {
         } else {
             self.get_job(active.as_str().context("invalid active identity")?)?
         };
-        let row = json!({"schema_version":1,"record_type":"native_provider_fault","project_id":self.config["project_id"],
+        let mut row = json!({"schema_version":1,"record_type":"native_provider_fault","project_id":self.config["project_id"],
             "agent_name":agent,"provider":spec["provider"],"fault_id":uuid::Uuid::new_v4().to_string(),
             "status":"blocked","phase":phase,"reason":if phase == "startup" { "provider_start_failed" } else { "provider_protocol_error" },
             "pid":owned["pid"],"runtime_instance_id":owned["runtime_instance_id"],"daemon_instance_id":self.state,
             "job_id":job["job_id"],"execution_instance_id":job["provider_options"]["native_execution_instance"],"observed_at":now(),
             "io_error_kind":error.chain().find_map(|e| e.downcast_ref::<std::io::Error>()).map(|e|format!("{:?}", e.kind())),
             "transport_closed":error.chain().find_map(|e|e.downcast_ref::<crate::provider_fault::TransportClosed>()).map(|e|e.0)});
+        // Preserve launch lifetime even when no task exists. Failure to observe
+        // an OS scope must not prevent recording the original provider fault.
+        if let Ok(scope) = self.owned_scope(agent) {
+            row["provider_scope"] = crate::provider_fault::seal_provider_scope(&scope, &row);
+        }
         self.kernel.store.save(
             &crate::provider_fault::path(spec["provider"].as_str().unwrap(), agent),
             &row,
@@ -1345,10 +1361,11 @@ impl Daemon {
                     && owned["runtime_instance_id"] == fault["runtime_instance_id"],
                 "owned provider is not confirmed closed"
             );
-        } else if owned.is_null() && !fault["recovery_scope"].is_null() {
+        } else if owned.is_null()
+            && (!fault["recovery_scope"].is_null() || !fault["provider_scope"].is_null())
+        {
             ensure!(
-                crate::owned_process::probe_recovery(&fault["recovery_scope"])["status"]
-                    == "stopped",
+                crate::provider_fault::scope_observation(&fault)["status"] == "stopped",
                 "recovery scope is not confirmed stopped"
             );
         } else if owned.is_null() && !fault["pid"].is_null() {

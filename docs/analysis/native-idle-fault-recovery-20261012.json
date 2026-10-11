@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "base_commit": "e77d59b9",
+  "recorded_at": "2026-10-11T22:20:28.394188+00:00",
+  "behavior": "Persist provider process/Job lifetime proof independently of a task and use it for explicit cold fault recovery",
+  "platform": "Windows same-session scope observation",
+  "real_model_inference": false,
+  "production_install_changed": false,
+  "verification": {
+    "initial_red": "Idle fault did not contain provider_scope",
+    "focused_selection": "12 passed in 31.96s",
+    "final_selection": "94 passed in 217.20s; idle fault/provider fault/execution recovery/transport/ping",
+    "rust_unit_tests": "30 passed plus parent-invoked process-death helper in 33.08s",
+    "format_clippy_diff": "passed",
+    "full_repository_run": false
+  },
+  "binary_sha256": {
+    "ccb-kernel.exe": "d2beab3f25ee9d7c5bfa8ed2d5e1ba9bb1a6ce5cac0cc7c49113b47186ed8009",
+    "ccb-native.exe": "00e03c4d07744621d7ca40b14422ddbc15dc42d0c7450cca080f01c3b6bea6da"
+  },
+  "repository_bin_matches_release": true,
+  "limits": [
+    "PID reuse is simulated with a live separate test process and a mismatching historical creation identity",
+    "Controlled named-Job fixtures exercise the live-member guard; no production process is terminated",
+    "Legacy PID-only faults remain conservative; cross-Windows-session observation remains blocked",
+    "Cooperative journal integrity is assumed; this is not authentication of arbitrarily edited records"
+  ]
+}

@@ -18,6 +18,38 @@ impl std::error::Error for TransportClosed {}
 pub fn path(provider: &str, agent: &str) -> String {
     format!("providers/{provider}/{agent}/fault.json")
 }
+pub fn seal_provider_scope(scope: &Value, row: &Value) -> Value {
+    if scope["supported"] != true
+        || !crate::execution_recovery::valid_process_scope(&scope["recovery"])
+    {
+        return Value::Null;
+    }
+    let mut proof = scope["recovery"].clone();
+    proof["schema_version"] = serde_json::json!(1);
+    proof["record_type"] = serde_json::json!("native_provider_scope");
+    for key in [
+        "project_id",
+        "agent_name",
+        "provider",
+        "runtime_instance_id",
+        "daemon_instance_id",
+    ] {
+        proof[key] = row[key].clone();
+    }
+    proof
+}
+pub fn scope_observation(row: &Value) -> Value {
+    let proof = if !row["recovery_scope"].is_null() {
+        &row["recovery_scope"]
+    } else {
+        &row["provider_scope"]
+    };
+    if proof.is_null() {
+        serde_json::json!({"status":"unavailable","reason":"provider_scope_missing"})
+    } else {
+        crate::owned_process::probe_recovery(proof)
+    }
+}
 pub fn validate(row: &Value, provider: &Value, agent: &str, project: &Value) -> Result<()> {
     ensure!(
         row["transport_closed"].is_null()
@@ -88,6 +120,44 @@ pub fn validate(row: &Value, provider: &Value, agent: &str, project: &Value) -> 
                 && proof["provider_pid"] == row["pid"],
             "invalid provider recovery scope"
         );
+    }
+    if !row["provider_scope"].is_null() {
+        let proof = &row["provider_scope"];
+        ensure!(
+            proof["schema_version"] == 1
+                && proof["record_type"] == "native_provider_scope"
+                && crate::execution_recovery::valid_process_scope(proof)
+                && [
+                    "project_id",
+                    "agent_name",
+                    "provider",
+                    "runtime_instance_id",
+                    "daemon_instance_id"
+                ]
+                .iter()
+                .all(|key| proof[*key] == row[*key])
+                && proof["provider_pid"] == row["pid"]
+                && proof["job_id"].is_null()
+                && proof["execution_instance_id"].is_null(),
+            "invalid provider scope"
+        );
+        if !row["recovery_scope"].is_null() {
+            ensure!(
+                [
+                    "scope_id",
+                    "scope_name",
+                    "owner_pid",
+                    "owner_created",
+                    "provider_pid",
+                    "provider_created",
+                    "windows_session",
+                    "kill_on_owner_exit"
+                ]
+                .iter()
+                .all(|key| proof[*key] == row["recovery_scope"][*key]),
+                "conflicting provider scopes"
+            );
+        }
     }
     Ok(())
 }

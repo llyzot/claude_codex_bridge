@@ -49,6 +49,19 @@ pub fn valid_shape(p: &Value) -> bool {
         v.as_str()
             .is_some_and(|s| uuid::Uuid::parse_str(s).is_ok_and(|id| id.to_string() == s))
     };
+    p["schema_version"] == 1
+        && valid_process_scope(p)
+        && valid_uuid(&p["runtime_instance_id"])
+        && valid_uuid(&p["execution_instance_id"])
+        && p["daemon_instance_id"]
+            .as_str()
+            .is_some_and(|id| !id.is_empty())
+}
+pub(crate) fn valid_process_scope(p: &Value) -> bool {
+    let valid_uuid = |v: &Value| {
+        v.as_str()
+            .is_some_and(|s| uuid::Uuid::parse_str(s).is_ok_and(|id| id.to_string() == s))
+    };
     let valid_pid = |v: &Value| {
         v.as_u64()
             .is_some_and(|pid| pid > 0 && pid <= u32::MAX as u64)
@@ -57,15 +70,9 @@ pub fn valid_shape(p: &Value) -> bool {
         v.as_str()
             .is_some_and(|s| s.parse::<u64>().is_ok_and(|n| n > 0 && n.to_string() == s))
     };
-    !(p["schema_version"] != 1
-        || p["kind"] != "windows_job"
+    !(p["kind"] != "windows_job"
         || p["kill_on_owner_exit"] != true
         || !valid_uuid(&p["scope_id"])
-        || !valid_uuid(&p["runtime_instance_id"])
-        || !valid_uuid(&p["execution_instance_id"])
-        || p["daemon_instance_id"]
-            .as_str()
-            .is_none_or(|id| id.is_empty())
         || !valid_pid(&p["owner_pid"])
         || !valid_pid(&p["provider_pid"])
         || !valid_time(&p["owner_created"])

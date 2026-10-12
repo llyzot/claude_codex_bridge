@@ -15,7 +15,7 @@
     "experimental_mode": "CCB_CORE_RUNTIME=rust",
     "binary_override": "CCB_KERNEL_BIN",
     "final_requirement": "Rust must own the default core runtime; an optional sidecar alone is not completion",
-    "native_prefix_default": "User PATH now selects Desktop/work/ccb-rust/bin for ccb/ask. Legacy Python prefix retained; other existing project workspaces are not migrated by PATH selection.",
+    "native_prefix_default": "User PATH selects Desktop/work/ccb-rust/bin for ccb/ask. Old Python installation and its desktop virtualized copy were removed; current sample-project Rust sessions were verified unchanged.",
     "account_default_native": true
   },
   "completed": [
@@ -261,32 +261,11 @@
     "Ordinary pwsh Herdr reconnect now retains the protected implicit launch PATH without ignoring actual config changes. Account default ccb/ask selects the verified Rust prefix; sample-project direct reconnect passed with same Workspace, Pi process/session and Codex thread, and helper startup script is obsolete"
   ],
   "remaining": [
-    "Broaden native Keeper real-model/Herdr foreground acceptance, legacy/cross-platform coexistence and unavailable-observation/storage recovery; evaluate optional OS-level restart of the Keeper itself and production/default rollout",
-    "Complete legacy/provider-history and cross-Windows-session recovery where new ownership proof is unavailable; verify non-Windows scoped process-tree termination and recovery",
-    "Complete remaining provider completion/control adapters and failure-notice orchestration; measure native Git observation latency and move expensive request-path observations off the actor where needed",
-    "Complete public API-2/CLI/config-schema/worktree parity, remaining project-memory bootstrap and legacy provider-projection parity; broaden native coordination guidance acceptance, role skills/permissions/activation hooks and full Keeper/Herdr reload integration and busy-agent drain orchestration; verify non-Windows process lifetime and default native routing",
-    "Finish remaining native CLI/provider command composition and production installer/default promotion after interface parity; explicit fresh Rust prefix installation is now available",
-    "Finish interrupted-running-task reconciliation and Herdr attachment; add Claude hooks/interactive requests; validate real Codex/Claude interruption and interactive requests plus graphical approval UI integration",
-    "Broaden actual Herdr-integrated execution/tool/foreground-attach acceptance beyond the verified Pi and authenticated Claude Lead/Codex Worker result chains and same-session Keeper recovery; see native-keeper-live-20261012.json",
-    "Complete full Windows Python CcbdApp versus native startup/idle and matched end-to-end receipt/callback benchmarking on larger histories and real repositories; the core-contract/secure-token baseline is measured but is not the production performance gate, and executable placement must be controlled because identical binaries showed different latency across locations",
-    "Validate state compatibility, crash points, rollback and default Rust ownership",
-    "Remove transitional Python core dependencies after native runtime parity is proven",
-    "Reconcile legacy Python provider test assumptions with the user-approved live-resource behavior and Windows fixtures; wider repository regression is not yet green",
-    "Verify authenticated Claude skill-body execution (Lead result-chain review separately passed), evaluate production Pi/Claude resource interactions and Unix links, and verify real Codex skill-body execution/hot reload: the private read-only real-model test registers the skill but its PowerShell read of SKILL.md is rejected by policy; catalogue visibility is not successful skill execution",
-    "Broaden Claude MCP elicitation beyond the validated local form and controlled URL cases; finish other native dialogs and graphical question rendering, host hook callbacks, persistent permission configuration and unowned/background/inherited approval recovery; verify real authenticated tool approval and enforce caller authorization/UI consent beyond the local administrative control-plane token",
-    "Complete native copy-mode and controller worktree lifecycle/retirement/reload parity, explicit workspace setup hooks and broader project-target/config-schema compatibility; validate cross-platform workspace behavior and production startup performance before default rollout",
-    "Complete remaining workgroup Git operations and integration controller migration, evaluate asynchronous/bounded Git observation latency and content-filter behavior on production repositories, and extend explicitly rejected sparse/conflicted/submodule states where safe",
-    "Complete explicit cleanup of unverified orphaned installation stages and audit-receipt retention, extend active-runtime coexistence beyond stopped-prefix exclusion, and verify cross-version project-state rollback; complete signed release/distribution validation and production/default Rust promotion",
-    "Validate actual foreground detach/exit and stopped-server recovery, fresh Claude session publication timing, external active cancellation/context controls, idle-fault recovery and Agent migration/retirement, multi-workspace reload and cross-server-generation recovery. Native Pi/Codex/Claude terminal dispatch/history/callback and open composition have offline coverage; authenticated Pi/Claude protocol Lead result chains are verified separately. Original Herdr UI/tool acceptance remains incomplete.",
-    "Complete native sidebar focus/recovery/config UI and packaging/installer integration, verify actual terminal/Herdr interaction, and benchmark helper-per-request polling against direct transport before production promotion",
-    "Complete operator-directed repair/reassignment for ambiguous legacy Agent-journal parents and verify older mixed-version/cross-platform migration; current cooperative ownership checks do not govern arbitrary direct filesystem edits or unmodified alternate-root writers",
-    "Complete other-provider native clear/compact, graphical context controls and authenticated Claude model/cancellation/error scenarios; verify general empty-startup recovery, explicit Codex old-thread unloading, large-history compaction, real-model restart continuity, broader retained-history migration and runtime/context-control journal retention",
-    "Resolve or externally repair the now-isolated Codex sandbox runtime ACL/sharing failure on desktop node_repl.exe; authorized shared-process interruption and identical retest failed to resolve the conflict, and sandbox policy must not be weakened",
-    "Broaden actual Claude foreground lifecycle/hook evidence and model-backed in-flight recovery acceptance; finish partially bound/uncertain startup repair and server launch-argument parity; migrate legacy terminal configurations before native default/production promotion",
-    "Validate the implemented original Claude TUI adapter against actual Herdr/Claude interaction; finish TUI context-switch/approval/interactive-input coordination and cancellation/error scenarios beyond structured transcript plus idle completion. Native Codex uses authenticated WebSocket input; legacy terminal migration and production rollout remain pending.",
-    "Broaden real-model native Codex followup acceptance beyond the verified direct and Pi-callback happy paths; evaluate other-provider steering/legacy socket adoption and complete automatic outbox retention (explicit terminal-history compaction is implemented); uncertain sends remain intentionally non-replayed",
-    "Broaden transport acceptance to inherited open pipes/blocked writers/silent hangs and legacy idle fault lifetime repair and cross-Windows-session recovery; observed output EOF and first-write input failures now have three-provider coverage",
-    "Implement native hard role command enforcement/managed role capabilities and caller authorization; verify restored-session defaults, hook trust/project acceptance and interactive permission parity. Explicit manual/auto launch mapping now exists; required role surfaces currently fail_mount."
+    "Complete native worktree inspect/integration/recoverable retirement/cleanup and configuration lifecycle, preserving dirty and untracked work and fencing active jobs, replies and provider lifetimes.",
+    "Validate real Pi/Codex/Claude interrupted-turn recovery, native Claude terminal hooks, cancellation, context controls and interactive approval in scoped test resources.",
+    "Complete command/config/state compatibility necessary for the selected Windows Herdr three-provider workflow, including partial-startup and ambiguous legacy-state repair.",
+    "Enforce required role command surfaces and caller/approval boundaries when configured; role declarations must not silently become advisory.",
+    "Verify project-state upgrade/crash recovery and performance on actual repositories; installed program rollback alone is not runtime-state rollback."
   ],
   "verification": {
     "native_role_addressing": "20 final-release cases passed: compact canonical/legacy role expansion against the existing parser, project/user/current-directory precedence, adapter and source-home naming, managed-HOME avoidance, hybrid/rich binding, invalid IDs/manifests/names, duplicate default names, unambiguous/ambiguous/disabled targeting, agents listing, and actual native project startup plus role-addressed fixture work",
@@ -686,12 +665,13 @@
     "native_herdr_work_recovery": "100 final-release cases passed in 588.16s; Rust 46 passed and two parent-invoked helper entries ignored; fmt/Clippy passed. Completed/interrupted child callback, unsent A/B FIFO, opener death, changed model/env, corrupt permit/cancel intent, mismatched lease and silent cancellation verified. Debug 44 passed/1 bounded-observation assertion corrected; retained XML. Candidate refreshed to bc366d09. No new paid model inference or production/default promotion. See native-herdr-work-recovery-20261012.json.",
     "native_herdr_deferred_claude_recovery": "165 final-release cases passed in 961.01s; Rust 47 passed and two parent-invoked helper entries ignored; fmt/Clippy passed. Positive/uncertain deferred callbacks and FIFO, stale-cache replacement, duplicate/missing/foreign refusal, actual Claude receipt emission, simulated post-receipt pre-finalization recovery, hook invalidation, changed execution/history and fresh retry permission covered. Large/partial-history unit coverage added. Original red cases and initial cursor-schema regression retained. Candidate refreshed to 2ea63fac; no new paid model inference or production/default cutover. See native-herdr-deferred-claude-recovery-20261012.json.",
     "native_sample-project_project": "Actual installed 2ea63fac / f6c5ec25 project rollout passed; project session ccb-native-77324b3f209d and workspace w1 remain active/idle for user. Exact original chain verified after correcting a prompt/judge punctuation mismatch; no resubmission. Startup through project open.ps1 reuses the same runtime and preserves its launch PATH. See native-sample-project-rollout-20261012.json.",
-    "native_shell_reconnect": "Original release failed the caller-PATH-only test with the same migration error. Debug 3 passed. Final release 86 passed in 753.59s; fmt/Clippy passed. Project backend upgraded under stopped-image guards, same Pi PID/session and Codex thread preserved, direct fresh-account-path pwsh ccb herdr open returned running, and foreground Herdr client observed. Legacy Python installation retained and User PATH rollback saved. See native-herdr-shell-reconnect-20261012.json."
+    "native_shell_reconnect": "Original release failed the caller-PATH-only test with the same migration error. Debug 3 passed. Final release 86 passed in 753.59s; fmt/Clippy passed. Project backend upgraded under stopped-image guards, same Pi PID/session and Codex thread preserved, direct fresh-account-path pwsh ccb herdr open returned running, and foreground Herdr client observed. Legacy Python installation retained and User PATH rollback saved. See native-herdr-shell-reconnect-20261012.json.",
+    "legacy_python_uninstall": "User completed deletion of normal and MSIX LocalCache copies; both paths verified absent. Old sample-project-2 Python daemon stopped via authenticated project shutdown before removal. Rust daemon/Pi/Codex identities and sessions unchanged; shared skills retained and original user-config backup preserved outside removed prefixes."
   },
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\5.Tool\\sample-project",
     "candidate_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "next_action": "sample-project is active on Rust and account ccb/ask selection is now Rust. Continue scoped real interrupted-turn/Claude foreground acceptance and remaining parity; existing legacy project workspaces remain untouched and require their own explicit migration.",
+    "next_action": "Implement and test the complete worktree lifecycle in isolated repositories, then broaden real three-provider interruption/approval acceptance. Other providers, advanced workgroups/plan-tree and extra GUI are optional backlog. Preserve current sample-project runtime; no automatic integration or cleanup of its working branch.",
     "latest_evidence": "docs/analysis/native-herdr-shell-reconnect-20261012.json",
     "herdr_preflight": {
       "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_",
@@ -709,5 +689,59 @@
     "binary_sha256": "e3a4421381c7abfe6f86f5ea2bdc2906819fb6e24466e7d030a579c6c997a573",
     "account_default": true,
     "evidence": "docs/analysis/native-herdr-shell-reconnect-20261012.json"
-  }
+  },
+  "active_scope": {
+    "platform": "Windows 11 + pwsh + Herdr",
+    "providers": [
+      "pi",
+      "codex",
+      "claude"
+    ],
+    "provider_expansion_required": false,
+    "workgroups_and_plan_tree": "optional backlog; not a completion gate for the selected workflow",
+    "extra_graphical_interface": "optional backlog; retain original provider TUIs, Herdr and CLI diagnostics",
+    "required_worktree_lifecycle": [
+      "ownership and status inspection",
+      "freeze dispatch and verify agent idle before lifecycle changes",
+      "review and commit identification",
+      "explicit target-branch integration with conflict retention",
+      "recoverable retirement retaining uncommitted/untracked work and commit reachability",
+      "guarded worktree/branch cleanup",
+      "interrupted-operation recovery and no duplicate merge/cleanup"
+    ],
+    "runtime_acceptance": [
+      "real Pi/Codex/Claude delegation, callbacks and interruption/recovery in owned test resources",
+      "native terminal cancellation and interactive approval boundaries",
+      "preserve active sample-project sessions during development"
+    ],
+    "lifecycle_execution_scope": "Implementation and isolated test repositories; no automatic merge, archive or branch deletion in sample-project."
+  },
+  "historical_remaining_backlog": [
+    "Broaden native Keeper real-model/Herdr foreground acceptance, legacy/cross-platform coexistence and unavailable-observation/storage recovery; evaluate optional OS-level restart of the Keeper itself and production/default rollout",
+    "Complete legacy/provider-history and cross-Windows-session recovery where new ownership proof is unavailable; verify non-Windows scoped process-tree termination and recovery",
+    "Complete remaining provider completion/control adapters and failure-notice orchestration; measure native Git observation latency and move expensive request-path observations off the actor where needed",
+    "Complete public API-2/CLI/config-schema/worktree parity, remaining project-memory bootstrap and legacy provider-projection parity; broaden native coordination guidance acceptance, role skills/permissions/activation hooks and full Keeper/Herdr reload integration and busy-agent drain orchestration; verify non-Windows process lifetime and default native routing",
+    "Finish remaining native CLI/provider command composition and production installer/default promotion after interface parity; explicit fresh Rust prefix installation is now available",
+    "Finish interrupted-running-task reconciliation and Herdr attachment; add Claude hooks/interactive requests; validate real Codex/Claude interruption and interactive requests plus graphical approval UI integration",
+    "Broaden actual Herdr-integrated execution/tool/foreground-attach acceptance beyond the verified Pi and authenticated Claude Lead/Codex Worker result chains and same-session Keeper recovery; see native-keeper-live-20261012.json",
+    "Complete full Windows Python CcbdApp versus native startup/idle and matched end-to-end receipt/callback benchmarking on larger histories and real repositories; the core-contract/secure-token baseline is measured but is not the production performance gate, and executable placement must be controlled because identical binaries showed different latency across locations",
+    "Validate state compatibility, crash points, rollback and default Rust ownership",
+    "Remove transitional Python core dependencies after native runtime parity is proven",
+    "Reconcile legacy Python provider test assumptions with the user-approved live-resource behavior and Windows fixtures; wider repository regression is not yet green",
+    "Verify authenticated Claude skill-body execution (Lead result-chain review separately passed), evaluate production Pi/Claude resource interactions and Unix links, and verify real Codex skill-body execution/hot reload: the private read-only real-model test registers the skill but its PowerShell read of SKILL.md is rejected by policy; catalogue visibility is not successful skill execution",
+    "Broaden Claude MCP elicitation beyond the validated local form and controlled URL cases; finish other native dialogs and graphical question rendering, host hook callbacks, persistent permission configuration and unowned/background/inherited approval recovery; verify real authenticated tool approval and enforce caller authorization/UI consent beyond the local administrative control-plane token",
+    "Complete native copy-mode and controller worktree lifecycle/retirement/reload parity, explicit workspace setup hooks and broader project-target/config-schema compatibility; validate cross-platform workspace behavior and production startup performance before default rollout",
+    "Complete remaining workgroup Git operations and integration controller migration, evaluate asynchronous/bounded Git observation latency and content-filter behavior on production repositories, and extend explicitly rejected sparse/conflicted/submodule states where safe",
+    "Complete explicit cleanup of unverified orphaned installation stages and audit-receipt retention, extend active-runtime coexistence beyond stopped-prefix exclusion, and verify cross-version project-state rollback; complete signed release/distribution validation and production/default Rust promotion",
+    "Validate actual foreground detach/exit and stopped-server recovery, fresh Claude session publication timing, external active cancellation/context controls, idle-fault recovery and Agent migration/retirement, multi-workspace reload and cross-server-generation recovery. Native Pi/Codex/Claude terminal dispatch/history/callback and open composition have offline coverage; authenticated Pi/Claude protocol Lead result chains are verified separately. Original Herdr UI/tool acceptance remains incomplete.",
+    "Complete native sidebar focus/recovery/config UI and packaging/installer integration, verify actual terminal/Herdr interaction, and benchmark helper-per-request polling against direct transport before production promotion",
+    "Complete operator-directed repair/reassignment for ambiguous legacy Agent-journal parents and verify older mixed-version/cross-platform migration; current cooperative ownership checks do not govern arbitrary direct filesystem edits or unmodified alternate-root writers",
+    "Complete other-provider native clear/compact, graphical context controls and authenticated Claude model/cancellation/error scenarios; verify general empty-startup recovery, explicit Codex old-thread unloading, large-history compaction, real-model restart continuity, broader retained-history migration and runtime/context-control journal retention",
+    "Resolve or externally repair the now-isolated Codex sandbox runtime ACL/sharing failure on desktop node_repl.exe; authorized shared-process interruption and identical retest failed to resolve the conflict, and sandbox policy must not be weakened",
+    "Broaden actual Claude foreground lifecycle/hook evidence and model-backed in-flight recovery acceptance; finish partially bound/uncertain startup repair and server launch-argument parity; migrate legacy terminal configurations before native default/production promotion",
+    "Validate the implemented original Claude TUI adapter against actual Herdr/Claude interaction; finish TUI context-switch/approval/interactive-input coordination and cancellation/error scenarios beyond structured transcript plus idle completion. Native Codex uses authenticated WebSocket input; legacy terminal migration and production rollout remain pending.",
+    "Broaden real-model native Codex followup acceptance beyond the verified direct and Pi-callback happy paths; evaluate other-provider steering/legacy socket adoption and complete automatic outbox retention (explicit terminal-history compaction is implemented); uncertain sends remain intentionally non-replayed",
+    "Broaden transport acceptance to inherited open pipes/blocked writers/silent hangs and legacy idle fault lifetime repair and cross-Windows-session recovery; observed output EOF and first-write input failures now have three-provider coverage",
+    "Implement native hard role command enforcement/managed role capabilities and caller authorization; verify restored-session defaults, hook trust/project acceptance and interactive permission parity. Explicit manual/auto launch mapping now exists; required role surfaces currently fail_mount."
+  ]
 }

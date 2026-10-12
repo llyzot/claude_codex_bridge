@@ -399,6 +399,8 @@ pub fn compile(root: &Path, document: Value, executables: &Value) -> Result<Valu
         .context("config agents must be a table")?
     {
         crate::models::validate_agent(name)?;
+        let normalized = crate::launch_options::normalize(raw)?;
+        let raw = &normalized;
         let provider = raw["provider"].as_str().context("agent provider missing")?;
         let (workspace, plan) = crate::workspaces::plan(root, name, raw)?;
         let mut spec = raw.clone();
@@ -441,7 +443,12 @@ pub fn compile(root: &Path, document: Value, executables: &Value) -> Result<Valu
                 }
                 spec["thread_options"] = json!(options);
                 if let Some(thinking) = raw["thinking"].as_str() {
-                    spec["turn_options"] = json!({"effort":thinking});
+                    let mut turn = spec["turn_options"]
+                        .as_object()
+                        .cloned()
+                        .unwrap_or_default();
+                    turn.insert("effort".into(), json!(thinking));
+                    spec["turn_options"] = json!(turn);
                 }
             }
             "claude" => {
@@ -456,6 +463,9 @@ pub fn compile(root: &Path, document: Value, executables: &Value) -> Result<Valu
                 ]);
                 if let Some(model) = raw["model"].as_str() {
                     argv.extend([json!("--model"), json!(model)]);
+                }
+                if let Some(thinking) = raw["thinking"].as_str() {
+                    argv.extend([json!("--effort"), json!(thinking)]);
                 }
                 spec["driver_kind"] = json!("claude_stream");
                 spec["profile_family"] = json!("structured_result");

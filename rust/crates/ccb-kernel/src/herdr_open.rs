@@ -178,29 +178,14 @@ fn prepare_request(
             hosted(spec) || spec["thread_options"].is_null() && spec["turn_options"].is_null(),
             "headless protocol options require explicit terminal startup_args"
         );
-        let mut args: Vec<String> = spec
-            .get("startup_args")
-            .map(|v| serde_json::from_value(v.clone()))
-            .transpose()?
-            .unwrap_or_default();
-        if let Some(model) = spec["model"].as_str().filter(|_| !hosted(spec)) {
-            args.extend(["--model".into(), model.into()]);
-        }
-        if let Some(thinking) = spec["thinking"].as_str().filter(|_| !hosted(spec)) {
-            if provider == "pi" {
-                args.extend(["--thinking".into(), thinking.into()]);
-            } else if provider == "claude" {
-                args.extend(["--effort".into(), thinking.into()]);
-            } else {
-                args.extend([
-                    "-c".into(),
-                    format!(
-                        "model_reasoning_effort={}",
-                        serde_json::to_string(thinking)?
-                    ),
-                ]);
-            }
-        }
+        let mut args: Vec<String> = if hosted(spec) {
+            spec["startup_args"]
+                .as_array()
+                .map(|v| v.iter().map(|s| s.as_str().unwrap().to_owned()).collect())
+                .unwrap_or_default()
+        } else {
+            crate::launch_options::terminal_args(spec)?
+        };
         if provider == "pi" {
             let bridge = crate::pi_terminal::execute(
                 &json!({"schema_version":1,"project_root":project,"agent_name":name}),
@@ -587,6 +572,7 @@ pub(crate) fn open(
         .context("missing agents")?
         .values_mut()
     {
+        *spec = crate::launch_options::normalize(spec)?;
         if spec["driver_kind"] == "codex_app_server" && !hosted(spec) {
             if spec["thread_options"]
                 .as_object()

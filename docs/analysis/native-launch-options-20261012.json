@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "base_commit": "f69ffdd0",
+  "recorded_at": "2026-10-12T01:35:07.567232+00:00",
+  "implemented": [
+    "Shared validation/normalization for Pi, Codex and Claude model/thinking/startup_args/env before protocol compilation or Herdr mutation.",
+    "Claude protocol launch passes thinking through --effort; original terminal launch uses the same mapping.",
+    "Codex thinking merges into turn_options rather than discarding other fields; conflicting model/effort declarations are rejected.",
+    "Canonical legacy model/thinking prefixes are removed once before command reconstruction. Remaining duplicate shortcut switches are rejected.",
+    "Malformed option tables, non-string/NUL startup arguments, malformed environment values and unsupported thinking levels are rejected before launch."
+  ],
+  "verification": {
+    "integration_cases_passed": 56,
+    "junit": "docs/analysis/native-launch-options-20261012.xml",
+    "red": "The first new Pi model/thinking case failed before implementation because whitespace/case were not normalized.",
+    "coverage": [
+      "All three provider command/option outputs",
+      "Every thinking level in the existing Python contract",
+      "Legacy prefix deduplication",
+      "Conflicts and malformed values",
+      "Herdr dry-run rejection before runtime files",
+      "Existing config formats and native startup lifetimes",
+      "Claude Herdr model/effort forwarding and stable reconnect"
+    ],
+    "format_clippy_diff": "passed",
+    "rust_full_unit_rerun": false,
+    "full_repository_suite": false
+  },
+  "remaining_permission_gap": {
+    "confirmed": true,
+    "finding": "Rust config compilation copies top-level permission but native runtime has no permission/permission_default/auto_permission consumer. Python launchers apply auto and role command policy explicitly.",
+    "sources": [
+      "lib/agents/policy.py",
+      "lib/provider_backends/codex/launcher_runtime/command_runtime/service.py",
+      "lib/provider_backends/claude/launcher_runtime/service.py"
+    ],
+    "required_next_work": "Migrate explicit provider permission policy with role restrictions and caller authorization; validate both protocol and terminal paths before production/default promotion."
+  },
+  "binary_sha256": {
+    "ccb-kernel.exe": "19e68ac4d99930d5ef92fcbb799a0a3921c91a362d1e1b84c0eda22990b492e0",
+    "ccb-native.exe": "d91ab36900ad9e390a28f64b5c0cd90dc0a8acc479465d9446c82ba32140befc"
+  },
+  "production_install_changed": false,
+  "provider_permission_policy_changed": false,
+  "real_model_inference_performed": false,
+  "limits": [
+    "Supported thinking presets follow the existing repository contract; model-specific availability remains the provider authority.",
+    "This is not complete ccb.config/API/provider flag parity. Arbitrary terminal-only startup flags, role command enforcement, permission mode and broader legacy migration remain pending.",
+    "No real Herdr UI or production installation changes in this patch."
+  ]
+}

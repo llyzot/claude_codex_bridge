@@ -70,6 +70,26 @@ impl Daemon {
                         job["status"] == "running",
                         "Herdr completion job is not running"
                     );
+                    if job["provider"] == "claude" {
+                        // Preserve independently observed idle before callback /
+                        // finalization. A dead owner can recover this exact result.
+                        let spec = self.spec(agent)?;
+                        let receipt =
+                            match crate::herdr_terminal_evidence::prepare(&job, &spec, &decision) {
+                                Ok(receipt) => receipt,
+                                Err(error) => {
+                                    self.record_provider_fault(
+                                        agent,
+                                        "terminal_observation",
+                                        &error,
+                                    )?;
+                                    return Ok(());
+                                }
+                            };
+                        job["provider_options"]["herdr_terminal_observation"] = receipt;
+                        admission::append(&mut self.kernel, "jobs", &job)?;
+                        self.kernel.store.commit()?;
+                    }
                     let checkpoint = self.kernel.memory_checkpoint();
                     if let Err(error) = self.complete(&job, &decision) {
                         self.kernel.store.rollback();

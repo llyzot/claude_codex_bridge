@@ -81,6 +81,48 @@ def test_first_claude_prompt_creates_transcript_and_cache_serves_second(runtime)
     assert await_watch(s,second['job_id'],lambda v:v['terminal'],timeout=15)['reply']=='second reply'
 
 @pytest.mark.parametrize('deferred',[False,True])
+def test_claude_idle_confirmation_is_durable_and_bound_to_exact_transcript(runtime,deferred):
+    r=runtime
+    if deferred:r['defer']()
+    s=r['start']();task=r['submit'](s);prompt=wait_for(lambda:r['prompts']())[-1]
+    r['finish'](prompt,settle=False);time.sleep(.3)
+    current=s.rpc('records.latest',dict(stream='jobs',identity='job_id',agent_name='worker'),version=1)['result'][-1]
+    assert current['provider_options'].get('herdr_terminal_observation') is None
+    r['idle']()
+    try:await_watch(s,task['job_id'],lambda v:v['terminal'])
+    except (OSError,ValueError):
+        if s.proc.poll() is not None:pytest.fail(s.proc.stderr.read())
+        raise
+    current=s.rpc('records.latest',dict(stream='jobs',identity='job_id',agent_name='worker'),version=1)['result'][-1]
+    observed=current['provider_options']['herdr_terminal_observation']
+    assert observed['job_id']==task['job_id']
+    assert observed['execution_instance_id']==current['provider_options']['native_execution_instance']
+    assert observed['decision']['diagnostics']['herdr_idle_observation']['identity']==current['provider_options']['herdr_dispatch']['identity']
+    assert observed['decision']['source_cursor']['offset']==r['path'].stat().st_size
+    assert observed['decision']['source_cursor']['digest']
+
+def test_explicit_retry_gets_new_permission_without_inheriting_old_idle_evidence(runtime):
+    r=runtime;s=r['start']();task=r['submit'](s);prompt=wait_for(lambda:r['prompts']())[-1]
+    message=s.rpc('records.latest',dict(stream='messages',identity='message_id'),version=1)['result'][-1]
+    message['retry_policy']['max_attempts']=1
+    s.rpc('records.append',dict(stream='messages',record=message),version=1)
+    user=r['row']('user','failed-user',content=prompt['body'])
+    assistant=r['row']('assistant','failed-assistant','failed-user',[dict(type='text',text='synthetic API error')],'end_turn')
+    assistant['isApiErrorMessage']=True;r['append'](user,assistant);r['idle']()
+    assert await_watch(s,task['job_id'],lambda v:v['terminal'])['status']=='failed'
+    previous=s.rpc('records.latest',dict(stream='jobs',identity='job_id',agent_name='worker'),version=1)['result'][-1]
+    assert previous['provider_options']['herdr_terminal_observation']
+    retried=s.rpc('retry',dict(target=task['job_id']))
+    next_prompt=wait_for(lambda:r['prompts']() if len(r['prompts']())==2 else None)[-1]
+    current=s.rpc('records.latest',dict(stream='jobs',identity='job_id',agent_name='worker'),version=1)['result'][-1]
+    assert current['job_id']==retried['job_id']
+    assert current['provider_options']['herdr_dispatch']['job_id']==retried['job_id']
+    assert current['provider_options']['native_execution_instance']!=previous['provider_options']['native_execution_instance']
+    assert current['provider_options'].get('herdr_terminal_observation') is None
+    r['finish'](next_prompt,'new retry result')
+    assert await_watch(s,retried['job_id'],lambda v:v['terminal'])['reply']=='new retry result'
+
+@pytest.mark.parametrize('deferred',[False,True])
 def test_claude_transcript_recovery_never_replays_permitted_prompt(runtime,deferred):
     r=runtime
     if deferred:r['defer']()

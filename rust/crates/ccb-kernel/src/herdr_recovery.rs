@@ -146,6 +146,7 @@ fn resumes(
     open: &Value,
     agents: &Value,
     kernel: &mut crate::Kernel,
+    prior: &Value,
 ) -> Result<Value> {
     let mut result = json!({});
     for (name, spec) in config["agents"].as_object().unwrap() {
@@ -216,7 +217,7 @@ fn resumes(
                 &format!("providers/{provider}/{name}/herdr-history.json"),
             )?
             .unwrap_or(Value::Null);
-            let history = if cache.is_object() {
+            let mut history = if cache.is_object() {
                 ensure!(
                     cache["identity"]["process"] == agents["agents"][name]["binding"]["process"],
                     "Codex recovery cache belongs to another process"
@@ -225,6 +226,32 @@ fn resumes(
             } else {
                 open["bindings"][name]["history"].clone()
             };
+            if prior["agents"][name]["herdr_discovery"].is_object() {
+                let running = rows
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|row| row["status"] == "running")
+                    .collect::<Vec<_>>();
+                ensure!(
+                    running.len() <= 1,
+                    "multiple unfinished deferred executions for one agent"
+                );
+                if let Some(job) = running.first() {
+                    let recovered = crate::herdr_discovery::recover(
+                        &prior["agents"][name],
+                        job,
+                        &crate::herdr_agents::recorded_identity(agents, name),
+                    )?
+                    .context(
+                        "unfinished deferred execution has no uniquely verified native session",
+                    )?;
+                    history = json!(recovered.binding);
+                    kernel.store.save(&format!("providers/{provider}/{name}/herdr-history.json"),
+                            &json!({"schema_version":1,"identity":crate::herdr_agents::recorded_identity(agents,name),
+                            "discovery":prior["agents"][name]["herdr_discovery"],"history":history}))?;
+                }
+            }
             if history.is_null() {
                 ensure!(
                     rows.as_array().unwrap().is_empty(),
@@ -498,7 +525,7 @@ pub(super) fn step(
             prior["herdr"] == *request,
             "recovery source configuration changed"
         );
-        let sessions = resumes(root, &runtime, config, open, &agents, &mut kernel)?;
+        let sessions = resumes(root, &runtime, config, open, &agents, &mut kernel, &prior)?;
         let (mut offline, work) =
             crate::daemon::Daemon::recover_closed_work(kernel, prior, &agents)?;
         work_handoff::recoverable(&mut offline.kernel, config)?;

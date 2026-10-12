@@ -3,6 +3,8 @@ import json
 import os
 import subprocess
 import sys
+import hashlib
+import uuid
 from pathlib import Path
 
 import pytest
@@ -29,12 +31,13 @@ def finish_worker(p, prompt, reply, turn):
             out.write(json.dumps(dict(type='event_msg', payload=payload))+'\n')
 
 
-@pytest.mark.parametrize('durable_result,crash', [(True,False),(False,False),(True,True)], ids=['completed','interrupted','opener_crash'])
-def test_reopen_delivers_child_once_and_preserves_unsent_fifo(project, durable_result, crash):
+@pytest.mark.parametrize('durable_result,crash,deferred', [(True,False,False),(False,False,False),(True,True,False),(True,False,True),(False,False,True),(True,False,'stale_cache')], ids=['completed','interrupted','opener_crash','deferred_completed','deferred_interrupted','deferred_stale_cache'])
+def test_reopen_delivers_child_once_and_preserves_unsent_fifo(project, durable_result, crash, deferred):
     p = project
     original = json.loads(p['pi'].args[2])
     history = Path(original['native_session_path'])
     history.write_text(json.dumps({'type':'session', 'id':original['session_id'], 'cwd':str(p['root'])})+'\n', encoding='utf-8')
+    if deferred:change(p['backend'],lambda s:s['agent_sessions'].pop('codex'))
     assert p['open']().returncode == 0
     parent = cli('--state-root', p['native'], 'ask', 'lead', 'delegate before retirement')
     assert parent.returncode == 0, parent.stderr
@@ -56,6 +59,17 @@ def test_reopen_delivers_child_once_and_preserves_unsent_fifo(project, durable_r
         proc.kill(); proc.wait(timeout=5)
     if durable_result:
         finish_worker(p, worker['body'], 'durable old worker result', 'old-turn')
+    elif deferred:
+        with p['log'].open('a',encoding='utf-8') as out:
+            for payload in [dict(type='task_started',turn_id='old-turn'),dict(type='user_message',message=worker['body'])]:
+                out.write(json.dumps(dict(type='event_msg',payload=payload))+'\n')
+    if deferred=='stale_cache':
+        previous=str(uuid.uuid4());old=p['log'].parent/f'rollout-{previous}.jsonl'
+        old.write_text(json.dumps(dict(type='session_meta',payload=dict(id=previous,cwd=str(p['root']))))+'\n',encoding='utf-8')
+        dispatched=job(p,'worker',child_id)['provider_options']['herdr_dispatch']
+        cache=p['native']/'providers/codex/worker/herdr-history.json';cache.parent.mkdir(parents=True,exist_ok=True)
+        cache.write_text(json.dumps(dict(schema_version=1,identity=dispatched['identity'],discovery=dispatched['discovery'],
+            history=dict(root=str(old.parent),cwd=str(p['root']),path=str(old),session_id=previous))),encoding='utf-8')
     gate = p['root']/'resume-ready'
     original['start_gate'] = str(gate)
     pi = subprocess.Popen([NODE, str(HOST), json.dumps(original)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -63,6 +77,7 @@ def test_reopen_delivers_child_once_and_preserves_unsent_fifo(project, durable_r
     codex = subprocess.Popen([sys.executable, '-I', '-c', 'import time;time.sleep(180)'], creationflags=0x08000000)
     try:
         change(p['backend'], lambda s:s.update(provider_pids=[pi.pid, codex.pid]))
+        if deferred:change(p['backend'],lambda s:s['agent_sessions'].update(codex=dict(agent='codex',kind='id',value=p['session'],source='fixture')))
         if crash:fault(p['backend'],['agent','start'],'hang-after')
         assert p['open'](0).returncode == 0
         wait_for(lambda:(p['native']/'herdr/herdr-recovery.json').exists() and
@@ -160,3 +175,82 @@ def test_recovery_keeps_durable_silent_cancellation_without_a_reply(stopped):
     replies=p['runtime']/'replies/replies.jsonl'
     assert not replies.exists() or not replies.read_text(encoding='utf-8').strip()
     assert mutate_count(p['backend'],['agent','prompt'])==1
+
+
+@pytest.mark.parametrize('stopped',['claude'],indirect=True)
+@pytest.mark.parametrize('evidence',['recorded','absent','hook_continued','foreign_execution','rewritten_history'])
+def test_stopped_claude_reuses_only_unchanged_durable_idle_evidence(stopped,evidence):
+    p=stopped;submitted=cli('--state-root',p['runtime'],'ask','worker','recover Claude result')
+    assert submitted.returncode==0,submitted.stderr
+    identity=json.loads(submitted.stdout)['job_id']
+    wait_for(lambda:mutate_count(p['backend'],['agent','prompt'])==1)
+    prompt=json.loads((p['backend']/'prompts.jsonl').read_text(encoding='utf-8').splitlines()[-1])['body']
+    retire(p)
+    path=p['project']/'.ccb/agents/worker/jobs.jsonl'
+    row=json.loads(path.read_text(encoding='utf-8').splitlines()[-1])
+    permit=row['provider_options']['herdr_dispatch'];execution=row['provider_options']['native_execution_instance']
+    user=str(uuid.uuid4());assistant=str(uuid.uuid4());reply='Claude settled before owner death'
+    def append(records):
+        with p['log'].open('a',encoding='utf-8') as out:
+            for record in records:out.write(json.dumps(record)+'\n')
+    scope=dict(sessionId=p['session'],cwd=str(p['project']),isSidechain=False)
+    append([dict(scope,type='user',uuid=user,parentUuid='historical',message=dict(role='user',content=prompt)),
+            dict(scope,type='assistant',uuid=assistant,parentUuid=user,message=dict(id='native-reply',role='assistant',content=[dict(type='text',text=reply)],stop_reason='end_turn'))])
+    data=p['log'].read_bytes();offset=len(data)
+    cursor=dict(schema_version=2,record_type='completion_cursor',source_kind='session_event_log',session_path=str(p['log']),
+                identity=permit['baseline']['identity'],offset=offset,digest=hashlib.sha256(offset.to_bytes(8,'little')+data[-65536:]).hexdigest(),
+                line_no=None,event_seq=None,opaque_cursor=None,updated_at=row['updated_at'])
+    # Model the authority's committed observation immediately before its final
+    # completion transaction. The ordinary dispatch tests verify actual emission.
+    decision=dict(schema_version=2,record_type='completion_decision',terminal=True,status='completed',reason='claude_assistant_end_turn',
+                  confidence='exact',anchor_seen=True,reply_started=True,reply_stable=True,reply=reply,provider_turn_ref=user,
+                  source_cursor=cursor,finished_at=row['updated_at'],diagnostics=dict(completion_authority='herdr_idle_and_anchored_transcript',
+                  session_id=p['session'],request_anchor=permit['request_anchor'],assistant_uuid=assistant,native_execution_instance=execution,
+                  herdr_idle_observation=dict(schema_version=1,identity=permit['identity'],interactive_ready=True,
+                  agent_session=dict(agent='claude',kind='id',value=p['session']),history_binding=permit['history_binding'],observed_at=row['updated_at'])))
+    if evidence!='absent':
+        row['provider_options']['herdr_terminal_observation']=dict(schema_version=1,record_type='herdr_terminal_observation',
+            job_id=identity,agent_name='worker',project_id=row['request']['project_id'],execution_instance_id=execution,decision=decision)
+        if evidence=='foreign_execution':decision['diagnostics']['native_execution_instance']=str(uuid.uuid4())
+        with path.open('a',encoding='utf-8') as out:out.write(json.dumps(row)+'\n')
+    if evidence=='hook_continued':
+        append([dict(scope,type='user',isMeta=True,uuid='hook-feedback',parentUuid=assistant,message=dict(role='user',content='continue checking'))])
+    elif evidence=='rewritten_history':
+        p['log'].write_text(p['log'].read_text(encoding='utf-8').replace(reply,'tampered terminal result'),encoding='utf-8')
+    replacement=p['helper']();change(p['backend'],lambda s:s.update(provider_pids=[replacement.pid]))
+    reopened=p['open']()
+    if evidence in ['foreign_execution','rewritten_history']:
+        assert reopened.returncode!=0
+        assert mutate_count(p['backend'],['agent','start'])==1
+    else:
+        assert reopened.returncode==0,reopened.stderr
+        watched=cli('--state-root',p['runtime'],'watch',identity)
+        result=json.loads(watched.stdout)
+        assert result['status']==('completed' if evidence=='recorded' else 'incomplete')
+        if evidence=='recorded':assert result['reply']==reply
+    assert mutate_count(p['backend'],['agent','prompt'])==1
+
+
+@pytest.mark.parametrize('invalid',['duplicate_anchor','foreign_anchor','missing_history'])
+def test_deferred_recovery_refuses_unknown_or_ambiguous_session_without_launch(project,invalid):
+    p=project;original=json.loads(p['pi'].args[2])
+    Path(original['native_session_path']).write_text(json.dumps(dict(type='session',id=original['session_id'],cwd=str(p['root'])))+'\n',encoding='utf-8')
+    change(p['backend'],lambda s:s['agent_sessions'].pop('codex'))
+    assert p['open']().returncode==0
+    submitted=cli('--state-root',p['native'],'ask','worker','deferred identity test')
+    assert submitted.returncode==0,submitted.stderr
+    prompt=wait_for(lambda:p['prompts']())[-1]
+    killed=cli('--state-root',p['native'],'kill',timeout=25);assert killed.returncode==0,killed.stderr
+    for proc in [p['pi'],p['codex']]:proc.kill();proc.wait(timeout=5)
+    if invalid=='missing_history':p['log'].unlink()
+    else:
+        finish_worker(p,prompt['body'] if invalid=='duplicate_anchor' else 'CCB_REQ_ID: unrelated\nforeign task','result','old-turn')
+        if invalid=='duplicate_anchor':
+            other=str(uuid.uuid4());duplicate=p['log'].parent/f'rollout-{other}.jsonl'
+            rows=p['log'].read_text(encoding='utf-8').splitlines();header=json.loads(rows[0]);header['payload']['id']=other
+            duplicate.write_text('\n'.join([json.dumps(header),*rows[1:]])+'\n',encoding='utf-8')
+    reopened=p['open']()
+    assert reopened.returncode!=0
+    assert mutate_count(p['backend'],['agent','start'])==2
+    assert mutate_count(p['backend'],['agent','prompt'])==1
+    assert job(p,'worker',json.loads(submitted.stdout)['job_id'])['status']=='running'

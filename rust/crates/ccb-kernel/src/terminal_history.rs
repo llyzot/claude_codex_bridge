@@ -56,6 +56,25 @@ impl ProviderReader {
             Self::Claude(r) => r.poll(),
         }
     }
+    pub(crate) fn poll_stopped(&mut self) -> Result<Option<Value>> {
+        let position = |reader: &Self| match reader {
+            Self::Native(r) => r.offset,
+            Self::Claude(r) => r.position(),
+        };
+        let start = position(self);
+        for _ in 0..64 {
+            let before = position(self);
+            let decision = self.poll()?;
+            ensure!(
+                position(self).saturating_sub(start) <= 64 * 1024 * 1024,
+                "stopped history recovery exceeds read limit"
+            );
+            if decision.is_some() || position(self) == before {
+                return Ok(decision);
+            }
+        }
+        anyhow::bail!("stopped history recovery exceeds poll limit")
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

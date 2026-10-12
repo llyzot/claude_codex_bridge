@@ -391,6 +391,7 @@ fn run(
                         continue;
                     };
                     decision = latest;
+                    crate::herdr_terminal_evidence::attach(&mut decision, &live, &observed_binding);
                 }
                 decision["diagnostics"]["native_execution_instance"] = json!(execution);
                 events.send(Event::Completed(decision))?;

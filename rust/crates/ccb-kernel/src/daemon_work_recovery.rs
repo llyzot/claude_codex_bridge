@@ -125,10 +125,7 @@ impl Daemon {
         );
         let execution = records::string(&job["provider_options"], "native_execution_instance")?;
         uuid::Uuid::parse_str(execution)?;
-        let row = &agents["agents"][agent];
-        let identity = json!({"namespace_owner":agents["namespace_owner"],"workspace_id":agents["workspace_id"],
-            "herdr_name":row["herdr_name"],"pane_id":row["pane_id"],"terminal_id":row["terminal_id"],
-            "process":row["binding"]["process"],"plan_hash":agents["plan_hash"]});
+        let identity = crate::herdr_agents::recorded_identity(agents, agent);
         ensure!(
             identity["process"].is_object()
                 && !crate::startup::owner_alive(
@@ -144,46 +141,72 @@ impl Daemon {
                     && permit["job_id"] == job["job_id"]
                     && permit["execution_instance_id"] == execution
                     && permit["request_anchor"] == anchor
-                    && permit["identity"] == identity
-                    && permit["history_binding"] == spec["herdr_history"],
+                    && permit["identity"] == identity,
                 "stopped Herdr execution permit does not match its recorded owner"
             );
-            let configured: Binding = serde_json::from_value(permit["history_binding"].clone())?;
-            let resolved: Binding =
-                serde_json::from_value(if permit["resolved_history_binding"].is_null() {
-                    permit["history_binding"].clone()
-                } else {
-                    permit["resolved_history_binding"].clone()
-                })?;
-            ensure!(
-                configured.root == resolved.root
-                    && configured.cwd == resolved.cwd
-                    && configured.session_id == resolved.session_id,
-                "stopped terminal history scope changed"
-            );
-            let baseline: Baseline = serde_json::from_value(permit["baseline"].clone())?;
-            if job["provider"] == "pi" {
-                let producer = baseline
-                    .producer
-                    .as_ref()
-                    .context("Pi execution producer missing")?;
+            if spec["herdr_discovery"].is_object() {
+                if let Some(recovered) = crate::herdr_discovery::recover(spec, job, &identity)? {
+                    if job["provider"] == "claude" {
+                        decision = crate::herdr_terminal_evidence::recover(
+                            job,
+                            spec,
+                            &identity,
+                            &recovered.binding,
+                            recovered.decision,
+                        )?;
+                    } else {
+                        decision = recovered.decision;
+                    }
+                }
+            } else {
                 ensure!(
-                    producer["owner"] == spec["pi_bridge_owner"]
-                        && producer["process"] == identity["process"],
-                    "stopped Pi producer differs from permitted input"
+                    permit["history_binding"] == spec["herdr_history"],
+                    "stopped terminal history binding changed"
                 );
-            }
-            let mut reader = ProviderReader::new(
-                records::string(job, "provider")?,
-                resolved,
-                baseline,
-                anchor,
-            )?;
-            let candidate = reader.poll()?;
-            // Claude transcript text alone needed live idle confirmation. Death
-            // is not that confirmation; retain its history and mark interrupted.
-            if job["provider"] != "claude" {
-                decision = candidate;
+                let configured: Binding =
+                    serde_json::from_value(permit["history_binding"].clone())?;
+                let resolved: Binding =
+                    serde_json::from_value(if permit["resolved_history_binding"].is_null() {
+                        permit["history_binding"].clone()
+                    } else {
+                        permit["resolved_history_binding"].clone()
+                    })?;
+                ensure!(
+                    configured.root == resolved.root
+                        && configured.cwd == resolved.cwd
+                        && configured.session_id == resolved.session_id,
+                    "stopped terminal history scope changed"
+                );
+                let baseline: Baseline = serde_json::from_value(permit["baseline"].clone())?;
+                if job["provider"] == "pi" {
+                    let producer = baseline
+                        .producer
+                        .as_ref()
+                        .context("Pi execution producer missing")?;
+                    ensure!(
+                        producer["owner"] == spec["pi_bridge_owner"]
+                            && producer["process"] == identity["process"],
+                        "stopped Pi producer differs from permitted input"
+                    );
+                }
+                let mut reader = ProviderReader::new(
+                    records::string(job, "provider")?,
+                    resolved,
+                    baseline,
+                    anchor,
+                )?;
+                let candidate = reader.poll_stopped()?;
+                if job["provider"] == "claude" {
+                    decision = crate::herdr_terminal_evidence::recover(
+                        job,
+                        spec,
+                        &identity,
+                        &configured,
+                        candidate,
+                    )?;
+                } else {
+                    decision = candidate;
+                }
             }
         }
         let mut decision=decision.unwrap_or_else(||json!({"schema_version":2,"record_type":"completion_decision",

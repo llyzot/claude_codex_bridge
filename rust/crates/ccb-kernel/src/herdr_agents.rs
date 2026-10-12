@@ -1035,6 +1035,12 @@ pub fn execute(request: &Value) -> Result<Value> {
 
 /// Observe a previously mounted process without acquiring a second journal writer.
 /// The process remains owned by Herdr; callers never gain termination rights.
+pub(crate) fn recorded_identity(record: &Value, agent: &str) -> Value {
+    let row = &record["agents"][agent];
+    json!({"namespace_owner":record["namespace_owner"],"workspace_id":record["workspace_id"],
+        "herdr_name":row["herdr_name"],"pane_id":row["pane_id"],"terminal_id":row["terminal_id"],
+        "process":row["binding"]["process"],"plan_hash":record["plan_hash"]})
+}
 pub(crate) fn bound(request: &Value, agent: &str) -> Result<Value> {
     let namespace = herdr_namespace::inspect_prepared(request)?;
     let mut inspect = request.clone();
@@ -1047,9 +1053,7 @@ pub(crate) fn bound(request: &Value, agent: &str) -> Result<Value> {
         row["binding"].is_object(),
         "Herdr agent has no saved process binding"
     );
-    let identity = json!({"namespace_owner":record["namespace_owner"],"workspace_id":record["workspace_id"],
-        "herdr_name":row["herdr_name"],"pane_id":row["pane_id"],"terminal_id":row["terminal_id"],
-        "process":row["binding"]["process"],"plan_hash":record["plan_hash"]});
+    let identity = recorded_identity(&record, agent);
     let manager = Manager {
         store: None,
         request,

@@ -182,6 +182,9 @@ impl Reader {
     pub(crate) fn anchored(&self) -> bool {
         self.anchor.is_some()
     }
+    pub(crate) fn position(&self) -> u64 {
+        self.offset
+    }
     pub(crate) fn poll(&mut self) -> Result<Option<Value>> {
         self.binding.validate()?;
         let mut file = File::open(&self.binding.path)?;
@@ -212,7 +215,13 @@ impl Reader {
         if reader.get_ref().metadata()?.len() > self.offset {
             return Ok(None);
         }
-        Ok(self.terminal.clone())
+        Ok(self.terminal.clone().map(|mut decision| {
+            decision["source_cursor"] = json!({"schema_version":2,"record_type":"completion_cursor",
+                "source_kind":"session_event_log","session_path":self.binding.path,"identity":self.baseline.identity,
+                "offset":self.offset,"digest":self.digest,"line_no":null,"event_seq":null,"opaque_cursor":null,
+                "updated_at":crate::daemon::now()});
+            decision
+        }))
     }
     fn event(&mut self, row: &Value) -> Result<()> {
         scope(&self.binding, row)?;
@@ -322,7 +331,7 @@ impl Reader {
             json!({"schema_version":2,"record_type":"completion_decision","terminal":true,"status":status,"reason":reason,
             "confidence":"exact","anchor_seen":true,"reply_started":!self.reply.is_empty(),"reply_stable":true,
             "reply":if status=="completed"{&self.reply}else{""},"provider_turn_ref":self.anchor,"source_cursor":null,"finished_at":crate::daemon::now(),
-            "diagnostics":{"completion_authority":"claude_transcript_and_herdr_idle","session_id":self.binding.session_id,"request_anchor":self.request,"assistant_uuid":self.last_assistant}}),
+            "diagnostics":{"completion_authority":"claude_transcript_candidate","session_id":self.binding.session_id,"request_anchor":self.request,"assistant_uuid":self.last_assistant}}),
         );
     }
 }
@@ -586,5 +595,53 @@ mod tests {
             append(&b,&[prompt,assistant(&b,"answer","request",json!("end_turn"),"answer")]);
             assert_eq!(r.poll().unwrap().is_some(),accepted,"{body}");
         }
+    }
+    #[test]
+    fn stopped_reader_drains_chunks_but_never_accepts_a_partial_tail() {
+        let (_dir, binding) = setup();
+        let checkpoint = baseline(&binding, false).unwrap();
+        append(
+            &binding,
+            &[
+                user(&binding),
+                assistant(
+                    &binding,
+                    "large",
+                    "request",
+                    json!("end_turn"),
+                    &"x".repeat(1100000),
+                ),
+                row(&binding, "attachment", "later", Some("large"), Value::Null),
+            ],
+        );
+        let mut reader = crate::terminal_history::ProviderReader::new(
+            "claude",
+            binding.clone(),
+            checkpoint.clone(),
+            "job:execution".into(),
+        )
+        .unwrap();
+        assert!(reader.poll().unwrap().is_none());
+        assert_eq!(
+            reader.poll_stopped().unwrap().unwrap()["reply"]
+                .as_str()
+                .unwrap()
+                .len(),
+            1100000
+        );
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&binding.path)
+            .unwrap();
+        write!(file, "{{\"type\":\"user\"").unwrap();
+        drop(file);
+        let mut reader = crate::terminal_history::ProviderReader::new(
+            "claude",
+            binding,
+            checkpoint,
+            "job:execution".into(),
+        )
+        .unwrap();
+        assert!(reader.poll_stopped().unwrap().is_none());
     }
 }

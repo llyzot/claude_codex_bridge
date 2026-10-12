@@ -98,6 +98,19 @@ pub fn admit(kernel: &mut Kernel, args: &Value) -> Result<Value> {
         .as_object()
         .cloned()
         .unwrap_or_default();
+    // A new attempt must obtain its own execution and send permission. A prior
+    // observation (including a Claude idle receipt) never belongs to this job.
+    for key in [
+        "native_execution_instance",
+        "native_daemon_instance",
+        "native_scope_proof",
+        "native_cancel_intent",
+        "native_termination_intent",
+        "herdr_dispatch",
+        "herdr_terminal_observation",
+    ] {
+        options.remove(key);
+    }
     let continue_mode = request["message_type"]
         .as_str()
         .is_some_and(|s| s.trim().eq_ignore_ascii_case("ask"))

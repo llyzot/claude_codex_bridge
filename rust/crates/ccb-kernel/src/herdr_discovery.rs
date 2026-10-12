@@ -171,6 +171,103 @@ fn observed(request: &Value, agent: &str, identity: Option<&Value>) -> Result<Va
     }
     Ok(live)
 }
+pub(crate) struct Recovered {
+    pub binding: Binding,
+    pub decision: Option<Value>,
+}
+/// Read only the old permitted execution. Never send input or invent a session.
+pub(crate) fn recover(spec: &Value, job: &Value, identity: &Value) -> Result<Option<Recovered>> {
+    let permit = &job["provider_options"]["herdr_dispatch"];
+    let provider = crate::records::string(job, "provider")?;
+    let execution = crate::records::string(&job["provider_options"], "native_execution_instance")?;
+    uuid::Uuid::parse_str(execution)?;
+    let anchor = format!("{}:{execution}", crate::records::string(job, "job_id")?);
+    validate(&spec["herdr_discovery"], &spec["workspace_path"])?;
+    ensure!(
+        permit["schema_version"] == 1
+            && permit["job_id"] == job["job_id"]
+            && permit["execution_instance_id"] == execution
+            && permit["request_anchor"] == anchor
+            && permit["identity"] == *identity
+            && permit["discovery"] == spec["herdr_discovery"]
+            && permit["fixed_history"].is_boolean()
+            && spec["provider"] == job["provider"],
+        "invalid stopped deferred dispatch proof"
+    );
+    ensure!(
+        identity["process"].is_object()
+            && !crate::startup::owner_alive(
+                &json!({"pid":identity["process"]["pid"],"process":identity["process"]})
+            )?,
+        "deferred recovery process is live or unconfirmed"
+    );
+    let d: Discovery = serde_json::from_value(spec["herdr_discovery"].clone())?;
+    let since = permit["not_before_ms"]
+        .as_u64()
+        .context("missing deferred recovery time boundary")?;
+    let mut readers = BTreeMap::new();
+    let mut fixed_binding = None;
+    if !permit["history"].is_null() {
+        let binding: Binding = serde_json::from_value(permit["history"].clone())?;
+        ensure!(
+            binding.root == d.root
+                && binding.cwd == d.cwd
+                && d.session_id
+                    .as_ref()
+                    .is_none_or(|id| id == &binding.session_id),
+            "stopped deferred history scope changed"
+        );
+        let reader = ProviderReader::new(
+            provider,
+            binding.clone(),
+            serde_json::from_value(permit["baseline"].clone())?,
+            anchor.clone(),
+        )?;
+        if permit["fixed_history"] == true {
+            fixed_binding = Some(binding.clone());
+        }
+        readers.insert(binding.path.clone(), (binding, reader));
+    } else {
+        ensure!(
+            permit["baseline"].is_null() && permit["fixed_history"] == false,
+            "stopped deferred history baseline missing"
+        );
+    }
+    if permit["fixed_history"] != true {
+        for binding in candidates(&d, since, provider)? {
+            if !readers.contains_key(&binding.path) {
+                let baseline = terminal_history::provider_baseline(provider, &binding, true)?;
+                let reader =
+                    ProviderReader::new(provider, binding.clone(), baseline, anchor.clone())?;
+                readers.insert(binding.path.clone(), (binding, reader));
+            }
+        }
+    }
+    ensure!(
+        readers.len() <= 32,
+        "deferred recovery candidate limit exceeded"
+    );
+    let mut found = None;
+    for (binding, reader) in readers.values_mut() {
+        let decision = reader.poll_stopped()?;
+        if reader.anchored() {
+            ensure!(
+                found.is_none(),
+                "request anchor appears in multiple recovery histories"
+            );
+            found = Some(Recovered {
+                binding: binding.clone(),
+                decision,
+            });
+        }
+    }
+    Ok(found.or_else(|| {
+        fixed_binding.map(|binding| Recovered {
+            binding,
+            decision: None,
+        })
+    }))
+}
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run(
     request: &Value,
@@ -360,6 +457,7 @@ pub(crate) fn run(
                         continue;
                     };
                     decision = latest;
+                    crate::herdr_terminal_evidence::attach(&mut decision, &live, &binding);
                 }
                 decision["diagnostics"]["binding_authority"] =
                     json!("mounted_process_and_execution_anchor");

@@ -247,7 +247,8 @@
     "Refreshed independent Rust installation to e35f6a1a source. Installed Pi and Claude Leads each completed Codex callbacks across Keeper recovery with stable sessions. New binary resumed a stopped prior-build Pi/Codex project and recalled both markers without its deleted launch source. User-authorized existing-default file write/read verified from actual tool records, separately from still-failing restricted mode.",
     "Scoped real Herdr 0.9.3/Windows Terminal Pi Lead plus native Codex host completed automatic result delivery. Fixed terminal adapter sampling before later extension transforms by reading the anchored settled session branch; stable content-versioned .mjs loader fixes stale implementation reload. Live revision change and restoration preserve Pi PID/session. All test resources stopped; final release rebuild awaits frozen regression completion.",
     "Read-only worktree startup preflight rejects missing or unconfirmed checkouts before publishing a new daemon lifetime, preserving prior startup identity and retaining locked materialization checks",
-    "Native takeover checks legacy Python Keeper liveness before daemon ownership or journal recovery; missing/unmounted daemon lease and stale stopped Keeper state do not authorize takeover"
+    "Native takeover checks legacy Python Keeper liveness before daemon ownership or journal recovery; missing/unmounted daemon lease and stale stopped Keeper state do not authorize takeover",
+    "Ordinary native Herdr open discovers provider executables, defaults Codex to authenticated hosted input, expands Windows topology before discovery, selects activated Herdr standalone release before stale PATH, and exposes these selections in read-only preview"
   ],
   "remaining": [
     "Broaden native Keeper real-model/Herdr foreground acceptance, legacy/cross-platform coexistence and unavailable-observation/storage recovery; evaluate optional OS-level restart of the Keeper itself and production/default rollout",
@@ -666,13 +667,14 @@
     "native_core_regression_current": "Frozen pre-Pi-fix release aggregated coverage: 1188 passed, 11 skipped across 1199 collected cases. Initial progress-observer WinError 5 interrupted pytest; tail completed; two negative workspace cases needed a harness deadline beyond the CLI 15-second observation window and passed. Failed/interrupted evidence retained. See native-core-regression-summary-20261012.json.",
     "native_pi_canonical_release": "19 final-release Pi bridge cases passed, including real installed Pi no-model loading and session clear. Source e4dba8a6 release installed into stopped ccb-rust candidate, all three aliases verified Rust; old image retained for rollback. Real Herdr callback/hot reload debug evidence remains separately scoped.",
     "native_workspace_preflight": "53 affected release startup/worktree/Keeper cases passed; original release failed both actionable-error regressions, debug fix passed both. Existing native-start bytes and user workspace contents preserved on rejection. fmt/Clippy passed. Candidate installed at source 570093dc; default unchanged. Evidence native-workspace-preflight-20261012.json.",
-    "native_legacy_keeper": "Old release incorrectly admitted all eight live/invalid legacy Keeper fixtures. Debug passed all nine; 41 final release daemon/Keeper/Herdr-recovery and handoff cases passed. Candidate installed from 79e17170, fmt and Clippy passed. Production daemon observed alive, legacy Keeper PID absent; no production controls. See native-legacy-keeper-20261012.json."
+    "native_legacy_keeper": "Old release incorrectly admitted all eight live/invalid legacy Keeper fixtures. Debug passed all nine; 41 final release daemon/Keeper/Herdr-recovery and handoff cases passed. Candidate installed from 79e17170, fmt and Clippy passed. Production daemon observed alive, legacy Keeper PID absent; no production controls. See native-legacy-keeper-20261012.json.",
+    "native_herdr_defaults": "63 final-release ordinary-default/Herdr-open/startup/Windows-layout cases passed. New fixture transport integration uses installed Codex no-model initialization without supplying compiled options; reconnect does not duplicate pane launch. Real production config dry-run selected Herdr 0.9.3 and hosted Codex without writes. Candidate installed from 142a1bb4. See native-herdr-defaults-20261012.json."
   },
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2",
     "candidate_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "next_action": "Prepare the concrete production migration for ordinary ccb herdr open: validate default Codex TUI-host composition and Herdr executable selection without test-only options, then prepare legacy shutdown, retained state, native startup and default entrypoint rollback. Do not repeat completed baseline/tests without new evidence.",
-    "latest_evidence": "docs/analysis/native-legacy-keeper-20261012.json",
+    "next_action": "Concrete production migration plan prepared: recheck idle legacy authority and exact workspace, stop legacy, preserve old runtime metadata in place, point this project to .ccb/native-runtime, start ordinary Rust Herdr session ccb-native-f48a0cc655bf, verify automatic Pi/Codex callback, then promote user PATH with recorded rollback. Obtain the production-specific outside-Herdr exception; the previous exception covered only a separate test session.",
+    "latest_evidence": "docs/analysis/native-production-migration-plan-20261012.json",
     "herdr_preflight": {
       "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_",
       "session": "ccb-rust-ui-gjjd92m_",
@@ -683,9 +685,9 @@
   },
   "installed_candidate": {
     "prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "rust_source_commit": "79e171709051b269d5cbce2da92ea6b13b7751d4",
-    "binary_sha256": "349a33776ed5e6e1ac8b10b844d9d2c20c9691c6e45bfc6739710a7f67adc66a",
+    "rust_source_commit": "142a1bb4878e502622ceb081ce2b2cebedb80151",
+    "binary_sha256": "00056c18804d79b04f1177879ac96101469d9a4baa27c7f4a7e0a6d24852498b",
     "account_default": false,
-    "evidence": "docs/analysis/native-legacy-keeper-20261012.json"
+    "evidence": "docs/analysis/native-herdr-defaults-20261012.json"
   }
 }

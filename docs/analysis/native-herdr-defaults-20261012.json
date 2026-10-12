@@ -81,5 +81,63 @@
     "Actual default composition test used fixture Herdr transport and installed Codex no-model initialization; actual model-backed UI chains remain earlier separately scoped evidence.",
     "Explicit compiled --options configurations retain their chosen adapters.",
     "No production startup, old daemon shutdown, runtime-root change or account PATH change."
-  ]
+  ],
+  "source_commit": "142a1bb4878e502622ceb081ce2b2cebedb80151",
+  "candidate_install": {
+    "plan": {
+      "active_use_check": "performed_on_apply",
+      "backup": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-c1c399f7-80fb-4b6a-9c73-edb4b1a988e0.backup",
+      "from": {
+        "binary_sha256": "349a33776ed5e6e1ac8b10b844d9d2c20c9691c6e45bfc6739710a7f67adc66a",
+        "manifest_sha256": "a5a338eda14ce3404dcd18088b237b036fa707ecd856a93cef1d0811adbaed80",
+        "version": "8.7.10"
+      },
+      "operation_id": "c1c399f7-80fb-4b6a-9c73-edb4b1a988e0",
+      "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+      "requires_stopped_native_commands": true,
+      "runtime_state_changed": false,
+      "stage": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-c1c399f7-80fb-4b6a-9c73-edb4b1a988e0.stage",
+      "status": "planned",
+      "to_binary_sha256": "00056c18804d79b04f1177879ac96101469d9a4baa27c7f4a7e0a6d24852498b",
+      "to_version": "8.7.10"
+    },
+    "result": {
+      "backup": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-c1c399f7-80fb-4b6a-9c73-edb4b1a988e0.backup",
+      "path_modified": false,
+      "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+      "provider_settings_modified": false,
+      "runtime_state_changed": false,
+      "stage": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-c1c399f7-80fb-4b6a-9c73-edb4b1a988e0.stage",
+      "state_compatibility": "not_checked",
+      "status": "upgraded",
+      "upgrade": {
+        "finished_at": "2026-10-12T04:55:10.769148900Z",
+        "from": {
+          "binary_sha256": "349a33776ed5e6e1ac8b10b844d9d2c20c9691c6e45bfc6739710a7f67adc66a",
+          "manifest_sha256": "a5a338eda14ce3404dcd18088b237b036fa707ecd856a93cef1d0811adbaed80",
+          "version": "8.7.10"
+        },
+        "operation_id": "c1c399f7-80fb-4b6a-9c73-edb4b1a988e0",
+        "phase": "committed",
+        "prefix_name": "ccb-rust",
+        "record_type": "ccb_native_upgrade",
+        "runtime_state_changed": false,
+        "schema_version": 1,
+        "started_at": "2026-10-12T04:55:10.596755600Z",
+        "to": {
+          "binary_sha256": "00056c18804d79b04f1177879ac96101469d9a4baa27c7f4a7e0a6d24852498b",
+          "manifest_sha256": "b8dfea9b35c02409051aacd34e99f23a4a4473633fa5f9f47f5c780106c3b730",
+          "version": "8.7.10"
+        }
+      }
+    },
+    "verify": {
+      "binary_sha256": "00056c18804d79b04f1177879ac96101469d9a4baa27c7f4a7e0a6d24852498b",
+      "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+      "runtime": "rust",
+      "status": "verified",
+      "version": "8.7.10"
+    },
+    "account_path_changed": false
+  }
 }

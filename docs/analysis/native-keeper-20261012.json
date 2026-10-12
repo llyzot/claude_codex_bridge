@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-12T00:25:51.717589+00:00",
+  "base_commit": "6b5cf5d5500b3cd489f1ae17e8d7a802ec9ebf22",
+  "implemented": [
+    "Windows native start now creates or attaches one lifetime-locked Rust Keeper by default; native daemon command remains directly runnable",
+    "Generation-fenced Keeper state and stop receipt, passive keeper-status, process creation identity in native leases",
+    "Daemon death triggers bounded backoff and restart from verified committed protected configuration; no stale bootstrap config fallback",
+    "Three consecutive replacement launches are allowed before terminal restart-limit failure; readiness observation races adopt only matching newly published lifetimes",
+    "Shutdown persists desired stopped before its reply, while CLI stop fences both Keeper and reachable daemon",
+    "Existing task reconciliation and FIFO/callback rules are retained; unknown execution is not replayed",
+    "Both pre-open and post-journal daemon ownership checks share the same lifetime validation"
+  ],
+  "validation": {
+    "reports": {
+      "native-keeper-regression0-20261012.xml": {
+        "passed": 99,
+        "skipped": 0
+      },
+      "native-keeper-regression1-20261012.xml": {
+        "passed": 114,
+        "skipped": 0
+      },
+      "native-keeper-final-20261012.xml": {
+        "passed": 72,
+        "skipped": 0
+      },
+      "native-keeper-fifo-20261012.xml": {
+        "passed": 1,
+        "skipped": 0
+      }
+    },
+    "earlier_broad_passed": 213,
+    "final_recovery_passed": 72,
+    "additional_fifo_passed": 1,
+    "rust_unit_passed_before_final_shared_owner_check_refactor": 35,
+    "ignored_parent_invoked_worker_entries": 2,
+    "red_findings": [
+      "keeper-status absent before implementation",
+      "Replacement died after endpoint publication but before readiness observation; matching spawn proof now retains bounded retry counting",
+      "Controlled PID reuse exposed a remaining PID-only guard inside Daemon::new; the common lease guard now handles both checks"
+    ],
+    "semantics_verified": [
+      "Same Keeper revives daemon after source config file deletion",
+      "Reload then crash restores last committed fingerprint",
+      "Missing/corrupt checkpoint does not fall back",
+      "Stop during backoff prevents another launch",
+      "Stop intent survives daemon or Keeper death after receipt",
+      "Keeper death leaves daemon alive and explicit start attaches a new Keeper",
+      "Three-restart limit terminates a crash loop",
+      "Worker owner death automatically resumes persisted Pi Lead session in controlled protocol fixtures",
+      "Queued second Worker task executes once after active task is classified incomplete",
+      "Controlled reused PID preserves an unrelated helper process"
+    ],
+    "fmt": "passed",
+    "clippy_all_targets_deny_warnings": "passed",
+    "release_build": "passed"
+  },
+  "binary_sha256": {
+    "ccb-kernel.exe": "2af045f43ce36973521595005f93ff17ba72cd3cc395caa6ca3e7b70adc5d7be",
+    "ccb-native.exe": "76ba9098d7a17feedb17a2e1b3cd1606391d1e7c524e68a8dcce7ca79ff2f31b"
+  },
+  "source_sha256": {
+    "rust/crates/ccb-kernel/src/keeper.rs": "19de5974280a0374e800ebe66f4a98631aced5d750ac274493a01d2992790da0",
+    "rust/crates/ccb-kernel/src/startup.rs": "9f72d17416087e2b6ad3f7b6eab7822ac87cf7af2b763be7f3050541c01e225c",
+    "rust/crates/ccb-kernel/src/daemon.rs": "0341e6a24174e7e4d4c2aa1e69db8f2e11ca375a83abfe86b427ab091faa79ea",
+    "rust/crates/ccb-kernel/src/cli.rs": "2c4474925e41dc69927e4b8fc14cfba26cd517769082f2d0869e6b50748e8b10",
+    "rust/crates/ccb-kernel/src/lib.rs": "ac6c223cf77e91c7e728d1f9dfe00a7929fd0ebc36b38b89a16b66c186758924",
+    "test/test_native_keeper.py": "4e924dce812e02ae00918ba2bfbd9d8ba08b8335d38910116209bb387b4b8e2e"
+  },
+  "production_install_changed": false,
+  "existing_agents_controlled": false,
+  "limits": [
+    "Windows native startup path only; account default remains Python",
+    "A live but unresponsive daemon is not killed or restarted based on timeout",
+    "Keeper process loss is repaired by explicit native start; no OS boot/login service or second watchdog installed",
+    "Missing committed startup configuration and unverified legacy ownership fail explicitly",
+    "Automatic native background recovery is verified with controlled providers and offline Herdr fixtures; this checkpoint adds no real-model/foreground UI acceptance claim",
+    "Production rollout, broader legacy integration and cross-platform supervision remain open"
+  ]
+}

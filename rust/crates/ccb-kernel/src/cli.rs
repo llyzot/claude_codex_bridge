@@ -112,6 +112,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             json!({"schema_version":1,"service":"ccb-native","runtime":"rust",
             "version":crate::installation::version(),"core_version":env!("CARGO_PKG_VERSION"),
             "codex_tui_host":{"experimental":true,"supported":cfg!(windows),"input":"authenticated_websocket","herdr_open_integrated":true,"stopped_server_recovery":true,"dead_display_reattachment":true},
+            "native_keeper":{"supported":cfg!(windows),"default_native_start":cfg!(windows),"restart_limit":3},
             "public_api_version":2,"herdr_open":{"experimental":true,"supported":cfg!(windows),"terminal_providers":["pi","codex"],"background_startup":true,"quiescent_stopped_recovery":true},"native_prefix_installation":{"schema_version":1,
                 "supported":cfg!(all(windows,target_arch="x86_64")),"commands":["ccb","ask","ccb-native"],
                 "modifies_account_settings":false,"in_place_upgrade":true,"upgrade_requires_stopped_commands":true,
@@ -134,6 +135,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask [--compact] [--silence] [--chain] [--artifact-request|--inline-request] [--artifact-reply] <agent> [from <actor>] [--] <message...>\n  target accepts a configured agent or uniquely bound role ID; agents lists bindings\n  ask also reads redirected UTF-8 stdin; --artifact-io enables request/reply artifacts\n  --task-id <id>, --reply-to <id>, --mode <type>; native --from <actor> remains supported\nccb-native --state-root <dir> ask get|cancel <job-id>\nccb-native --state-root <dir> cancel <job-id> [--silent] | retry <job-id>\nccb-native --state-root <dir> watch <target> [--cursor <n>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> agents|ping|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> job-recovery|job-reconcile <job-id>\nccb-native --state-root <dir> provider-status <agent>\nccb-native --state-root <dir> provider-terminate <agent> [--silent]\nccb-native --state-root <dir> provider-recover <agent> <fault-id>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native workspace-tree <path> [--include-controller-state]\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
         println!("ccb-native [--project <directory>] [--state-root <dir>] reload [--config <json>|--executables <manifest>] [--dry-run] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> reload-status");
         println!("ccb-native --state-root <dir> start --resume-config [--timeout-ms <ms>] (restore committed Windows configuration after owner exit)");
+        println!("ccb-native --state-root <dir> keeper-status (Windows native start supervises daemon lifetime; stop also stops its Keeper)");
         println!("ccb-native install --prefix <new-absolute-directory> [--dry-run]\nccb-native installation verify --prefix <directory>");
         println!("ccb-native installation upgrade|recover|rollback --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]\nccb-native installation status --prefix <directory>");
         println!("ccb-native installation remove --prefix <directory> [--dry-run] [--operation-id <uuid>] [--expected-manifest <sha256>]");
@@ -243,6 +245,19 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         return Ok(());
     }
     crate::installation::check_command_installation()?;
+    if args.first().is_some_and(|s| s == "--keeper-worker") {
+        ensure!(args.len() == 1, "invalid Keeper worker arguments");
+        let mut bytes = Vec::new();
+        std::io::stdin()
+            .lock()
+            .take(2 * 1024 * 1024 + 1)
+            .read_until(b'\n', &mut bytes)?;
+        ensure!(
+            bytes.len() <= 2 * 1024 * 1024 && bytes.last() == Some(&b'\n'),
+            "invalid Keeper bootstrap frame"
+        );
+        return crate::keeper::worker(&serde_json::from_slice(&bytes)?);
+    }
     if args.first().is_some_and(|s| s == "--herdr-open-worker") {
         ensure!(args.len() == 1, "invalid Herdr worker arguments");
         let mut bytes = Vec::new();
@@ -430,6 +445,17 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         .remove(0)
         .into_string()
         .map_err(|_| anyhow::anyhow!("invalid command encoding"))?;
+    if op == "keeper-status" {
+        ensure!(args.is_empty(), "keeper-status takes no arguments");
+        println!("{}", crate::keeper::status(&root)?);
+        return Ok(());
+    }
+    if op == "stop" && args.is_empty() {
+        if let Some(result) = crate::keeper::stop(&root)? {
+            println!("{result}");
+            return Ok(());
+        }
+    }
     if op == "view" || op == "project-view" {
         op = "project_view".into();
     }

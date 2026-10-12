@@ -16,5 +16,11 @@
     "lib/ccbd/keeper.py",
     "lib/ccbd/keeper_runtime/loop.py"
   ],
-  "not_done": true
+  "not_done": true,
+  "implementation_status": "Windows native default startup supervision implemented and tested; see native-keeper-20261012.json",
+  "remaining_acceptance": [
+    "Real model/Herdr foreground and tool behavior across automatic daemon recovery",
+    "Broader legacy/cross-platform coexistence and production/default rollout",
+    "Operational recovery for unavailable observation/storage and optional OS-level supervisor lifetime integration"
+  ]
 }

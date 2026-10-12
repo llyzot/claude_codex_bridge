@@ -60,10 +60,21 @@ pub fn verify_owner(root: &std::path::Path) -> Result<()> {
         Err(e) => return Err(e.into()),
     };
     let lease: Value = serde_json::from_slice(&raw)?;
+    verify_lease_owner(&lease)
+}
+fn verify_lease_owner(lease: &Value) -> Result<()> {
+    if lease.is_null() {
+        return Ok(());
+    }
     if lease["mount_state"] != "unmounted" {
         let pid = lease["ccbd_pid"].as_u64().unwrap_or(0);
+        let stopped = if lease["process"].is_object() {
+            !crate::startup::owner_alive(&json!({"pid":pid,"process":lease["process"]}))?
+        } else {
+            pid > 0 && pid <= u32::MAX as u64 && owner_stopped(pid as u32)
+        };
         ensure!(
-            pid > 0 && pid <= u32::MAX as u64 && owner_stopped(pid as u32),
+            stopped,
             "existing daemon ownership is live or cannot be proven stopped"
         );
     }
@@ -201,13 +212,7 @@ impl Daemon {
         Self::validate_config(&config)?;
         let agents = config["agents"].as_object().unwrap();
         let prior = kernel.store.json("lease.json")?.unwrap_or(Value::Null);
-        if !prior.is_null() && prior["mount_state"] != "unmounted" {
-            let pid = prior["ccbd_pid"].as_u64().unwrap_or(0);
-            ensure!(
-                pid > 0 && pid <= u32::MAX as u64 && owner_stopped(pid as u32),
-                "existing daemon ownership is live or cannot be proven stopped"
-            );
-        }
+        verify_lease_owner(&prior)?;
         let state = format!("daemon-{generation}");
         let names = agents.keys().cloned().collect::<Vec<_>>();
         kernel.dispatch(
@@ -272,6 +277,11 @@ impl Daemon {
     }
     pub fn mount(&mut self, endpoint: &Value) -> Result<()> {
         self.initialize_configuration()?;
+        let process = if cfg!(windows) {
+            crate::owned_process::observe_external_process(std::process::id())?
+        } else {
+            Value::Null
+        };
         let timestamp = now();
         let prior = self.kernel.store.json("lease.json")?.unwrap_or(Value::Null);
         let generation = prior["generation"].as_u64().unwrap_or(0) + 1;
@@ -285,7 +295,7 @@ impl Daemon {
             &mut self.kernel,
             "save",
             &json!({"record":{"schema_version":2,"record_type":"ccbd_lease","api_version":2,"project_id":self.config["project_id"],
-            "ccbd_pid":std::process::id(),"socket_path":address,"socket_inode":null,"boot_id":self.state,"generation":generation,"daemon_instance_id":self.state,
+            "ccbd_pid":std::process::id(),"process":process,"socket_path":address,"socket_inode":null,"boot_id":self.state,"generation":generation,"daemon_instance_id":self.state,
             "started_at":timestamp,"last_heartbeat_at":timestamp,"mount_state":"mounted","control_plane_endpoint":descriptor,
             "config_signature":crate::config::fingerprint(&self.config)?}}),
         )?;
@@ -705,6 +715,20 @@ impl Daemon {
                     self.reload.is_none(),
                     "configuration reload in progress; observe reload-status before shutdown"
                 );
+                let mut lifecycle = self
+                    .kernel
+                    .store
+                    .json("lifecycle.json")?
+                    .context("missing daemon lifecycle")?;
+                lifecycle["desired_state"] = json!("stopped");
+                lifecycle["phase"] = json!("stopping");
+                lifecycle["phase_started_at"] = json!(now());
+                crate::lifecycle::dispatch(
+                    &mut self.kernel,
+                    "lifecycle_save",
+                    &json!({"record":lifecycle}),
+                )?;
+                // The request dispatcher commits this before sending its ACK.
                 self.stopping = true;
                 Ok(json!({"status":"stopping"}))
             }

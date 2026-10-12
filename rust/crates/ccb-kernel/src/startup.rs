@@ -50,7 +50,7 @@ impl Drop for StandardHandles {
     }
 }
 
-fn unlinked(path: &Path) -> Result<()> {
+pub(crate) fn unlinked(path: &Path) -> Result<()> {
     if let Ok(metadata) = fs::symlink_metadata(path) {
         ensure!(
             !metadata.file_type().is_symlink(),
@@ -67,7 +67,7 @@ fn unlinked(path: &Path) -> Result<()> {
     }
     Ok(())
 }
-fn load(path: &Path) -> Result<Option<Value>> {
+pub(crate) fn load(path: &Path) -> Result<Option<Value>> {
     unlinked(path)?;
     match fs::read(path) {
         Ok(bytes) => Ok(Some(serde_json::from_slice(&bytes)?)),
@@ -75,7 +75,7 @@ fn load(path: &Path) -> Result<Option<Value>> {
         Err(e) => Err(e.into()),
     }
 }
-fn save(path: &Path, value: &Value) -> Result<()> {
+pub(crate) fn save(path: &Path, value: &Value) -> Result<()> {
     unlinked(path)?;
     let temporary = path.with_extension(format!("{}.tmp", uuid::Uuid::new_v4().simple()));
     let mut file = OpenOptions::new()
@@ -87,7 +87,7 @@ fn save(path: &Path, value: &Value) -> Result<()> {
     fs::rename(temporary, path)?;
     Ok(())
 }
-fn ping(root: &Path, project: &Value, fingerprint: &str) -> Result<Option<Value>> {
+pub(crate) fn ping(root: &Path, project: &Value, fingerprint: &str) -> Result<Option<Value>> {
     if !root.join("kernel/control-plane.json").is_file() {
         return Ok(None);
     }
@@ -159,7 +159,14 @@ fn wait(root: &Path, intent: &Value, fingerprint: &str, timeout: Duration) -> Re
         std::thread::sleep(Duration::from_millis(25));
     }
 }
-pub fn start(root: &Path, mut config: Value, timeout: Duration) -> Result<Value> {
+pub fn start(root: &Path, config: Value, timeout: Duration) -> Result<Value> {
+    if cfg!(windows) {
+        crate::keeper::start(root, config, timeout)
+    } else {
+        start_daemon(root, config, timeout)
+    }
+}
+pub(crate) fn start_daemon(root: &Path, mut config: Value, timeout: Duration) -> Result<Value> {
     crate::daemon::Daemon::validate_config(&config)?;
     let fingerprint = crate::config::fingerprint(&config)?;
     if let Some(response) = ping(root, &config["project_id"], &fingerprint)? {

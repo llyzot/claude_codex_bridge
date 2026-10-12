@@ -39,6 +39,7 @@ mod herdr_open;
 mod herdr_transport;
 mod herdr_worker;
 mod installation;
+mod keeper;
 mod lifecycle;
 mod live_directory;
 pub mod models;

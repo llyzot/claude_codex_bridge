@@ -601,6 +601,32 @@ fn daemon_configuration(request: &Value, record: &Value) -> Value {
     daemon
 }
 
+fn retain_inherited_paths(runtime: &Path, source: &Value, request: &mut Value) -> Result<()> {
+    let Some(committed) = read(runtime, "configuration.json")? else {
+        return Ok(());
+    };
+    let prior = crate::restart_config::restore(&committed)?;
+    if prior["project_id"] != source["project_id"] || !prior["herdr"].is_object() {
+        return Ok(());
+    }
+    let mut adjusted = request.clone();
+    for (name, spec) in source["agents"].as_object().context("missing agents")? {
+        let explicit = spec["env"]
+            .as_object()
+            .is_some_and(|env| env.keys().any(|key| key.eq_ignore_ascii_case("PATH")));
+        if !explicit && prior["herdr"]["config"]["agents"][name]["env"]["PATH"].is_string() {
+            adjusted["config"]["agents"][name]["env"]["PATH"] =
+                prior["herdr"]["config"]["agents"][name]["env"]["PATH"].clone();
+        }
+    }
+    // Retain an inherited launch environment only when every other request
+    // field matches. Explicit PATH/model/home/policy changes remain fenced.
+    if adjusted == prior["herdr"] {
+        *request = adjusted;
+    }
+    Ok(())
+}
+
 pub(crate) fn open(
     project: &Path,
     mut config: Value,
@@ -702,6 +728,9 @@ pub(crate) fn open(
     }
     let (mut request, mut bridges) =
         prepare_request(project, &config, options, &record["resume_args"])?;
+    if !record.is_null() {
+        retain_inherited_paths(&runtime, &config, &mut request)?;
+    }
     let signature = hash(&json!([
         request,
         options["history_roots"],

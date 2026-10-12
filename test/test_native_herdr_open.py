@@ -223,6 +223,26 @@ def test_changed_request_does_not_replace_running_agents_or_daemon(project):
     refused=p['open']();assert refused.returncode!=0
     assert mutate_count(p['backend'],['agent','start'])==2 and p['ready']()['pid']==before['pid']
 
+def test_reconnect_from_another_powershell_path_preserves_running_environment(project):
+    p=project;assert p['open']().returncode==0;before=wait_for(p['ready'],timeout=20)
+    ledger=json.loads((p['native']/'herdr/herdr-open.json').read_text(encoding='utf-8'))
+    argv=cli('--project',p['root'],'herdr','open','--options',p['file'],'--no-attach','--timeout-ms','10000',
+             env={**os.environ,'PATH':str(p['root']/'another-shell-bin')+os.pathsep+os.environ['PATH']})
+    assert argv.returncode==0,argv.stderr
+    wait_for(lambda:json.loads((p['native']/'herdr/herdr-open.json').read_text(encoding='utf-8'))['phase']=='running',timeout=20)
+    after=json.loads((p['native']/'herdr/herdr-open.json').read_text(encoding='utf-8'))
+    assert after['request_hash']==ledger['request_hash'] and after['daemon_fingerprint']==ledger['daemon_fingerprint']
+    assert p['ready']()['pid']==before['pid'] and mutate_count(p['backend'],['agent','start'])==2
+
+def test_reconnect_does_not_accept_a_changed_explicit_agent_path(project):
+    p=project;p['options']['config']['agents']['worker']['env']={'Path':os.environ['PATH']}
+    p['file'].write_text(json.dumps(p['options']),encoding='utf-8')
+    assert p['open']().returncode==0;before=wait_for(p['ready'],timeout=20)
+    p['options']['config']['agents']['worker']['env']['Path']=str(p['root']/'changed-agent-tools')+os.pathsep+os.environ['PATH']
+    p['file'].write_text(json.dumps(p['options']),encoding='utf-8')
+    refused=p['open']();assert refused.returncode!=0 and 'configuration changed' in refused.stderr
+    assert p['ready']()['pid']==before['pid'] and mutate_count(p['backend'],['agent','start'])==2
+
 def test_opener_crash_after_launch_intent_resumes_without_duplicate_agent_start(project):
     p=project;fault(p['backend'],['agent','start'],'hang-after')
     initial=p['open'](0);assert initial.returncode==0,initial.stderr

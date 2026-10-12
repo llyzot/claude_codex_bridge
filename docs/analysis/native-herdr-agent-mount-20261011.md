@@ -29,6 +29,12 @@ verified Pi/Codex/Claude sessions under a new namespace owner. It waits for old
 foreground lifetimes to end, reuses a running server, and can restart a stopped
 CCB-owned server. Recovery archives the old namespace and session evidence before
 creating the replacement; an interrupted opener observes existing launch intents.
+Before starting the replacement authority, terminal bindings must report the
+saved session ID and native history path. Passing a resume argument alone is not
+enough. Deferred session discovery stays in `binding_sessions` until confirmed;
+a different session is rejected. This check applies during recovery reset, so a
+later supported context-clear operation is not compared to obsolete recovery
+evidence. Hosted Codex also checks the resumed thread through its RPC protocol.
 Missing history, a duplicated live session, an old workspace ID that reappeared,
 or unfinished jobs/mailboxes/callbacks/faults block automatic reopening. A close
 whose outcome remains uncertain is not treated as confirmed retirement. The

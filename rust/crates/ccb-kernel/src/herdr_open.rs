@@ -764,15 +764,36 @@ pub(crate) fn open(
                         {
                             continue;
                         }
-                        if record["bindings"][name].is_null() {
+                        let expected_session = recovery::expected_session(&root, &record, name)?;
+                        if record["bindings"][name].is_null()
+                            || expected_session.is_some()
+                                && record["bindings"][name]["discovery"].is_object()
+                        {
+                            record["bindings"].as_object_mut().unwrap().remove(name);
                             if let Some(bound) =
                                 binding(&request, &bridges, options, name, &root, &mut record)?
                             {
-                                record["bindings"][name] = bound;
+                                if recovery::verify_session(
+                                    expected_session.as_ref(),
+                                    &request["config"]["agents"][name],
+                                    &bound,
+                                    name,
+                                )? {
+                                    record["bindings"][name] = bound;
+                                }
                                 save(&root, &record)?;
                             }
                         } else {
                             let saved = &record["bindings"][name];
+                            ensure!(
+                                recovery::verify_session(
+                                    expected_session.as_ref(),
+                                    &request["config"]["agents"][name],
+                                    saved,
+                                    name
+                                )?,
+                                "recovered native session has not been confirmed"
+                            );
                             let live = crate::herdr_agents::bound(&request, name)?;
                             if request["config"]["agents"][name]["provider"] == "pi" {
                                 let configured: crate::terminal_history::Binding =

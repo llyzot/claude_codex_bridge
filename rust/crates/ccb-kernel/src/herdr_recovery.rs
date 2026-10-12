@@ -9,6 +9,75 @@ use std::{
     path::{Path, PathBuf},
 };
 const STATE: &str = "herdr-recovery.json";
+pub(super) fn expected_session(root: &Path, open: &Value, agent: &str) -> Result<Option<Value>> {
+    let Some(recovery) = read(root, STATE)? else {
+        return Ok(None);
+    };
+    if recovery["phase"] != "reset" {
+        return Ok(None);
+    }
+    ensure!(
+        recovery["operation_id"] == open["last_recovery_id"]
+            && recovery["project_id"] == open["project_id"]
+            && recovery["session"] == open["session"],
+        "recovered native session belongs to another recovery operation"
+    );
+    let saved = recovery["sessions"]
+        .get(agent)
+        .context("recovered native session evidence is missing")?;
+    if saved["fresh"] == true {
+        return Ok(None);
+    }
+    ensure!(
+        saved["session_id"].is_string() && saved["path"].is_string(),
+        "recovered native session identity is incomplete"
+    );
+    Ok(Some(saved.clone()))
+}
+pub(super) fn verify_session(
+    expected: Option<&Value>,
+    spec: &Value,
+    bound: &Value,
+    agent: &str,
+) -> Result<bool> {
+    let Some(expected) = expected else {
+        return Ok(true);
+    };
+    ensure!(
+        expected["provider"] == spec["provider"],
+        "recovered native session provider changed"
+    );
+    if bound["history"].is_null() {
+        ensure!(
+            bound["discovery"]["session_id"].is_null()
+                || bound["discovery"]["session_id"] == expected["session_id"],
+            "recovered native session differs from the saved session"
+        );
+        // A launch argument or an unbound discovery root is not confirmation.
+        return Ok(false);
+    }
+    let history: crate::terminal_history::Binding =
+        serde_json::from_value(bound["history"].clone())?;
+    ensure!(
+        history.session_id == crate::records::string(expected, "session_id")?,
+        "recovered native session differs from the saved session"
+    );
+    let path = if spec["provider"] == "pi" {
+        let (_, producer) = crate::pi_terminal::resolve(
+            &history,
+            crate::records::string(bound, "pi_bridge_owner")?,
+            agent,
+        )?;
+        producer["session_path"].clone()
+    } else {
+        json!(history.path)
+    };
+    ensure!(
+        crate::pi_terminal::same_session_path(&path, &expected["path"]),
+        "recovered native session history path changed"
+    );
+    Ok(true)
+}
 fn put(root: &Path, recovery: &Value, open: &Value) -> Result<()> {
     let mut store = crate::store::Store::open(root)?;
     store.save(STATE, recovery)?;

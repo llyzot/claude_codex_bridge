@@ -3,6 +3,8 @@ import json
 import os
 import subprocess
 import sys
+import time
+import uuid
 from pathlib import Path
 import pytest
 from test_native_herdr_recovery import stopped
@@ -13,7 +15,14 @@ from test_native_herdr_worker import wait_for
 
 pytestmark=pytest.mark.skipif(os.name!='nt',reason='Windows process lifetime recovery')
 
-def read(path):return json.loads(path.read_text(encoding='utf-8'))
+def read(path):
+    # A live Windows atomic replacement can briefly deny a reader. Retry this
+    # observation only; never restart a process or suppress malformed JSON.
+    for attempt in range(11):
+        try:return json.loads(path.read_text(encoding='utf-8'))
+        except (PermissionError,FileNotFoundError):
+            if attempt==10:raise
+            time.sleep(.02)
 
 def retire(p):
     old=read(p['state']/'namespace.json')
@@ -64,6 +73,33 @@ def test_reopen_rejects_same_session_active_elsewhere(stopped):
     result=p['open']();assert result.returncode!=0 and 'already active' in result.stderr
     assert mutate_count(p['backend'],['agent','start'])==1
 
+@pytest.mark.parametrize('stopped',['codex','claude'],indirect=True)
+def test_recovery_rejects_a_provider_that_resumed_the_wrong_native_session(stopped):
+    p=stopped;retire(p);replacement=p['helper']();foreign=str(uuid.uuid4())
+    log=p['log'].parent/(f'{foreign}.jsonl' if p['provider']=='claude' else f'rollout-{foreign}.jsonl')
+    header={'type':'user','uuid':'foreign-user','sessionId':foreign,'cwd':str(p['project']),'message':{'role':'user','content':'foreign'}} if p['provider']=='claude' else {'type':'session_meta','payload':{'id':foreign,'cwd':str(p['project'])}}
+    log.write_text(json.dumps(header)+'\n',encoding='utf-8')
+    change(p['backend'],lambda s:s.update(provider_pids=[replacement.pid],agent_sessions={p['provider']:{'agent':p['provider'],'kind':'id','value':foreign,'source':'fixture'}}))
+    result=p['open']()
+    assert result.returncode!=0 and 'recovered native session' in result.stderr
+    assert cli('--state-root',p['runtime'],'ping').returncode!=0
+    assert read(p['state']/'herdr-recovery.json')['phase']=='reset'
+
+def test_recovery_waits_for_native_session_confirmation_before_starting_daemon(stopped):
+    p=stopped;retire(p);replacement=p['helper']()
+    change(p['backend'],lambda s:s.update(provider_pids=[replacement.pid],agent_sessions={}))
+    assert p['open'](ms=0).returncode==0
+    wait_for(lambda:read(p['state']/'herdr-open.json')['phase']=='binding_sessions')
+    assert cli('--state-root',p['runtime'],'ping').returncode!=0
+    assert read(p['state']/'herdr-recovery.json')['phase']=='reset'
+    def publish(s):
+        for a in s['agents'].values():
+            if a['agent']=='codex':a['agent_session']={'agent':'codex','kind':'id','value':p['session'],'source':'fixture'}
+    change(p['backend'],publish)
+    result=p['open']();assert result.returncode==0,result.stderr
+    wait_for(lambda:read(p['state']/'herdr-open.json')['phase']=='running')
+    assert mutate_count(p['backend'],['agent','start'])==2
+
 def test_reopen_observes_started_agent_after_opener_crash_without_duplicate(stopped):
     p=stopped;retire(p);replacement=p['helper']();change(p['backend'],lambda s:s.update(provider_pids=[replacement.pid]))
     fault(p['backend'],['agent','start'],'hang-after')
@@ -98,8 +134,8 @@ def test_retired_namespace_reopens_after_its_owned_server_also_stops(stopped):
     assert read(p['state']/'herdr-recovery.json')['sessions']['worker']['session_id']==p['session']
     assert mutate_count(p['backend'],['workspace','close'])==1
 
-@pytest.mark.parametrize('native_host',[False,True])
-def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,native_host):
+@pytest.mark.parametrize('native_host,fresh_pi',[(False,False),(True,False),(False,True)],ids=['terminal','hosted','foreign_pi'])
+def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,native_host,fresh_pi):
     from test_native_codex_tui_host import CODEX
     from test_native_pi_terminal import HOST
     p=project
@@ -113,6 +149,7 @@ def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,nat
     assert p['open']().returncode==0
     wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=20)
     original=json.loads(p['pi'].args[2]);history=Path(original['native_session_path'])
+    expected_pi=original['session_id']
     history.write_text(json.dumps({'type':'session','id':original['session_id'],'cwd':str(p['root'])})+'\n',encoding='utf-8')
     history_before=history.read_bytes()
     worker_before=read(p['native']/'providers/codex/worker/session.json') if native_host else None
@@ -120,6 +157,10 @@ def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,nat
     assert result.returncode==0 and json.loads(result.stdout)['status']=='closed',result.stderr
     for proc in [p['pi'],p['codex']]:proc.kill();proc.wait(timeout=5)
     gate=p['root']/'new-epoch-ready';original['start_gate']=str(gate)
+    if fresh_pi:
+        original['session_id']=str(uuid.uuid4());original['native_session_path']=str(p['root']/'wrong-pi-session.jsonl')
+        Path(original['native_session_path']).write_text(json.dumps({'type':'session','id':original['session_id'],'cwd':str(p['root'])})+'\n',encoding='utf-8')
+        change(p['backend'],lambda s:s['agent_sessions']['pi'].update(value=original['native_session_path']))
     pi=subprocess.Popen([NODE,str(HOST),json.dumps(original)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8',creationflags=0x08000000)
     codex=subprocess.Popen([sys.executable,'-I','-c','import time;time.sleep(180)'],creationflags=0x08000000)
     def command(**data):
@@ -130,9 +171,14 @@ def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,nat
         assert p['open'](0).returncode==0
         wait_for(lambda:(p['native']/'herdr/herdr-recovery.json').exists() and read(p['native']/'herdr/herdr-recovery.json')['phase']=='reset',timeout=20)
         gate.touch();assert json.loads(pi.stdout.readline())['ready']
+        if fresh_pi:
+            rejected=p['open']()
+            assert rejected.returncode!=0 and 'recovered native session' in rejected.stderr
+            assert p['ready']() is None
+            return
         wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=20)
         recovery=read(p['native']/'herdr/herdr-recovery.json')
-        assert recovery['sessions']['lead']['session_id']==original['session_id']
+        assert recovery['sessions']['lead']['session_id']==expected_pi
         assert history.read_bytes()==history_before
         assert read(p['native']/'herdr/herdr-agents.json')['agents']['lead']['binding']['process']['pid']==pi.pid
         if native_host:

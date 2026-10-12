@@ -1,0 +1,85 @@
+{
+  "source_base_commit": "c50842ac",
+  "source_commit": "2ea63fac60af4416c10c57c3eb97ea3802511098",
+  "candidate_install": {
+    "result": {
+      "backup": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-75e7c856-7b3f-4a15-b076-601f7f0dba5d.backup",
+      "path_modified": false,
+      "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+      "provider_settings_modified": false,
+      "runtime_state_changed": false,
+      "stage": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-75e7c856-7b3f-4a15-b076-601f7f0dba5d.stage",
+      "state_compatibility": "not_checked",
+      "status": "upgraded",
+      "upgrade": {
+        "finished_at": "2026-10-12T09:17:56.129150300Z",
+        "from": {
+          "binary_sha256": "5224b59ffa725cebbc72b33ebeacaf5e37aaf8c163569ac254d15e6e897821eb",
+          "manifest_sha256": "14246b2e8880ee564cea3c0a876b3f8d4529feb3b117a640c238a6eb65dda028",
+          "version": "8.7.10"
+        },
+        "operation_id": "75e7c856-7b3f-4a15-b076-601f7f0dba5d",
+        "phase": "committed",
+        "prefix_name": "ccb-rust",
+        "record_type": "ccb_native_upgrade",
+        "runtime_state_changed": false,
+        "schema_version": 1,
+        "started_at": "2026-10-12T09:17:55.976075500Z",
+        "to": {
+          "binary_sha256": "f6c5ec25056c59e57cffdbf74bc467476c377580f8c03b10091fb10b16842f18",
+          "manifest_sha256": "a0404b8822b595a46cc69822997f48168f46e46455b4cd02ddcd9e0e966c770c",
+          "version": "8.7.10"
+        }
+      }
+    },
+    "verification": "{\"binary_sha256\":\"f6c5ec25056c59e57cffdbf74bc467476c377580f8c03b10091fb10b16842f18\",\"prefix\":\"\\\\\\\\?\\\\C:\\\\Users\\\\user\\\\Desktop\\\\work\\\\ccb-rust\",\"runtime\":\"rust\",\"status\":\"verified\",\"version\":\"8.7.10\"}\nccb-native 8.7.10 (core 0.1.0)\nccb-native 8.7.10 (core 0.1.0)\nccb-native 8.7.10 (core 0.1.0)\n",
+    "account_default": false
+  },
+  "native_sha256": "f6c5ec25056c59e57cffdbf74bc467476c377580f8c03b10091fb10b16842f18",
+  "change": "Recover stopped deferred-discovery jobs from their original permission, exact execution anchor and unique native history. Persist Claude's independently observed Herdr idle and transcript boundary before the completion transaction, and revalidate that evidence on cold recovery.",
+  "behavior": [
+    "Deferred recovery validates old process lifetime, project/workspace/root, dispatch identity, execution UUID and native header, then scans bounded history candidates without sending input.",
+    "The active execution's unique native history supersedes an older cache. Ambiguous, missing, foreign and out-of-scope histories cannot authorize replacement agents or fabricated fresh sessions.",
+    "Claude assistant text is a candidate. Native observation must also confirm the mounted identity and idle state against the anchored transcript; only the authority commits the resulting receipt.",
+    "Claude recovery checks receipt/job/execution/session/process binding, file identity and recorded boundary digest, then rereads current history. Hook continuation, changed replies, replaced/rewritten history or foreign receipts cannot report old success.",
+    "Ordinary Claude observation validation failures quarantine the affected provider rather than shutting down the entire actor.",
+    "Stopped readers drain bounded observation chunks up to 64 MiB; incomplete trailing records remain uncertain instead of releasing a premature result.",
+    "New retry attempts discard prior native execution, scope, cancellation, termination, dispatch and terminal-observation fields, and acquire a new execution and send permission. Other provider options retain their previous semantics."
+  ],
+  "validation": {
+    "release_pending": false,
+    "release_xml": "docs/analysis/native-herdr-deferred-claude-release-20261012.xml",
+    "red": [
+      "Two deferred completed/interrupted reopen cases failed before implementation; retained native-herdr-deferred-recovery-red-20261012.xml",
+      "Two Claude durable-idle cases failed with missing observation before implementation; retained native-herdr-claude-evidence-red-20261012.xml"
+    ],
+    "debug": [
+      "Deferred completed/interrupted callback and FIFO cases: 2 passed",
+      "First Claude evidence iteration: 10 failed / 3 passed because the new completion cursor omitted the shared schema; corrected after the focused test exposed invalid completion cursor schema",
+      "Corrected Claude terminal dispatch, callback and session-scope selection: 13 passed",
+      "Stopped Claude receipt/no-receipt/hook/foreign-execution/rewrite plus deferred recovery selection: 7 passed",
+      "Stale-cache, duplicate/missing/foreign history and explicit retry boundary selection: 5 passed"
+    ],
+    "rust_units": "47 passed; two subprocess helper entries ignored; their parent process-death tests passed",
+    "format": "passed",
+    "clippy": "all-targets -D warnings passed",
+    "release": "165 passed in 961.01 seconds",
+    "release_junit": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "165",
+      "time": "960.756",
+      "timestamp": "2026-10-12T17:00:53.475995+08:00",
+      "hostname": "HOST"
+    }
+  },
+  "limits": [
+    "Missing or ambiguous native session identity still requires explicit recovery; this does not invent a new session for uncertain old work.",
+    "Old Claude tasks without the new durable idle receipt remain incomplete on stopped-provider recovery. Process death and transcript text alone are not success evidence.",
+    "Uncertain side effects and result delivery are never automatically replayed. Program rollback does not roll back project/runtime state.",
+    "New acceptance uses controlled provider/Herdr fixtures, the actual native Pi adapter, installed Codex no-model host cases and real Windows process lifetimes. New paid model-backed in-flight and actual Claude foreground-hook acceptance remains the next step.",
+    "Account default, existing production Workspace and provider authentication settings are unchanged by this increment."
+  ]
+}

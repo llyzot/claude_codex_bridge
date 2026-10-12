@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="58.049" timestamp="2026-10-12T16:35:46.481371+08:00" hostname="HOST"><testcase classname="test.test_native_herdr_work_recovery" name="test_reopen_delivers_child_once_and_preserves_unsent_fifo[deferred_completed]" time="29.435"><failure message="Failed: expected fixture state not observed">test\test_native_herdr_work_recovery.py:74: in test_reopen_delivers_child_once_and_preserves_unsent_fifo
+    wait_for(lambda:(p['native']/'herdr/herdr-recovery.json').exists() and
+test\test_native_herdr_worker.py:24: in wait_for
+    pytest.fail('expected fixture state not observed')
+E   Failed: expected fixture state not observed</failure></testcase><testcase classname="test.test_native_herdr_work_recovery" name="test_reopen_delivers_child_once_and_preserves_unsent_fifo[deferred_interrupted]" time="28.197"><failure message="Failed: expected fixture state not observed">test\test_native_herdr_work_recovery.py:74: in test_reopen_delivers_child_once_and_preserves_unsent_fifo
+    wait_for(lambda:(p['native']/'herdr/herdr-recovery.json').exists() and
+test\test_native_herdr_worker.py:24: in wait_for
+    pytest.fail('expected fixture state not observed')
+E   Failed: expected fixture state not observed</failure></testcase></testsuite></testsuites>

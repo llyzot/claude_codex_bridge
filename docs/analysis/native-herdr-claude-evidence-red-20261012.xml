@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="16.554" timestamp="2026-10-12T16:40:26.950819+08:00" hostname="HOST"><testcase classname="test.test_native_herdr_claude" name="test_claude_idle_confirmation_is_durable_and_bound_to_exact_transcript[False]" time="8.227"><failure message="KeyError: 'herdr_terminal_observation'">test\test_native_herdr_claude.py:93: in test_claude_idle_confirmation_is_durable_and_bound_to_exact_transcript
+    observed=current['provider_options']['herdr_terminal_observation']
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'herdr_terminal_observation'</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_claude_idle_confirmation_is_durable_and_bound_to_exact_transcript[True]" time="7.983"><failure message="KeyError: 'herdr_terminal_observation'">test\test_native_herdr_claude.py:93: in test_claude_idle_confirmation_is_durable_and_bound_to_exact_transcript
+    observed=current['provider_options']['herdr_terminal_observation']
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'herdr_terminal_observation'</failure></testcase></testsuite></testsuites>

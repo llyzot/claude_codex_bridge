@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="10" skipped="0" tests="13" time="132.812" timestamp="2026-10-12T16:42:53.238728+08:00" hostname="HOST"><testcase classname="test.test_native_herdr_claude" name="test_bound_claude_result_waits_for_idle_then_wakes_same_pi_lead" time="11.375"><failure message="ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。">test\test_native_herdr_claude.py:68: in test_bound_claude_result_waits_for_idle_then_wakes_same_pi_lead
+    r['idle']();result=await_watch(s,task['job_id'],lambda v:v['visible_reply_source']=='message_bureau_reply',timeout=15)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:68: in await_watch
+    row=server.rpc('watch',{'target':job})
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:32: in rpc
+    with socket.create_connection((self.endpoint['host'],self.endpoint['port']),timeout=3) as stream:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:874: in create_connection
+    raise exceptions[0]
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:859: in create_connection
+    sock.connect(sa)
+E   ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_first_claude_prompt_creates_transcript_and_cache_serves_second" time="9.951"><failure message="ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。">test\test_native_herdr_claude.py:76: in test_first_claude_prompt_creates_transcript_and_cache_serves_second
+    assert await_watch(s,first['job_id'],lambda v:v['terminal'],timeout=15)['reply']=='Claude terminal result'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:68: in await_watch
+    row=server.rpc('watch',{'target':job})
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:32: in rpc
+    with socket.create_connection((self.endpoint['host'],self.endpoint['port']),timeout=3) as stream:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:874: in create_connection
+    raise exceptions[0]
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:859: in create_connection
+    sock.connect(sa)
+E   ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_claude_idle_confirmation_is_durable_and_bound_to_exact_transcript[False]" time="9.512"><failure message="ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。">test\test_native_herdr_claude.py:91: in test_claude_idle_confirmation_is_durable_and_bound_to_exact_transcript
+    r['idle']();await_watch(s,task['job_id'],lambda v:v['terminal'])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:68: in await_watch
+    row=server.rpc('watch',{'target':job})
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:32: in rpc
+    with socket.create_connection((self.endpoint['host'],self.endpoint['port']),timeout=3) as stream:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:874: in create_connection
+    raise exceptions[0]
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:859: in create_connection
+    sock.connect(sa)
+E   ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_claude_idle_confirmation_is_durable_and_bound_to_exact_transcript[True]" time="10.234"><failure message="ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。">test\test_native_herdr_claude.py:91: in test_claude_idle_confirmation_is_durable_and_bound_to_exact_transcript
+    r['idle']();await_watch(s,task['job_id'],lambda v:v['terminal'])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:68: in await_watch
+    row=server.rpc('watch',{'target':job})
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:32: in rpc
+    with socket.create_connection((self.endpoint['host'],self.endpoint['port']),timeout=3) as stream:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:874: in create_connection
+    raise exceptions[0]
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:859: in create_connection
+    sock.connect(sa)
+E   ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_claude_transcript_recovery_never_replays_permitted_prompt[False]" time="10.215"><failure message="ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。">test\test_native_herdr_claude.py:107: in test_claude_transcript_recovery_never_replays_permitted_prompt
+    assert await_watch(restored,task['job_id'],lambda v:v['terminal'],timeout=15)['reply']=='Claude terminal result'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:68: in await_watch
+    row=server.rpc('watch',{'target':job})
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:32: in rpc
+    with socket.create_connection((self.endpoint['host'],self.endpoint['port']),timeout=3) as stream:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:874: in create_connection
+    raise exceptions[0]
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:859: in create_connection
+    sock.connect(sa)
+E   ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_claude_transcript_recovery_never_replays_permitted_prompt[True]" time="10.093"><failure message="ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。">test\test_native_herdr_claude.py:107: in test_claude_transcript_recovery_never_replays_permitted_prompt
+    assert await_watch(restored,task['job_id'],lambda v:v['terminal'],timeout=15)['reply']=='Claude terminal result'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:68: in await_watch
+    row=server.rpc('watch',{'target':job})
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:32: in rpc
+    with socket.create_connection((self.endpoint['host'],self.endpoint['port']),timeout=3) as stream:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:874: in create_connection
+    raise exceptions[0]
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:859: in create_connection
+    sock.connect(sa)
+E   ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_claude_native_session_change_before_idle_is_not_completion" time="6.933" /><testcase classname="test.test_native_herdr_claude" name="test_original_claude_lead_is_resumed_by_worker_result_in_same_session" time="18.690"><failure message="Failed: expected fixture state not observed">test\test_native_herdr_claude.py:123: in test_original_claude_lead_is_resumed_by_worker_result_in_same_session
+    continuation=wait_for(lambda:r['prompts']() if len(r['prompts']())==2 else None)[-1]
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_herdr_worker.py:24: in wait_for
+    pytest.fail('expected fixture state not observed')
+E   Failed: expected fixture state not observed</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_installed_claude_transcript_structure_preserves_actual_parent_chain" time="11.525"><failure message="ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。">test\test_native_herdr_claude.py:139: in test_installed_claude_transcript_structure_preserves_actual_parent_chain
+    assert await_watch(s,task['job_id'],lambda v:v['terminal'],timeout=15)['reply']=='final text'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:68: in await_watch
+    row=server.rpc('watch',{'target':job})
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:32: in rpc
+    with socket.create_connection((self.endpoint['host'],self.endpoint['port']),timeout=3) as stream:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:874: in create_connection
+    raise exceptions[0]
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:859: in create_connection
+    sock.connect(sa)
+E   ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_native_claude_pasted_prompt_completes_bound_and_first_sessions[False]" time="13.038"><failure message="ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。">test\test_native_herdr_claude.py:147: in test_native_claude_pasted_prompt_completes_bound_and_first_sessions
+    assert await_watch(s,task['job_id'],lambda v:v['terminal'],timeout=15)['reply']=='Claude terminal result'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:68: in await_watch
+    row=server.rpc('watch',{'target':job})
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:32: in rpc
+    with socket.create_connection((self.endpoint['host'],self.endpoint['port']),timeout=3) as stream:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:874: in create_connection
+    raise exceptions[0]
+..\..\..\..\..\scoop\apps\python\current\Lib\socket.py:859: in create_connection
+    sock.connect(sa)
+E   ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_native_claude_pasted_prompt_completes_bound_and_first_sessions[True]" time="10.852"><failure message="json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)">test\test_native_herdr_claude.py:147: in test_native_claude_pasted_prompt_completes_bound_and_first_sessions
+    assert await_watch(s,task['job_id'],lambda v:v['terminal'],timeout=15)['reply']=='Claude terminal result'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:68: in await_watch
+    row=server.rpc('watch',{'target':job})
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_daemon.py:37: in rpc
+    with stream.makefile('rb') as reader:result=json.loads(reader.readline())
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\json\__init__.py:352: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\json\decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\json\decoder.py:363: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_public_open_mounts_original_claude_and_reconnects_without_relaunch[False]" time="4.983" /><testcase classname="test.test_native_herdr_claude" name="test_public_open_mounts_original_claude_and_reconnects_without_relaunch[True]" time="4.855" /></testsuite></testsuites>

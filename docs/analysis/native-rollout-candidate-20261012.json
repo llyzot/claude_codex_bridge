@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "base_commit": "71650cd7",
+  "recorded_at": "2026-10-12T02:18:30.485178+00:00",
+  "candidate": {
+    "prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
+    "verified_canonical_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
+    "binary_sha256": "dc80ed286194ddbd044bf40586a7fc3b021c823be786941de67f64ad15766b5e",
+    "python_required": false,
+    "account_path_changed": false,
+    "provider_settings_changed": false,
+    "default_cutover_performed": false
+  },
+  "installation_redirection": {
+    "initial_requested_prefix": "C:/Users/user/AppData/Local/ccb-rust",
+    "observed_actual_prefix": "C:/Users/user/AppData/Local/Packages/OpenAI.Codex_2p2nqsd0c76g0/LocalCache/Local/ccb-rust",
+    "redirected_copy_removed": true,
+    "removal_operation_id": "8bd091c2-2ed8-4762-b11c-11bab3efe5ae",
+    "final_candidate_outside_appdata_virtualization": true
+  },
+  "legacy_project": {
+    "root": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2",
+    "project_id": "f48a0cc655bf36adfe036f78227caf2cdd5ba92a44d0cee1fcb5a547cc934ebd",
+    "config_sha256": "8256cc74177ee2bb8308db8b13d8118c73484195cd1a38c87208f106024cedcd",
+    "daemon_pid": 52968,
+    "daemon_responded_to_authenticated_ping": true,
+    "active_agent_count": 0,
+    "total_queue_depth": 0,
+    "total_pending_reply_count": 0,
+    "agent_names": [
+      "pi_lead",
+      "codex_worker"
+    ],
+    "native_session_ids_missing_in_runtime_records": true,
+    "pi_event_refers_to_missing_session_file": true,
+    "pi_session_file_count": 0,
+    "codex_session_file_count": 0,
+    "codex_threads_in_state_db": 0,
+    "limits": "Empty CCB queues and persisted history do not prove the present foreground state; no Herdr pane inspection or controls were performed."
+  },
+  "installed_candidate_real_chain": {
+    "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-keeper-live-7c6hd6vz",
+    "lead_provider": "pi",
+    "first_reply": "REVIEW_ONE_a24eb735",
+    "second_reply": "REVIEW_TWO_a24eb735 PREVIOUS=REVIEW_ONE_a24eb735",
+    "worker_recall": "WORKER_MEMORY_a24eb735",
+    "first_session_ids": {
+      "lead": "01a12ddd-2958-73a7-a604-ca938d9d6488",
+      "worker": "01a12ddd-2a24-7b91-9a75-6de98c493890"
+    },
+    "restored_session_ids": {
+      "lead": "01a12ddd-2958-73a7-a604-ca938d9d6488",
+      "worker": "01a12ddd-2a24-7b91-9a75-6de98c493890"
+    },
+    "initial_daemon": 52596,
+    "restored_daemon": 64576,
+    "keeper_instance_id": "82491782-fc95-4c1d-8f27-da6a1a7d5764"
+  },
+  "installed_candidate_io_probe": {
+    "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-installed-io-jayyjlwa",
+    "requested_sandbox": "workspace-write",
+    "requested_approval_policy": "on-request",
+    "file_verified": false,
+    "provider_reply": "Tool failed: `exec_command` could not create the process: `helper_unknown_error: setup refresh had errors`. Stopped without reading the file.",
+    "provider_turn_status": "completed",
+    "keeper_stopped": true,
+    "account_global_sandbox_observed": "danger-full-access",
+    "account_global_approval_policy_observed": "never",
+    "account_policy_changed": false,
+    "note": "The workspace-write probe is stricter than the observed account defaults; its failure must not be labeled a pass or generalized to an untested account-default execution path."
+  },
+  "io_failure": {
+    "log": "C:/Users/user/.codex/.sandbox/sandbox.2026-10-12.log",
+    "timestamp": "2026-10-12T02:12:45Z",
+    "classification": "Windows sharing violation (os error 32) during runtime read/execute ACL validation",
+    "runtime": "C:/Users/user/AppData/Local/OpenAI/Codex/runtimes/cua_node/cfb32733c877621e/bin/node_repl.exe",
+    "shared_runtime_processes_observed": 13,
+    "shared_processes_stopped": false,
+    "sandbox_weakened": false,
+    "pending_decision": "User authorization is required before interrupting shared desktop JS/browser tool runtimes; prior workspace/agent shutdown permission does not clearly cover these unrelated tool sessions."
+  },
+  "cutover_plan": {
+    "candidate_ready": true,
+    "default_switch_ready": false,
+    "steps": [
+      "Recheck old queue, owner identity and live provider state immediately before any production mutation.",
+      "Resolve or explicitly classify the shared-runtime tool-execution acceptance blocker without relaxing sandbox settings.",
+      "Stop only the identified old project authority/providers using the authorized control path.",
+      "Retain original controller/agent metadata, session references and provider resource directories in a recoverable migration checkpoint; preserve project identity, config and memory.",
+      "Start native ownership, verify actual task/result/tool behavior, then switch the account command entrypoint.",
+      "Retain the old installation and migration checkpoint until rollback compatibility has been verified."
+    ],
+    "rollback": "Restore the retained metadata and prior command entrypoint only after native ownership is stopped; program-file rollback alone does not prove state rollback."
+  },
+  "limits": [
+    "No production shutdown, state move or default PATH change occurred.",
+    "Real Herdr UI acceptance remains outstanding; this chat is not inside a Herdr-managed pane.",
+    "No real unrestricted-provider test was launched to bypass the sandbox failure."
+  ]
+}

@@ -11,6 +11,7 @@ def evidence(root):
     (root / 'project').mkdir()
     marker = 'CCB_RUST_IO_123456abcdef'
     report = dict(trial_root=str(root), marker=marker, sandbox='workspace-write', approval_policy='on-request',
+                  thread_id='fixture-thread', thread_policy_observation={'scope':'thread_binding_modes','thread_id':'fixture-thread','sandbox_type':'workspaceWrite','approval_policy':'on-request'},
                   watch={'status': 'completed', 'terminal': True, 'reply': marker},
                   keeper_status={'alive': False, 'keeper': {'phase': 'stopped'}})
     path = root / 'result.json'
@@ -43,5 +44,17 @@ def test_relaxed_policy_cannot_pass_the_restricted_gate(tmp_path):
     path, report = evidence(tmp_path)
     (tmp_path / 'project/probe.txt').write_text(report['marker'] + '\n', encoding='utf-8')
     report['sandbox'] = 'danger-full-access'
+    path.write_text(json.dumps(report), encoding='utf-8')
+    assert not verdict(path)['passed']
+
+
+def test_provider_response_must_match_requested_restrictions(tmp_path):
+    path, report = evidence(tmp_path)
+    (tmp_path / 'project/probe.txt').write_text(report['marker'] + '\n', encoding='utf-8')
+    report['thread_policy_observation']['sandbox_type'] = 'dangerFullAccess'
+    path.write_text(json.dumps(report), encoding='utf-8')
+    assert not verdict(path)['passed']
+    report['thread_policy_observation']['sandbox_type'] = 'workspaceWrite'
+    report['thread_policy_observation']['thread_id'] = 'another-thread'
     path.write_text(json.dumps(report), encoding='utf-8')
     assert not verdict(path)['passed']

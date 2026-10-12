@@ -4,6 +4,22 @@ use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
 use std::path::Path;
 
+/// Provider-reported modes at thread binding, not a claim about later turns or
+/// external TUI changes. Never persist arbitrary configuration/response fields.
+pub(crate) fn codex_observation(result: &Value, method: &str) -> Value {
+    fn known(value: &Value, choices: &[&str]) -> Value {
+        value
+            .as_str()
+            .filter(|v| choices.contains(v))
+            .map_or(Value::Null, |v| json!(v))
+    }
+    json!({"scope":"thread_binding_modes","source":method,"observed_at":crate::daemon::now(),
+        "thread_id":result["thread"]["id"],
+        "approval_policy":known(&result["approvalPolicy"], &["untrusted","on-request","never"]),
+        "sandbox_type":known(&result["sandbox"]["type"], &["readOnly","workspaceWrite","dangerFullAccess","externalSandbox"]),
+        "approval_reviewer":known(&result["approvalsReviewer"], &["user","auto_review","guardian_subagent"])})
+}
+
 pub(crate) fn automatic(spec: &Value) -> Result<bool> {
     let mode = if spec["permission"].is_null() {
         "manual"

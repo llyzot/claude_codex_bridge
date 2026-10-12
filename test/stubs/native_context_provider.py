@@ -136,7 +136,10 @@ for line in sys.stdin:
         elif method in {'thread/start', 'thread/resume'}:
             thread_id = command['params'].get('threadId') or sid()
             history.setdefault(thread_id, [])
-            response(command, {'thread':thread()})
+            result = {'thread':thread()}
+            if os.environ.get('CCB_FIXTURE_POLICY'):
+                result.update(json.loads(Path(os.environ['CCB_FIXTURE_POLICY']).read_text(encoding='utf-8')))
+            response(command, result)
         elif method == 'thread/read': response(command, {'thread':thread()})
         elif method == 'thread/compact/start':
             threading.Thread(target=codex_compact, args=(command,), daemon=True).start()

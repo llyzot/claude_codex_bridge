@@ -240,7 +240,8 @@
     "Shared Pi/Codex/Claude launch shortcut normalization and conflict validation; Claude protocol effort forwarding and Codex turn-option preservation verified",
     "Explicit native manual/auto task-permission mapping, conflict checks, transient launch derivation and required-role fail_mount guards implemented; no production or real-agent permission changes",
     "Existing version-2 single-window config expands into native agents and exact Herdr topology; actual sample-project-2 config compiles and dry-runs unchanged",
-    "Native followup-compact API/CLI provides dry-run and journaled retirement of terminal payload/history while preserving active records, admission order and permanent idempotency receipts; restart and uncertain-send deduplication validated"
+    "Native followup-compact API/CLI provides dry-run and journaled retirement of terminal payload/history while preserving active records, admission order and permanent idempotency receipts; restart and uncertain-send deduplication validated",
+    "Native Codex thread binding reports provider-observed sandbox/approval/reviewer modes through session metadata and provider-status; resume/clear refresh and compact retention verified; restricted IO acceptance now requires actual matching provider modes before submitting a model task"
   ],
   "remaining": [
     "Broaden native Keeper real-model/Herdr foreground acceptance, legacy/cross-platform coexistence and unavailable-observation/storage recovery; evaluate optional OS-level restart of the Keeper itself and production/default rollout",
@@ -643,12 +644,15 @@
     "native_followup_compaction_evidence": "docs/analysis/native-followup-compaction-20261012.json",
     "native_followup_compaction_validation": "26 followup/trace integration cases passed on final release in 66.85s; full Rust unit run 45 passed before final store recovery case, final four followup/storage units passed. Clippy, formatting, release/bin hash equality passed. Receipt replay after compaction/restart does not resend, including uncertain sends. Installed candidate/default unchanged.",
     "native_runtime_host_comparison_evidence": "docs/analysis/native-runtime-host-comparison-20261012.json",
-    "native_runtime_host_comparison_validation": "Same restricted IO probe failed in both desktop process and actual Windows Terminal + Scoop pwsh; owned Keepers stopped. New reusable acceptance gate rejects completed turns with missing files and returns nonzero against retained real failure. Three regression tests pass. No ACL/account policy/default changes; exact helper-context sharing cause remains unconfirmed."
+    "native_runtime_host_comparison_validation": "Same restricted IO probe failed in both desktop process and actual Windows Terminal + Scoop pwsh; owned Keepers stopped. New reusable acceptance gate rejects completed turns with missing files and returns nonzero against retained real failure. Three regression tests pass. No ACL/account policy/default changes; exact helper-context sharing cause remains unconfirmed.",
+    "native_codex_policy_observation_evidence": "docs/analysis/native-codex-policy-observation-20261012.json",
+    "native_codex_policy_observation_validation": "57 permission/context/observation/IO cases passed before final status projection; final 8 passed. Actual installed Codex returned workspaceWrite/on-request during no-model native initialization; owned Keeper stopped. Missing/unknown values remain null. Clippy, format, release/bin equality passed. No account permission change or unrestricted task execution."
   },
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2",
     "candidate_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
     "next_action": "Restricted IO failure reproduced in actual Windows Terminal as well as desktop tool process. Preserve policy; obtain new helper-context evidence or an upstream repair before another equivalent model probe. Continue remaining native lifecycle work; multiwindow requires coordinated namespace/mount/recovery support, not only config parsing.",
-    "latest_evidence": "docs/analysis/native-runtime-host-comparison-20261012.json"
+    "latest_evidence": "docs/analysis/native-runtime-host-comparison-20261012.json",
+    "permission_decision_pending": "Separately test the intended account-default manual configuration, currently danger-full-access/never, without changing user settings; do not label this restricted sandbox acceptance. User selection requested before execution."
   }
 }

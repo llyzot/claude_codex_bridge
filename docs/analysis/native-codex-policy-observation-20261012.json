@@ -1,0 +1,71 @@
+{
+  "recorded_at": "2026-10-12T02:39:27.943177+00:00",
+  "base_commit": "fe750fba",
+  "feature": "Observe actual Codex thread binding permission modes",
+  "public_command": "ccb-native --state-root <directory> provider-status <agent>",
+  "field": "thread_policy_observation",
+  "semantics": {
+    "source": "Only exact correlated thread/start or thread/resume response, including a new thread created by clear",
+    "scope": "Thread binding modes at observed_at; does not prove later per-turn overrides, external TUI changes or whole policy enforcement",
+    "unknown": "Missing/unrecognized approval, sandbox or reviewer values are null; never inferred from requested options",
+    "secrets": "Only recognized mode enums, validated thread ID, timestamp and method are retained; arbitrary provider response/configuration is not copied",
+    "context": "Resume refreshes observation; clear records the new thread response; compact preserves its existing binding observation"
+  },
+  "validation": {
+    "broad": "57 permission, context, observation and IO gate cases passed in 68.89s before final provider-status projection",
+    "final": "8 observation and IO gate cases passed in 9.24s after final provider-status projection",
+    "clippy": "all-targets -D warnings passed",
+    "format": "cargo fmt passed",
+    "release_build": "passed"
+  },
+  "real_cli_initialization": {
+    "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-policy-observation-ntc5zk7j",
+    "model_task_submitted": false,
+    "account_settings_changed": false,
+    "credentials_copied": false,
+    "binary_sha256": "15b210cb13815502d7139808260bbd5ddeb4df16dfa1f62c845dea83722a35f9",
+    "start": {
+      "keeper": {
+        "created": "134362462397801282",
+        "pid": 58032,
+        "windows_session": 1
+      },
+      "keeper_instance_id": "a8e0a1a2-ff84-41fb-a9fc-253f22db676c",
+      "pid": 47340,
+      "project_id": "405a066c6bc34f70a43694bf43cd059c",
+      "startup_id": "d10c6ca3-adcf-4424-adc6-93f2ad55f7b4",
+      "state_root": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-policy-observation-ntc5zk7j\\.ccb\\ccbd",
+      "status": "running"
+    },
+    "observation": {
+      "approval_policy": "on-request",
+      "approval_reviewer": "user",
+      "observed_at": "2026-10-12T02:37:22.431156400Z",
+      "sandbox_type": "workspaceWrite",
+      "scope": "thread_binding_modes",
+      "source": "thread/start",
+      "thread_id": "01a12df8-c3df-76f3-94d6-9ce7dc1e9ee1"
+    },
+    "passed": true,
+    "stop": {
+      "api_version": 2,
+      "keeper_instance_id": "a8e0a1a2-ff84-41fb-a9fc-253f22db676c",
+      "ok": true,
+      "status": "stopping"
+    },
+    "keeper_stopped": true
+  },
+  "real_cli_limit": "Executed before the final provider-status response addition; native binding observation logic was unchanged. No model task submitted.",
+  "installed_codex_schema": {
+    "directory": "C:/Users/user/AppData/Local/Temp/ccb-codex-policy-schema-46c24bb4fc1b44d4aeb250853d7f521e",
+    "response": "v2/ThreadStartResponse.json",
+    "sha256": "7247cd531d3f78174444f8262fd3090d5acf8ab74084547b4e0a831d74e77c9a"
+  },
+  "hashes": {
+    "ccb-native.exe": "307b5b68168008b984684a05fab9cffb1d37b81d5ef9b32537602ebe93d79ffc",
+    "ccb-kernel.exe": "f6a732b600e6c41b2f95c68350327e2c69497f60764d46d8bc4aed21e260e939"
+  },
+  "account_default_file_test": "Not performed; user decision on separately testing existing danger-full-access/never defaults is pending. Restricted sandbox failure remains unresolved.",
+  "production_default_changed": false,
+  "installed_candidate_updated": false
+}

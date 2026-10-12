@@ -38,7 +38,11 @@ for line in sys.stdin.buffer:
     if method=='initialize':response(command,{'userAgent':'fixture'})
     elif method in {'thread/start','thread/resume'}:
         if method=='thread/resume':thread_id=command['params']['threadId']
-        response(command,{'thread':thread()})
+        result={'thread':thread()}
+        if mode=='policy-observation':
+            policy_file=Path(os.environ['CCB_FIXTURE_POLICY'])
+            result.update(json.loads(policy_file.read_text(encoding='utf-8')))
+        response(command,result)
         if mode=='external-active':
             emit({'method':'thread/status/changed','params':{'threadId':thread_id,'status':{'type':'active','activeFlags':[]}}})
             def external_idle():

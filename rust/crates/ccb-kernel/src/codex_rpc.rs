@@ -789,6 +789,14 @@ impl Session {
                 "Codex resumed wrong thread"
             );
             self.state = json!({"thread_id":id,"path":thread["path"],"status":thread["status"]});
+            self.state["thread_policy_observation"] = crate::permission_policy::codex_observation(
+                &record["result"],
+                if self.expected.is_empty() {
+                    "thread/start"
+                } else {
+                    "thread/resume"
+                },
+            );
             if let Some(path) = &self.tui_host {
                 self.state["tui_host"] =
                     json!({"path":path,"input_transport":"authenticated_websocket"});

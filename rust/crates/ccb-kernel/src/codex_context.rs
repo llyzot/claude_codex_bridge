@@ -10,6 +10,7 @@ pub(crate) enum Step {
 pub(crate) struct Control {
     action: String,
     before: Value,
+    policy_observation: Value,
     thread: String,
     baseline: String,
     request: String,
@@ -50,6 +51,7 @@ impl Control {
         Ok(Self {
             action: action.into(),
             before: state.clone(),
+            policy_observation: state["thread_policy_observation"].clone(),
             thread: state["thread_id"]
                 .as_str()
                 .context("missing Codex context thread")?
@@ -88,7 +90,12 @@ impl Control {
         Step::Finished(state, decision)
     }
     fn observed(&self, thread: &Value) -> Value {
-        json!({"thread_id":thread["id"],"path":thread["path"],"status":thread["status"]})
+        let mut state =
+            json!({"thread_id":thread["id"],"path":thread["path"],"status":thread["status"]});
+        if self.policy_observation["thread_id"] == thread["id"] {
+            state["thread_policy_observation"] = self.policy_observation.clone();
+        }
+        state
     }
     pub fn ingest(&mut self, record: &Value, cancelled: bool) -> Result<Option<Step>> {
         if record["id"] == self.publish && self.phase == "publish" {
@@ -170,6 +177,8 @@ impl Control {
                     "Codex did not create a fresh idle thread"
                 );
                 self.thread = id.into();
+                self.policy_observation =
+                    crate::permission_policy::codex_observation(&record["result"], "thread/start");
                 if let Some(name) = &self.host_name {
                     self.phase = "publish";
                     return Ok(Some(Step::Send(

@@ -27,10 +27,15 @@ def verdict(path):
     keeper = report.get('keeper_status') or {}
     stopped = keeper.get('alive') is False and keeper.get('keeper', {}).get('phase') == 'stopped'
     terminal = report.get('watch', {})
+    observed = report.get('thread_policy_observation') or {}
     passed = (
         isinstance(marker, str) and bool(re.fullmatch(r'CCB_RUST_IO_[a-f0-9]{12}', marker))
         and report.get('sandbox') == 'workspace-write'
         and report.get('approval_policy') == 'on-request'
+        and observed.get('sandbox_type') == 'workspaceWrite'
+        and observed.get('approval_policy') == 'on-request'
+        and observed.get('scope') == 'thread_binding_modes'
+        and observed.get('thread_id') == report.get('thread_id') and bool(report.get('thread_id'))
         and terminal.get('terminal') is True and terminal.get('status') == 'completed'
         and terminal.get('reply', '').strip() == marker
         and file.is_file() and file.read_text(encoding='utf-8-sig') == marker + '\n'
@@ -76,6 +81,21 @@ def run():
     try:
         report['start'] = cli('--state-root', state, 'start', '--config', launch)
         save()
+        # Require provider evidence before any model request. A configuration
+        # declaration alone does not prove that the provider applied it.
+        metadata = state / 'providers/codex/worker/session.json'
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            if metadata.is_file():
+                bound = json.loads(metadata.read_text(encoding='utf-8')).get('state', {})
+                if bound.get('thread_id'):
+                    report['thread_id'] = bound['thread_id']
+                    report['thread_policy_observation'] = bound.get('thread_policy_observation')
+                    break
+            time.sleep(.1)
+        observed = report.get('thread_policy_observation') or {}
+        if observed.get('sandbox_type') != 'workspaceWrite' or observed.get('approval_policy') != 'on-request':
+            raise RuntimeError('Provider did not confirm requested restricted thread policy; no model task submitted')
         prompt = (f'In this disposable test workspace, use your normal file or shell tools to create probe.txt containing exactly {marker} and a newline, '
                   'then read it back using a tool. Do not access files outside this workspace. Do not request escalated execution or change any security settings. '
                   'If a tool fails, stop and report that error. Reply with the file contents only after both operations succeed.')

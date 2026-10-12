@@ -498,8 +498,13 @@ impl Daemon {
                 } else {
                     "unknown"
                 };
+                let thread_policy = self
+                    .codex
+                    .get(agent)
+                    .map(|session| session.state["thread_policy_observation"].clone())
+                    .unwrap_or(Value::Null);
                 Ok(
-                    json!({"agent_name":agent,"fault":fault,"owned":owned,"scope":scope,"active":active,"process_state":state,"recovery_observation":recovery_observation}),
+                    json!({"agent_name":agent,"fault":fault,"owned":owned,"scope":scope,"active":active,"process_state":state,"recovery_observation":recovery_observation,"thread_policy_observation":thread_policy}),
                 )
             }
             "provider-recover" => self.recover_provider(p),

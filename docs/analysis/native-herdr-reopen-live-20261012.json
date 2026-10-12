@@ -1,0 +1,285 @@
+{
+  "source_commit": "bb5a0f6ae2664240fcbc17ba95fea3091929d899",
+  "installed_binary_sha256": "8b8c75e52f122d9b332e3613b645f32111ef2545f5ac4ca7c0d8b12003650e34",
+  "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_\\retired-reopen-swp6o3nj",
+  "authorized_session": "ccb-rust-ui-gjjd92m_",
+  "passed": true,
+  "first_identity": {
+    "pi_session": "01a12ea8-888f-7738-a802-11e117d8b14e",
+    "pi_process": {
+      "created": "134362577582597504",
+      "pid": 70572,
+      "windows_session": 1
+    },
+    "pi_history": "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-rust-herdr-acceptance-gjjd92m_-retired-reopen-swp6o3nj--\\2026-10-12T05-49-19-376Z_01a12ea8-888f-7738-a802-11e117d8b14e.jsonl",
+    "codex_session": "01a12ea8-cc58-74a3-b4d9-2fa6a2db487f",
+    "codex_process": 56976,
+    "codex_history": "C:\\Users\\user\\.codex\\sessions\\2026\\10\\12\\rollout-2026-10-12T13-49-39-01a12ea8-cc58-74a3-b4d9-2fa6a2db487f.jsonl"
+  },
+  "restored_identity": {
+    "pi_session": "01a12ea8-888f-7738-a802-11e117d8b14e",
+    "pi_process": {
+      "created": "134362578216282541",
+      "pid": 68412,
+      "windows_session": 1
+    },
+    "pi_history": "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-rust-herdr-acceptance-gjjd92m_-retired-reopen-swp6o3nj--\\2026-10-12T05-49-19-376Z_01a12ea8-888f-7738-a802-11e117d8b14e.jsonl",
+    "codex_session": "01a12ea8-cc58-74a3-b4d9-2fa6a2db487f",
+    "codex_process": 69840,
+    "codex_history": "\\\\?\\C:\\Users\\user\\.codex\\sessions\\2026\\10\\12\\rollout-2026-10-12T13-49-39-01a12ea8-cc58-74a3-b4d9-2fa6a2db487f.jsonl"
+  },
+  "chains": [
+    {
+      "number": 1,
+      "job_id": "job_365ecd84e90f",
+      "reply": "REOPEN_ONE_38ee087d",
+      "child_reply": "WORKER_MEMORY_38ee087d\n\n1. 83 × (60 + 7) = 4,980 + 581 = **5,561**\n2. (80 + 3) × 67 = 5,360 + 201 = **5,561**",
+      "callback": {
+        "callback_target_agent": "pi_lead",
+        "child_agent": null,
+        "child_job_id": "job_dd2b14a8cb79",
+        "child_message_id": "msg_9f937839c799",
+        "child_reply_id": "rep_df6458842b01",
+        "child_status": "completed",
+        "continuation_job_id": "job_96d1c915cc65",
+        "created_at": "2026-10-12T05:50:01.268050Z",
+        "edge_id": "cb_3021b20800de",
+        "original_caller": "user",
+        "parent_agent": "pi_lead",
+        "parent_job_id": "job_365ecd84e90f",
+        "parent_message_id": "msg_d63f8191d84d",
+        "state": "done",
+        "updated_at": "2026-10-12T05:50:18.121943300Z"
+      }
+    },
+    {
+      "number": 2,
+      "job_id": "job_ef0be5140221",
+      "reply": "REOPEN_TWO_38ee087d PREVIOUS=REOPEN_ONE_38ee087d",
+      "child_reply": "WORKER_MEMORY_38ee087d\n\n1. 91 × (70 + 3) = 6,370 + 273 = **6,643**\n2. (90 + 1) × 73 = 6,570 + 73 = **6,643**",
+      "callback": {
+        "callback_target_agent": "pi_lead",
+        "child_agent": null,
+        "child_job_id": "job_69ca9cb7dad6",
+        "child_message_id": "msg_2d4cafadb3c4",
+        "child_reply_id": "rep_b7061882cdb1",
+        "child_status": "completed",
+        "continuation_job_id": "job_a3c745aa911e",
+        "created_at": "2026-10-12T05:50:39.362486500Z",
+        "edge_id": "cb_5c5e07a6bd7c",
+        "original_caller": "user",
+        "parent_agent": "pi_lead",
+        "parent_job_id": "job_ef0be5140221",
+        "parent_message_id": "msg_57ef7ef8769e",
+        "state": "done",
+        "updated_at": "2026-10-12T05:50:53.779995500Z"
+      }
+    }
+  ],
+  "lead_tool_calls": 2,
+  "lead_poll_or_wait_calls": false,
+  "timing": [
+    {
+      "chain": 1,
+      "parent_job": "job_365ecd84e90f",
+      "child_job": "job_dd2b14a8cb79",
+      "continuation_job": "job_96d1c915cc65",
+      "lead_released_before_worker_seconds": 4.819722,
+      "callback_state": "done"
+    },
+    {
+      "chain": 2,
+      "parent_job": "job_ef0be5140221",
+      "child_job": "job_69ca9cb7dad6",
+      "continuation_job": "job_a3c745aa911e",
+      "lead_released_before_worker_seconds": 2.720717,
+      "callback_state": "done"
+    }
+  ],
+  "first_kill": {
+    "close_outcome_pending": false,
+    "daemon_stopped": true,
+    "keeper_stopped": true,
+    "namespace_status": "retired",
+    "retirement_operation_id": "f9fbe695-43d7-4446-a26a-fd7be68acffb",
+    "status": "closed"
+  },
+  "final_kill": {
+    "close_outcome_pending": false,
+    "daemon_stopped": true,
+    "keeper_stopped": true,
+    "namespace_status": "retired",
+    "retirement_operation_id": "11ad4cf2-74cf-4a6a-8b08-ea1145f26f86",
+    "status": "closed"
+  },
+  "cleanup": {
+    "owned_lifetimes": [
+      {
+        "identity": {
+          "pid": 33652,
+          "created": "134362577547713972",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 69284,
+          "created": "134362578193652448",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 40644,
+          "created": "134362577757528320",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 51792,
+          "created": "134362577548892396",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 70572,
+          "created": "134362577582597504",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 49208,
+          "created": "134362578247246120",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 68412,
+          "created": "134362578216282541",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 47560,
+          "created": "134362578291515599",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 69840,
+          "created": "134362578248068947",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 18064,
+          "created": "134362578248570926",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 52396,
+          "created": "134362578204838695",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 66528,
+          "created": "134362578197578730",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 65004,
+          "created": "134362577831948446",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 56976,
+          "created": "134362577758291184",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 43184,
+          "created": "134362577758899301",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 27664,
+          "created": "134362577571083164",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      },
+      {
+        "identity": {
+          "pid": 69168,
+          "created": "134362577562529067",
+          "windows_session": 1
+        },
+        "ended": true,
+        "evidence": "PID absent in successful Win32_Process observation"
+      }
+    ],
+    "named_server_status_after_stop": "not_running",
+    "fallback_workspace": "w2",
+    "fallback_cwd": "C:/Users/user/Desktop/work/ccb-rust-herdr-acceptance-gjjd92m_",
+    "fallback_only_shell_pid": 66728,
+    "no_other_agents": true,
+    "default_session_controlled": false
+  },
+  "harness_path": "C:/Users/user/Desktop/work/ccb-real-retired-reopen-20261012.py",
+  "harness_sha256": "cd695db71eb25f8854341fe5d5c7deaebc562615224387df9b371b19f9ebb99f",
+  "limits": [
+    "Arithmetic tasks did not exercise provider file-write tools.",
+    "This was the previously authorized test session/base directory; formal production outside-Herdr approval remains pending.",
+    "No default PATH/account configuration/production Workspace change."
+  ]
+}

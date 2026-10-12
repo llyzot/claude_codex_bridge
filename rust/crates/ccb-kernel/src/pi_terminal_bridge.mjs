@@ -17,6 +17,27 @@ export default function (pi) {
   };
   const text = content => typeof content === 'string' ? content :
     Array.isArray(content) ? content.filter(p => p?.type === 'text' && typeof p.text === 'string').map(p => p.text).join('\n') : '';
+  const canonicalAssistant = ctx => {
+    const branch = ctx.sessionManager.getBranch();
+    if (!Array.isArray(branch)) throw new Error('CCB Pi requires a canonical session branch');
+    let assistant = null;
+    // Other extensions may transform message_end after this listener runs.
+    // Read the persisted in-memory branch at settlement, scoped to the last
+    // exact request anchor. Never strip provider/extension-looking text blindly.
+    for (let i = branch.length - 1; i >= 0; --i) {
+      const entry = branch[i];
+      if (entry?.type !== 'message') continue;
+      const message = entry.message;
+      if (message?.role === 'user') {
+        return anchor(text(message.content)) === active.anchor ? { matched: true, assistant } : { matched: false };
+      }
+      if (!assistant && message?.role === 'assistant') {
+        assistant = { text: text(message.content), stop_reason: message.stopReason,
+          error: Boolean(message.errorMessage), canonical_entry_id: entry.id };
+      }
+    }
+    return { matched: false };
+  };
   const publish = (root, state) => {
     const current = join(root, 'current.json');
     try { if (lstatSync(current).isSymbolicLink()) throw new Error('CCB Pi state link refused'); }
@@ -34,6 +55,7 @@ export default function (pi) {
     appendFileSync(generation.path, encoded, { encoding: 'utf8' });
   };
   const rotate = ctx => {
+    if (typeof ctx.sessionManager.getBranch !== 'function') throw new Error('CCB Pi requires SessionManager.getBranch');
     const root = resolve(options.event_root);
     if (realpathSync(root) !== root || lstatSync(root).isSymbolicLink()) throw new Error('CCB Pi event root changed');
     const id = String(ctx.sessionManager.getSessionId());
@@ -48,7 +70,7 @@ export default function (pi) {
       session_path: resolve(sessionPath) };
     const header = { type: 'session_meta', payload: { id, cwd: resolve(ctx.cwd), source: 'ccb_native_pi', ccb_bridge: bridge } };
     writeFileSync(path, JSON.stringify(header) + '\n', { encoding: 'utf8', flag: 'wx', mode: 0o600 });
-    const state = { schema_version: 1, provider: 'pi', ready: true, agent_name: options.agent_name,
+    const state = { schema_version: 1, adapter_revision: 'canonical-session-branch-v1', provider: 'pi', ready: true, agent_name: options.agent_name,
       owner: options.owner, session_id: id, cwd: resolve(ctx.cwd), path, bridge };
     publish(root, state);
     generation = { path, bridge, root, state };
@@ -92,7 +114,14 @@ export default function (pi) {
   });
   // agent_end/turn_end do not prove settlement; Pi may retry or continue them.
   pi.on('agent_settled', (event, ctx) => {
-    if (active) emit('agent_settled', { aborted: event.aborted, idle: ctx.isIdle(), assistant: active.assistant });
+    if (active) {
+      if (!event.aborted) {
+        const final = canonicalAssistant(ctx);
+        if (!final.matched) { emit('request_superseded'); active = null; return; }
+        active.assistant = final.assistant;
+      }
+      emit('agent_settled', { aborted: event.aborted, idle: ctx.isIdle(), assistant: active.assistant });
+    }
     active = null;
   });
 }

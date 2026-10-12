@@ -6,12 +6,13 @@ const config = JSON.parse(process.argv[2]);
 const bridge = (await import(pathToFileURL(config.extension).href)).default;
 let handlers;
 let currentSession = config.session_id;
+let branch = [];
 const ctx = { cwd: config.project, isIdle: () => true,
-  sessionManager: { getSessionId: () => currentSession, getSessionFile: () => config.native_session_path } };
+  sessionManager: { getSessionId: () => currentSession, getSessionFile: () => config.native_session_path, getBranch: () => branch } };
 const emit = async (event, payload={}) => { for (const handler of handlers.get(event) || []) await handler({type:event,...payload},ctx); };
 const load = async () => {
   handlers = new Map();
-  bridge({on:(event,handler)=>handlers.set(event,[...(handlers.get(event)||[]),handler])});
+  await bridge({on:(event,handler)=>handlers.set(event,[...(handlers.get(event)||[]),handler])});
   await emit('session_start');
 };
 await load();
@@ -27,6 +28,7 @@ for await (const line of createInterface({input:process.stdin})) {
     await emit('before_agent_start',{prompt});
     await emit('agent_start');
     await emit('message_end',{message:{role:'user',content:[{type:'text',text:prompt}]}});
+    branch.push({type:'message',id:`user-${branch.length}`,message:{role:'user',content:command.canonical_prompt ?? prompt}});
     let reply = command.reply || 'Pi terminal result';
     if (command.delegate) {
       const result = spawnSync(config.native,['--state-root',config.state_root,'ask','--from','lead','--chain','worker','delegate from terminal Pi'],{encoding:'utf8',windowsHide:true});
@@ -34,6 +36,7 @@ for await (const line of createInterface({input:process.stdin})) {
       reply='delegated';
     }
     await emit('message_end',{message:{role:'assistant',content:[{type:'text',text:reply}],stopReason:command.stop_reason||'stop',errorMessage:command.error||''}});
+    branch.push({type:'message',id:`assistant-${branch.length}`,message:{role:'assistant',content:[{type:'text',text:command.canonical_reply ?? reply}],stopReason:command.stop_reason||'stop',errorMessage:command.error||''}});
     await emit('agent_end',{messages:[]});
     if (!command.hold) await emit('agent_settled',{aborted:command.aborted||false});
   }

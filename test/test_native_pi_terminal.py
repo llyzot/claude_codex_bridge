@@ -96,6 +96,25 @@ def test_agent_end_alone_is_not_completion_and_exact_settlement_finishes(termina
     row=await_watch(s,receipt['job_id'],lambda row:row['terminal'])
     assert row['reply']=='settled result' and row['completion_reason']=='pi_agent_settled'
 
+
+@pytest.mark.parametrize('raw,canonical', [('\u00a74\u00a7 result','result'), ('raw text','\u00a74\u00a7 literal user text')])
+def test_settlement_uses_canonical_branch_after_other_extension_transform(terminal,raw,canonical):
+    r=terminal;s=r['start']();receipt=r['submit'](s)
+    r['command'](action='prompt',prompt=prompt(r)['body'],reply=raw,canonical_reply=canonical);r['idle']()
+    row=await_watch(s,receipt['job_id'],lambda row:row['terminal'])
+    assert row['reply']==canonical
+    current=bridge_state(r)
+    events=[json.loads(line) for line in Path(current['path']).read_text(encoding='utf-8').splitlines()]
+    final=next(e['payload'] for e in reversed(events) if e.get('payload',{}).get('type')=='agent_settled')
+    assert final['assistant']['canonical_entry_id'].startswith('assistant-')
+
+
+def test_canonical_branch_from_another_request_cannot_complete_active_job(terminal):
+    r=terminal;s=r['start']();receipt=r['submit'](s)
+    r['command'](action='prompt',prompt=prompt(r)['body'],reply='wrong result',canonical_prompt='unrelated user input');r['idle']()
+    wait_for(lambda:(s.root/'providers/pi/lead/fault.json').exists())
+    assert not s.rpc('watch',{'target':receipt['job_id']})['terminal']
+
 @pytest.mark.parametrize('mode',['reload','session','supersede','same-anchor'])
 def test_active_generation_or_session_change_holds_instead_of_completing(terminal,mode):
     r=terminal;s=r['start']();receipt=r['submit'](s)
@@ -113,6 +132,18 @@ def test_idle_extension_reload_keeps_same_process_and_new_tasks_use_new_generati
     assert before['bridge']['process']==after['bridge']['process'] and before['bridge']['instance']!=after['bridge']['instance']
     second=r['submit'](s);r['command'](action='prompt',prompt=prompt(r,2)['body'],reply='after reload');r['idle']()
     assert await_watch(s,second['job_id'],lambda row:row['terminal'])['reply']=='after reload'
+
+
+def test_reload_reloads_implementation_bytes_not_just_cached_factory(terminal):
+    r=terminal;before=bridge_state(r)
+    assert before['adapter_revision']=='canonical-session-branch-v1'
+    path=Path(r['bridge']['implementation']);source=path.read_text(encoding='utf-8')
+    path.write_text(source.replace('canonical-session-branch-v1','canonical-session-branch-test-v2'),encoding='utf-8')
+    r['command'](action='reload');after=bridge_state(r)
+    assert after['adapter_revision']=='canonical-session-branch-test-v2'
+    assert after['bridge']['process']==before['bridge']['process']
+    assert after['session_id']==before['session_id']
+    assert after['bridge']['instance']!=before['bridge']['instance']
     assert Path(before['path']).exists()
 
 def test_daemon_restart_observes_settled_pi_without_resending(terminal):

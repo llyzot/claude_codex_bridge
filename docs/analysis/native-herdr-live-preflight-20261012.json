@@ -47,11 +47,15 @@
     "global_PATH_changed": false
   },
   "authorization": {
-    "status": "pending",
-    "reason": "Herdr skill requires HERDR_ENV=1 before control commands; request explicit user exception limited to prepared named test session",
+    "status": "granted",
+    "scope": "Only ccb-rust-ui-gjjd92m_ and prepared test directory; start, inspect, callback validation, display and owned-test cleanup",
+    "user_reply": "允许这次明确限定的例外",
     "skill": "C:/Users/user/.agents/skills/herdr/SKILL.md"
   },
-  "runtime_started": false,
+  "runtime_started": true,
   "existing_Herdr_sessions_inspected": false,
-  "runtime_directory_created": false
+  "runtime_directory_created": false,
+  "execution_evidence": "docs/analysis/native-pi-canonical-herdr-live-20261012.json",
+  "execution_status": "real callback and code hot reload verified after adapter fixes; test resources stopped",
+  "test_resources_stopped": true
 }

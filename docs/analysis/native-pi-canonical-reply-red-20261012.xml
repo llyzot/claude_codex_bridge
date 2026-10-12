@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="3" time="36.283" timestamp="2026-10-12T11:36:11.876133+08:00" hostname="HOST"><testcase classname="test.test_native_pi_terminal" name="test_settlement_uses_canonical_branch_after_other_extension_transform[\xa74\xa7 result-result]" time="8.186"><failure message="AssertionError: assert '§4§ result' == 'result'&#10;  &#10;  - result&#10;  + §4§ result&#10;  ? ++++">test\test_native_pi_terminal.py:105: in test_settlement_uses_canonical_branch_after_other_extension_transform
+    assert row['reply']==canonical
+E   AssertionError: assert '§4§ result' == 'result'
+E
+E     - result
+E     + §4§ result
+E     ? ++++</failure></testcase><testcase classname="test.test_native_pi_terminal" name="test_settlement_uses_canonical_branch_after_other_extension_transform[raw text-\xa74\xa7 literal user text]" time="8.119"><failure message="AssertionError: assert 'raw text' == '§4§ literal user text'&#10;  &#10;  - §4§ literal user text&#10;  + raw text">test\test_native_pi_terminal.py:105: in test_settlement_uses_canonical_branch_after_other_extension_transform
+    assert row['reply']==canonical
+E   AssertionError: assert 'raw text' == '§4§ literal user text'
+E
+E     - §4§ literal user text
+E     + raw text</failure></testcase><testcase classname="test.test_native_pi_terminal" name="test_canonical_branch_from_another_request_cannot_complete_active_job" time="19.415"><failure message="Failed: expected fixture state not observed">test\test_native_pi_terminal.py:115: in test_canonical_branch_from_another_request_cannot_complete_active_job
+    wait_for(lambda:(s.root/'providers/pi/lead/fault.json').exists())
+test\test_native_herdr_worker.py:24: in wait_for
+    pytest.fail('expected fixture state not observed')
+E   Failed: expected fixture state not observed</failure></testcase></testsuite></testsuites>

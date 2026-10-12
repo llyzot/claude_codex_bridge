@@ -138,6 +138,7 @@ impl Store {
                         "native-role-bridge.mjs",
                         "terminal-bridge.json",
                         "terminal-bridge.mjs",
+                        "terminal-bridge-impl.mjs",
                     ]
                     .contains(&parts[3])
                 || parts[1] == "claude" && ["role-view.json", "role-view"].contains(&parts[3]));

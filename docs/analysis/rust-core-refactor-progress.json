@@ -244,7 +244,8 @@
     "Native Codex thread binding reports provider-observed sandbox/approval/reviewer modes through session metadata and provider-status; resume/clear refresh and compact retention verified; restricted IO acceptance now requires actual matching provider modes before submitting a model task",
     "Native reload --when-idle defers configuration cutover until jobs, mailboxes, callback edges and provider retirement checks clear, without freezing queue/continuation progress; exact-ID cancellation, shutdown/crash interruption, CLI observation timeout and ProjectView waiting status are verified",
     "Native Claude MCP elicitation broker supports explicitly answered bounded form/URL requests, session-level attribution, execution replay/identity fences, withdrawal and secret-free metadata. Authenticated Claude 2.1.296 plus local MCP fixture performed exactly one tool call and form answer, then completed the same task; Keeper stopped.",
-    "Refreshed independent Rust installation to e35f6a1a source. Installed Pi and Claude Leads each completed Codex callbacks across Keeper recovery with stable sessions. New binary resumed a stopped prior-build Pi/Codex project and recalled both markers without its deleted launch source. User-authorized existing-default file write/read verified from actual tool records, separately from still-failing restricted mode."
+    "Refreshed independent Rust installation to e35f6a1a source. Installed Pi and Claude Leads each completed Codex callbacks across Keeper recovery with stable sessions. New binary resumed a stopped prior-build Pi/Codex project and recalled both markers without its deleted launch source. User-authorized existing-default file write/read verified from actual tool records, separately from still-failing restricted mode.",
+    "Scoped real Herdr 0.9.3/Windows Terminal Pi Lead plus native Codex host completed automatic result delivery. Fixed terminal adapter sampling before later extension transforms by reading the anchored settled session branch; stable content-versioned .mjs loader fixes stale implementation reload. Live revision change and restoration preserve Pi PID/session. All test resources stopped; final release rebuild awaits frozen regression completion."
   ],
   "remaining": [
     "Broaden native Keeper real-model/Herdr foreground acceptance, legacy/cross-platform coexistence and unavailable-observation/storage recovery; evaluate optional OS-level restart of the Keeper itself and production/default rollout",
@@ -308,7 +309,7 @@
     "native_codex_release": "Final release passed all 16 Codex protocol/control contracts after strengthening active Job/provider/request/execution identity checks; installed CLI probe was initialization/thread binding only, no real model interruption was exercised",
     "native_current_suite": "Debug native contract suite 150 passed before the final active-job identity guard; final guard validated by the 16 release Codex contracts, Rust tests 5 passed and clippy warnings denied. Repository bin release artifacts rebuilt; production installation unchanged",
     "native_config": "11 cases passed against existing Python compact/TOML/hybrid reader and project-id normalization, including provider compilation and invalid overlay rejection",
-    "herdr_execution_constraint": "Current agent is outside Herdr (HERDR_ENV unavailable); focused-session controls were not issued under the explicit herdr skill gate. Isolated native Herdr runtime execution remains unverified",
+    "herdr_execution_constraint": "Explicit human exception granted for named test session ccb-rust-ui-gjjd92m_ only; real tests completed and resources stopped. Default Herdr session was not inspected or controlled.",
     "claude_stream": "6 passed: same-session turns, foreign-result fencing, duplicate-result rejection, Claude Lead/Codex callback, clean session resume, installed unauthenticated CLI failure handling",
     "real_models": "Real Codex Worker model round trip passed; actual Pi Lead + Codex Worker automatic callback passed after specifying existing Git Bash in private Pi settings. No polling in initial Lead turn",
     "claude_auth_constraint": "Installed Claude auth status is loggedIn=false; successful real Claude inference remains unverified, no login or credential changes were performed",
@@ -657,18 +658,21 @@
     "native_installed_refresh_evidence": "docs/analysis/native-installed-refresh-20261012.json",
     "native_installed_refresh_validation": "Installed image matches release. Pi/Codex and Claude/Codex real chains plus Keeper recovery passed; Lead initial turns ended before Worker completion. Old native test state resumed under the new image with stable IDs and correct recall. Actual dangerFullAccess/never defaults, without permission overrides, produced successful WriteAllText/ReadAllText records and verified marker. All test Keepers stopped. Legacy read transient was rechecked: same PID 52968 healthy, project config unchanged. Five IO gate tests passed. No default cutover or Herdr UI acceptance.",
     "native_herdr_live_preflight_evidence": "docs/analysis/native-herdr-live-preflight-20261012.json",
-    "native_herdr_live_preflight_validation": "Prepared separate Git test project, Pi/Codex config with explicit authenticated native Codex TUI host, executable manifest, named Herdr 0.9.3 session and guarded PowerShell launcher. Installed candidate config compilation and herdr open --dry-run passed. No Herdr status/control command or runtime startup performed outside the skill boundary. Pending explicit user exception for this test session only."
+    "native_herdr_live_preflight_validation": "Prepared separate Git test project, Pi/Codex config with explicit authenticated native Codex TUI host, executable manifest, named Herdr 0.9.3 session and guarded PowerShell launcher. Installed candidate config compilation and herdr open --dry-run passed. No Herdr status/control command or runtime startup performed outside the skill boundary. Pending explicit user exception for this test session only.",
+    "native_pi_canonical_herdr_evidence": "docs/analysis/native-pi-canonical-herdr-live-20261012.json",
+    "native_pi_canonical_herdr_validation": "Real initial Herdr flow exposed raw section framing and stale .mjs reload. Old release failed all three new tests. Reply/open debug selection passed 43. Loader diagnostic inside strict identity caused 12 failures; moved to separate state, preserving validation, and all 19 focused cases passed. Real fixed callback returned the exact marker; one native ask, no wait/poll calls. Actual code reload and restoration kept PID/session. Clippy/format passed; test server and Keepers stopped. Release/candidate update pending frozen-suite exit."
   },
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2",
     "candidate_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "next_action": "Await user decision on the explicitly scoped outside-Herdr test. On approval, launch only prepared session and observe the same operation without replacement on timeout; then validate terminal callback and cleanup. No default cutover yet.",
-    "latest_evidence": "docs/analysis/native-installed-refresh-20261012.json",
+    "next_action": "Observe the running frozen full Rust regression (exec session 18552, PID 67760). Once terminal, build the release containing the Pi adapter fix, run affected checks, update the stopped candidate installation, then prepare the remaining production migration.",
+    "latest_evidence": "docs/analysis/native-pi-canonical-herdr-live-20261012.json",
     "herdr_preflight": {
       "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_",
       "session": "ccb-rust-ui-gjjd92m_",
       "script": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_\\start-test.ps1",
-      "authorization": "pending"
+      "authorization": "granted",
+      "status": "executed; callback and hot reload passed after source fix"
     }
   },
   "installed_candidate": {

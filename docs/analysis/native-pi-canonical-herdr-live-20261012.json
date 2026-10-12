@@ -1,0 +1,161 @@
+{
+  "recorded_at": "2026-10-12T04:12:40.827436+00:00",
+  "base_commit": "23e8831a",
+  "session": "ccb-rust-ui-gjjd92m_",
+  "user_authorized_outside_Herdr_exception": true,
+  "initial_project": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_",
+  "fixed_project": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_\\canonical-fix-h9_u45lv",
+  "failure": {
+    "first_reply": "§4§ HERDR_REVIEW_cf707868",
+    "expected": "HERDR_REVIEW_cf707868",
+    "cause": "Adapter copied message_end text before later extensions normalized the message. Pi persisted/UI reply was clean.",
+    "failed_reload": {
+      "old_instance": "a39860f0-5cdc-4920-8f30-174d5ca37aa8",
+      "new_instance": "dd2319e4-4420-4e24-841f-3787c8f44409",
+      "same_process": true,
+      "adapter_revision": null,
+      "source_file_has_revision": true
+    },
+    "module_cache_reproducer": {
+      "exit_code": 0,
+      "stdout": "[{\"extension\":\"mjs\",\"first\":1,\"second\":1},{\"extension\":\"ts\",\"first\":1,\"second\":2}]\n",
+      "stderr": ""
+    }
+  },
+  "fix": {
+    "reply": "Read final assistant entry from the current SessionManager branch at agent_settled, requiring the latest user anchor to match the active request; do not strip text by pattern",
+    "loader": "Keep terminal-bridge.mjs entry path stable; factory imports terminal-bridge-impl.mjs with SHA-256 content query to avoid stale .mjs cache",
+    "identity": "Producer identity remains the existing exact five-field schema; adapter revision is separate diagnostic state",
+    "migration_limit": "A process that already cached the old monolithic .mjs entry needs one controlled cold restart to load the new stable wrapper. Future implementation updates reload in place."
+  },
+  "validation": {
+    "runs": {
+      "native-pi-canonical-reply-red-20261012.xml": {
+        "tests": "3",
+        "failures": "3",
+        "errors": "0",
+        "time": "36.283"
+      },
+      "native-pi-canonical-reply-debug-20261012.xml": {
+        "tests": "43",
+        "failures": "0",
+        "errors": "0",
+        "time": "328.154"
+      },
+      "native-pi-canonical-loader-debug-20261012.xml": {
+        "tests": "19",
+        "failures": "12",
+        "errors": "0",
+        "time": "398.805"
+      },
+      "native-pi-canonical-loader-fixed-20261012.xml": {
+        "tests": "19",
+        "failures": "0",
+        "errors": "0",
+        "time": "305.930"
+      }
+    },
+    "revision_placement_regression": "The initial diagnostic revision inside the producer identity was rejected by the existing strict schema (12 failures). Moved the diagnostic to top-level current state without weakening identity validation; all 19 rechecks passed.",
+    "jiti_loader_probe": {
+      "root": "C:\\Users\\user\\Desktop\\work\\ccb-pi-loader-check-4r448_l4",
+      "exit_code": 0,
+      "stdout": "{\"first\":1,\"second\":2,\"passed\":true}\n",
+      "stderr": ""
+    },
+    "format": "passed",
+    "clippy": "all-targets -D warnings passed"
+  },
+  "real_fixed_chain": {
+    "reply": "HERDR_CANONICAL_cc72ac63",
+    "visible_reply_source": "message_bureau_reply",
+    "parent": {
+      "agent_name": "pi_lead",
+      "business_status": "completed",
+      "created_at": "2026-10-12T04:02:12.295915200Z",
+      "job_id": "job_b8e5cf9ce0a6",
+      "message_type": "ask",
+      "provider": "pi",
+      "status": "completed",
+      "submission_id": null,
+      "terminal_reason": "pi_agent_settled",
+      "updated_at": "2026-10-12T04:02:35.229625900Z",
+      "visible_reply_id": "rep_3219e8597eaf"
+    },
+    "child": {
+      "agent_name": "codex_worker",
+      "business_status": "completed",
+      "created_at": "2026-10-12T04:02:26.532359400Z",
+      "job_id": "job_f1a38408f461",
+      "message_type": "ask",
+      "provider": "codex",
+      "status": "completed",
+      "submission_id": null,
+      "terminal_reason": "codex_turn_completed",
+      "updated_at": "2026-10-12T04:02:34.902824300Z",
+      "visible_reply_id": null
+    },
+    "callback": {
+      "callback_target_agent": "pi_lead",
+      "child_agent": null,
+      "child_job_id": "job_f1a38408f461",
+      "child_message_id": "msg_86385a5962df",
+      "child_reply_id": "rep_118e88966c75",
+      "child_status": "completed",
+      "continuation_job_id": "job_e436e1023ac8",
+      "created_at": "2026-10-12T04:02:26.532359400Z",
+      "edge_id": "cb_00f4f4d64890",
+      "original_caller": "user",
+      "parent_agent": "pi_lead",
+      "parent_job_id": "job_b8e5cf9ce0a6",
+      "parent_message_id": "msg_278f7e2fc719",
+      "state": "done",
+      "updated_at": "2026-10-12T04:02:43.526970300Z"
+    },
+    "lead_model_tool_calls": 1,
+    "lead_dispatch_command": "& 'C:/Users/user/Desktop/work/4.user/2.github/claude_codex_bridge/rust/target/debug/ccb-native.exe' '--state-root' 'C:/Users/user/Desktop/work/ccb-rust-herdr-acceptance-gjjd92m_/canonical-fix-h9_u45lv/.ccb/ccbd' 'ask' '--chain' '--from' 'pi_lead' 'codex_worker' '--' 'Compute 97*89 without using tools and explain two independent calculations. Do not edit files or control any other agent/session. Return the result and both calculations.'",
+    "lead_poll_or_wait_calls": false,
+    "pi_session_file": "C:\\Users\\user\\.pi\\agent\\sessions\\--C--Users-user-Desktop-work-ccb-rust-herdr-acceptance-gjjd92m_-canonical-fix-h9_u45lv--\\2026-10-12T04-00-44-030Z_01a12e45-1dfd-739e-b6f3-58dbdcd97d5f.jsonl",
+    "pi_process": {
+      "created": "134362512435089554",
+      "pid": 69356,
+      "windows_session": 1
+    },
+    "pi_session_id": "01a12e45-1dfd-739e-b6f3-58dbdcd97d5f",
+    "bridge_revision": "canonical-session-branch-v1"
+  },
+  "real_hot_reload": {
+    "passed": true,
+    "same_process": true,
+    "same_session": true,
+    "revisions": [
+      "canonical-session-branch-v1",
+      "canonical-session-branch-live-v2",
+      "canonical-session-branch-v1"
+    ]
+  },
+  "cleanup": {
+    "initial_keeper_stopped": true,
+    "fixed_keeper_stopped": true,
+    "managed_workspaces_closed": [
+      "w1",
+      "w3"
+    ],
+    "fallback_shell_verified_idle": true,
+    "explicit_test_server_status": "not_running",
+    "test_server_pid_absent": 66468,
+    "fixed_pi_pid_absent": 69356
+  },
+  "release_status": "Fix tested with debug build; release rebuild and candidate refresh deferred until the frozen full regression process finishes.",
+  "full_regression": {
+    "tool_session_id": 18552,
+    "pid": 67760,
+    "scope": "1199 tests on pre-fix release, 76 Rust core files; legacy Python provider suites tracked separately",
+    "progress_file": "docs/analysis/native-core-regression-20261012-progress.json"
+  },
+  "limits": [
+    "No existing default Herdr session or production Workspace controlled",
+    "No account PATH/default switch",
+    "No package/profile snapshots; only generated CCB adapter files changed",
+    "Frozen full regression is not a claim that this new bridge fix passed all 1199 cases"
+  ]
+}

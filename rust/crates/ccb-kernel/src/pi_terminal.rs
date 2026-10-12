@@ -174,6 +174,7 @@ pub(crate) fn execute(request: &Value) -> Result<Value> {
     let mut store = crate::store::Store::open(&state)?;
     let manifest = format!("providers/pi/{agent}/terminal-bridge.json");
     let script = format!("providers/pi/{agent}/terminal-bridge.mjs");
+    let implementation = format!("providers/pi/{agent}/terminal-bridge-impl.mjs");
     let old = store.json(&manifest)?.unwrap_or(Value::Null);
     let owner = if old.is_null() {
         uuid::Uuid::new_v4().to_string()
@@ -195,9 +196,14 @@ pub(crate) fn execute(request: &Value) -> Result<Value> {
         &serde_json::to_string(&options)?,
     );
     let path = store.owned_path(&script)?;
-    let record = json!({"schema_version":1,"owner":owner,"agent_name":agent,"event_root":events,"extension":path});
-    if store.bytes(&script)?.as_deref() != Some(source.as_bytes()) {
-        store.save_bytes(&script, source.as_bytes())?;
+    let record = json!({"schema_version":1,"owner":owner,"agent_name":agent,"event_root":events,"extension":path,
+        "implementation":store.owned_path(&implementation)?});
+    if store.bytes(&implementation)?.as_deref() != Some(source.as_bytes()) {
+        store.save_bytes(&implementation, source.as_bytes())?;
+    }
+    let loader = include_str!("pi_terminal_loader.mjs");
+    if store.bytes(&script)?.as_deref() != Some(loader.as_bytes()) {
+        store.save_bytes(&script, loader.as_bytes())?;
     }
     if old != record {
         store.save(&manifest, &record)?;

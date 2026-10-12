@@ -19,9 +19,9 @@ snapshot. The generated extension is not a replacement for Pi itself.
 {"schema_version":1,"project_root":"C:/test/project","agent_name":"lead"}
 ```
 
-This creates a small generated extension and its manifest in the native Herdr
+This creates a small generated extension entry, implementation and manifest in the native Herdr
 journal, plus an Agent-scoped event directory. It returns `bridge.owner`,
-`bridge.event_root`, `bridge.extension` and an `interactive_args` array containing
+`bridge.event_root`, `bridge.extension`, `bridge.implementation` and an `interactive_args` array containing
 `-e <extension-path>`. It starts no provider or Herdr server and changes no account
 settings. Reprovisioning preserves the owner identity and updates the generated
 source; it does not copy the user's resources. Use the returned arguments when
@@ -67,9 +67,14 @@ context exposes the settled idle state. `agent_end` and `turn_end` are insuffici
 
 The adapter associates a fresh turn UUID with an execution-specific first-line
 CCB request marker. It records actual `agent_start` and the delivered user-message
-marker, then emits the latest assistant snapshot only at `agent_settled`, including
+marker, then emits the final assistant text only at `agent_settled`, including
 idle, abort, stop reason and an error flag. It does not store model headers,
-credentials, thinking, tool arguments or full user prompt/role memory.
+credentials, thinking, tool arguments or full user prompt/role memory. For a
+non-aborted turn, it reads the final assistant entry from SessionManager's current
+branch and verifies the latest user marker against the active request. This
+allows later extension message transforms to finish before text is captured.
+An unrelated branch cannot supply a result. Literal text is preserved; there is
+no generic removal of apparent control prefixes.
 
 Rust requires the exact owner/instance/PID/session, a continuous event sequence,
 the matching turn and request anchor, and a settled idle/abort record. Only a final
@@ -105,7 +110,7 @@ real terminal/Herdr/model acceptance test.
 The first integration run correctly refused input because Node normalized Windows
 path separators while Rust compared the manifest path as a JSON string. Comparing
 path components fixed this false rejection; root/generation constraints remain.
-No real Herdr session or existing Workspace was controlled. Full `herdr open`
+At that checkpoint, no real Herdr session or existing Workspace was controlled. Full `herdr open`
 startup composition, automatic discovery/configuration of fresh sessions, original
 Claude terminal handling, model-backed terminal acceptance, performance measurement
 and default Rust promotion remain unfinished. Exact final test counts and binary
@@ -116,3 +121,33 @@ Final release verification passed all 30 dedicated Pi/Codex terminal cases in
 An earlier broader 81-case terminal/mount/Pi-RPC/context run also passed. The final
 process-lifetime and unload checks were then covered by the final dedicated run;
 this was not a complete repository or curated native-suite rerun.
+
+## Real Herdr acceptance and reload correction — 2026-10-12
+
+The user authorized one explicitly named test session outside the agent's Herdr
+pane. Installed Herdr 0.9.3, Pi and the native Codex TUI host completed a real
+Pi Lead/Worker callback in Windows Terminal. The default session was not touched.
+
+The run exposed a timing bug: `message_end` captured `§4§` framing before another
+extension removed it. The UI and saved session were clean. Reading the final
+session branch at settlement fixes the mismatch without stripping legitimate
+text. The corrected real run returned the exact requested marker through the
+CCB result mailbox, with one Worker and one continuation.
+
+It also exposed stale `.mjs` code across `/reload`. The installed Jiti loader
+reproducer returned the old implementation even with `moduleCache: false` and
+`tryNative: false`. The stable `terminal-bridge.mjs` entry now imports
+`terminal-bridge-impl.mjs` using its content hash. The entry pathname and owner
+remain stable. A process already caching the old monolithic entry needs one
+controlled cold restart for this transition; subsequent implementation changes
+reload without restarting Pi or changing its session. Both an actual Jiti probe
+and a live Pi revision-change/restore test verified this behavior.
+
+The revision diagnostic is outside the unchanged five-field producer identity.
+An initial placement inside that identity was correctly rejected by the existing
+validator and is retained in the failed-test evidence. All 19 focused rechecks
+passed after the correction, including the real Pi no-model probe. The prior
+reply/open selection passed 43 cases, and three old-release cases reproduced the
+original failures. See `native-pi-canonical-herdr-live-20261012.json` for scope,
+cleanup and build status. This does not establish every TUI lifecycle or default
+production migration path.

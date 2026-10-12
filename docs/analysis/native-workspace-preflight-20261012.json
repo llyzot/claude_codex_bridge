@@ -50,5 +50,64 @@
     "No production/default entrypoint migration in this change",
     "Read-only preflight is an early error check, not a substitute for locked materialization",
     "53 affected release cases, not a new full-suite run"
-  ]
+  ],
+  "source_commit": "570093dc9a50653ff24bbdd7c32bebbee600668b",
+  "candidate_install": {
+    "plan": {
+      "active_use_check": "performed_on_apply",
+      "backup": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-68ecc68b-8b8c-4f92-a250-4a65efbf9c1d.backup",
+      "from": {
+        "binary_sha256": "1dff79bd099b9ecc00d868071071cfdb80e2c1093840a2ed1971477025b2f3d1",
+        "manifest_sha256": "06d66d0130c01ed376bcd57b2f04908273b6ed97cdbb2e92582e10dcf69ea6c9",
+        "version": "8.7.10"
+      },
+      "operation_id": "68ecc68b-8b8c-4f92-a250-4a65efbf9c1d",
+      "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+      "requires_stopped_native_commands": true,
+      "runtime_state_changed": false,
+      "stage": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-68ecc68b-8b8c-4f92-a250-4a65efbf9c1d.stage",
+      "status": "planned",
+      "to_binary_sha256": "a036d9cc29866c8c83887dbe3a9209426279e291af2bd5acd2b89fd0e17b4e96",
+      "to_version": "8.7.10"
+    },
+    "result": {
+      "backup": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-68ecc68b-8b8c-4f92-a250-4a65efbf9c1d.backup",
+      "path_modified": false,
+      "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+      "provider_settings_modified": false,
+      "runtime_state_changed": false,
+      "stage": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-68ecc68b-8b8c-4f92-a250-4a65efbf9c1d.stage",
+      "state_compatibility": "not_checked",
+      "status": "upgraded",
+      "upgrade": {
+        "finished_at": "2026-10-12T04:36:13.670680600Z",
+        "from": {
+          "binary_sha256": "1dff79bd099b9ecc00d868071071cfdb80e2c1093840a2ed1971477025b2f3d1",
+          "manifest_sha256": "06d66d0130c01ed376bcd57b2f04908273b6ed97cdbb2e92582e10dcf69ea6c9",
+          "version": "8.7.10"
+        },
+        "operation_id": "68ecc68b-8b8c-4f92-a250-4a65efbf9c1d",
+        "phase": "committed",
+        "prefix_name": "ccb-rust",
+        "record_type": "ccb_native_upgrade",
+        "runtime_state_changed": false,
+        "schema_version": 1,
+        "started_at": "2026-10-12T04:36:13.510851100Z",
+        "to": {
+          "binary_sha256": "a036d9cc29866c8c83887dbe3a9209426279e291af2bd5acd2b89fd0e17b4e96",
+          "manifest_sha256": "67750bf37dc5b66ca010ca55a23eb02d0da21f0a4dd98c174549cd277d01c978",
+          "version": "8.7.10"
+        }
+      }
+    },
+    "verify": {
+      "binary_sha256": "a036d9cc29866c8c83887dbe3a9209426279e291af2bd5acd2b89fd0e17b4e96",
+      "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+      "runtime": "rust",
+      "status": "verified",
+      "version": "8.7.10"
+    },
+    "account_path_changed": false,
+    "production_workspace_changed": false
+  }
 }

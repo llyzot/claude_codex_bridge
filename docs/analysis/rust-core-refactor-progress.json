@@ -245,7 +245,8 @@
     "Native reload --when-idle defers configuration cutover until jobs, mailboxes, callback edges and provider retirement checks clear, without freezing queue/continuation progress; exact-ID cancellation, shutdown/crash interruption, CLI observation timeout and ProjectView waiting status are verified",
     "Native Claude MCP elicitation broker supports explicitly answered bounded form/URL requests, session-level attribution, execution replay/identity fences, withdrawal and secret-free metadata. Authenticated Claude 2.1.296 plus local MCP fixture performed exactly one tool call and form answer, then completed the same task; Keeper stopped.",
     "Refreshed independent Rust installation to e35f6a1a source. Installed Pi and Claude Leads each completed Codex callbacks across Keeper recovery with stable sessions. New binary resumed a stopped prior-build Pi/Codex project and recalled both markers without its deleted launch source. User-authorized existing-default file write/read verified from actual tool records, separately from still-failing restricted mode.",
-    "Scoped real Herdr 0.9.3/Windows Terminal Pi Lead plus native Codex host completed automatic result delivery. Fixed terminal adapter sampling before later extension transforms by reading the anchored settled session branch; stable content-versioned .mjs loader fixes stale implementation reload. Live revision change and restoration preserve Pi PID/session. All test resources stopped; final release rebuild awaits frozen regression completion."
+    "Scoped real Herdr 0.9.3/Windows Terminal Pi Lead plus native Codex host completed automatic result delivery. Fixed terminal adapter sampling before later extension transforms by reading the anchored settled session branch; stable content-versioned .mjs loader fixes stale implementation reload. Live revision change and restoration preserve Pi PID/session. All test resources stopped; final release rebuild awaits frozen regression completion.",
+    "Read-only worktree startup preflight rejects missing or unconfirmed checkouts before publishing a new daemon lifetime, preserving prior startup identity and retaining locked materialization checks"
   ],
   "remaining": [
     "Broaden native Keeper real-model/Herdr foreground acceptance, legacy/cross-platform coexistence and unavailable-observation/storage recovery; evaluate optional OS-level restart of the Keeper itself and production/default rollout",
@@ -662,13 +663,14 @@
     "native_pi_canonical_herdr_evidence": "docs/analysis/native-pi-canonical-herdr-live-20261012.json",
     "native_pi_canonical_herdr_validation": "Real initial Herdr flow exposed raw section framing and stale .mjs reload. Old release failed all three new tests. Reply/open debug selection passed 43. Loader diagnostic inside strict identity caused 12 failures; moved to separate state, preserving validation, and all 19 focused cases passed. Real fixed callback returned the exact marker; one native ask, no wait/poll calls. Actual code reload and restoration kept PID/session. Clippy/format passed; test server and Keepers stopped. Release/candidate update pending frozen-suite exit.",
     "native_core_regression_current": "Frozen pre-Pi-fix release aggregated coverage: 1188 passed, 11 skipped across 1199 collected cases. Initial progress-observer WinError 5 interrupted pytest; tail completed; two negative workspace cases needed a harness deadline beyond the CLI 15-second observation window and passed. Failed/interrupted evidence retained. See native-core-regression-summary-20261012.json.",
-    "native_pi_canonical_release": "19 final-release Pi bridge cases passed, including real installed Pi no-model loading and session clear. Source e4dba8a6 release installed into stopped ccb-rust candidate, all three aliases verified Rust; old image retained for rollback. Real Herdr callback/hot reload debug evidence remains separately scoped."
+    "native_pi_canonical_release": "19 final-release Pi bridge cases passed, including real installed Pi no-model loading and session clear. Source e4dba8a6 release installed into stopped ccb-rust candidate, all three aliases verified Rust; old image retained for rollback. Real Herdr callback/hot reload debug evidence remains separately scoped.",
+    "native_workspace_preflight": "53 affected release startup/worktree/Keeper cases passed; original release failed both actionable-error regressions, debug fix passed both. Existing native-start bytes and user workspace contents preserved on rejection. fmt/Clippy passed. Candidate installed at source 570093dc; default unchanged. Evidence native-workspace-preflight-20261012.json."
   },
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2",
     "candidate_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "next_action": "Rust candidate now contains the verified Pi canonical-reply and hot-reload fix. Prepare production/default migration with explicit legacy-state handling and remaining interface/role-policy limitations; do not rerun the completed frozen baseline without a new reason.",
-    "latest_evidence": "docs/analysis/native-pi-canonical-release-install-20261012.json",
+    "next_action": "Prepare production/default migration with explicit legacy-state handling and remaining interface/role-policy limitations. Candidate includes canonical Pi replies, actual implementation hot reload, and pre-spawn damaged-worktree rejection. Completed baseline and 53 affected tests need not be repeated without new evidence.",
+    "latest_evidence": "docs/analysis/native-workspace-preflight-20261012.json",
     "herdr_preflight": {
       "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_",
       "session": "ccb-rust-ui-gjjd92m_",
@@ -679,9 +681,9 @@
   },
   "installed_candidate": {
     "prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "rust_source_commit": "e4dba8a6",
-    "binary_sha256": "1dff79bd099b9ecc00d868071071cfdb80e2c1093840a2ed1971477025b2f3d1",
+    "rust_source_commit": "570093dc9a50653ff24bbdd7c32bebbee600668b",
+    "binary_sha256": "a036d9cc29866c8c83887dbe3a9209426279e291af2bd5acd2b89fd0e17b4e96",
     "account_default": false,
-    "evidence": "docs/analysis/native-pi-canonical-release-install-20261012.json"
+    "evidence": "docs/analysis/native-workspace-preflight-20261012.json"
   }
 }

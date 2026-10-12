@@ -1,0 +1,48 @@
+{
+  "source_commit": "2f7c14d2",
+  "prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
+  "operation_id": "cd5ebd6c-b969-40a6-a555-82c3b2ea51b1",
+  "status": "installed_verified",
+  "version": "8.7.10",
+  "core_version": "0.1.0",
+  "binary_sha256": "e4190dd00339525d2689d83d7bf749589988336104fa3c68d786a72ea53c4035",
+  "manifest_sha256": "89a0ff33483fc8696f934833befde6338cac418694a9999ba2544ceffdc3a58a",
+  "backup": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-cd5ebd6c-b969-40a6-a555-82c3b2ea51b1.backup",
+  "installed_aliases_verified": [
+    "ccb.exe",
+    "ask.exe",
+    "ccb-native.exe"
+  ],
+  "user_path_changed": false,
+  "fresh_account_path_resolution": {
+    "ccb": "C:\\Users\\user\\Desktop\\work\\ccb-rust\\bin\\ccb.exe",
+    "ask": "C:\\Users\\user\\Desktop\\work\\ccb-rust\\bin\\ask.exe"
+  },
+  "installed_workflow_test": {
+    "xml": "docs/analysis/native-worktree-lifecycle-installed-20261012.xml",
+    "tests": 1,
+    "failures": 0,
+    "errors": 0,
+    "covers": [
+      "real installed ccb.exe creates fixture worktree and merges explicit target",
+      "same-operation replay does not duplicate commit",
+      "new merge of already-integrated worker is a no-op"
+    ]
+  },
+  "old_foreground_entry": {
+    "pid": 27068,
+    "kind": "ccb herdr open",
+    "first_upgrade_blocked_by_image_lock": true,
+    "process_exited_before_stop_attempt": true,
+    "terminated_by_this_task": false
+  },
+  "production": {
+    "project": "C:\\Users\\user\\Desktop\\work\\1.code\\5.Tool\\sample-project",
+    "runtime_started": false,
+    "keeper_alive": false,
+    "git_status_clean": true,
+    "project_files_modified": false,
+    "providers_controlled": false
+  },
+  "runtime_state_migration": false
+}

@@ -667,13 +667,14 @@
     "native_sample-project_project": "Actual installed 2ea63fac / f6c5ec25 project rollout passed; project session ccb-native-77324b3f209d and workspace w1 remain active/idle for user. Exact original chain verified after correcting a prompt/judge punctuation mismatch; no resubmission. Startup through project open.ps1 reuses the same runtime and preserves its launch PATH. See native-sample-project-rollout-20261012.json.",
     "native_shell_reconnect": "Original release failed the caller-PATH-only test with the same migration error. Debug 3 passed. Final release 86 passed in 753.59s; fmt/Clippy passed. Project backend upgraded under stopped-image guards, same Pi PID/session and Codex thread preserved, direct fresh-account-path pwsh ccb herdr open returned running, and foreground Herdr client observed. Legacy Python installation retained and User PATH rollback saved. See native-herdr-shell-reconnect-20261012.json.",
     "legacy_python_uninstall": "User completed deletion of normal and MSIX LocalCache copies; both paths verified absent. Old sample-project-2 Python daemon stopped via authenticated project shutdown before removal. Rust daemon/Pi/Codex identities and sessions unchanged; shared skills retained and original user-config backup preserved outside removed prefixes.",
-    "native_worktree_lifecycle": "22 distinct lifecycle cases passed on the final release in two batches (14 initial passes before a fixture-only extended-path failure, 8 final passes after correcting Git for Windows path conversion). The no-op/replay case then passed with additional already-integrated ancestry assertions. Prior release selection: 60 passed including 40 unchanged workspace/startup regressions. Existing Rust 47 passed/2 subprocess helpers ignored; added hosted-provider lifetime guard passed separately. fmt, all-targets Clippy -D warnings and diff checks passed. No sample-project Git mutations, Agent controls or installed-prefix upgrade; see native-worktree-lifecycle-20261012.json and docs/native-worktree-lifecycle.md."
+    "native_worktree_lifecycle": "22 distinct lifecycle cases passed on the final release in two batches (14 initial passes before a fixture-only extended-path failure, 8 final passes after correcting Git for Windows path conversion). The no-op/replay case then passed with additional already-integrated ancestry assertions. Prior release selection: 60 passed including 40 unchanged workspace/startup regressions. Existing Rust 47 passed/2 subprocess helpers ignored; added hosted-provider lifetime guard passed separately. fmt, all-targets Clippy -D warnings and diff checks passed. No sample-project Git mutations, Agent controls or installed-prefix upgrade; see native-worktree-lifecycle-20261012.json and docs/native-worktree-lifecycle.md.",
+    "native_worktree_lifecycle_installation": "Stopped-prefix upgrade committed, retained prior binary backup, all three aliases and installation manifest verified. Fresh account PATH resolves ccb/ask to the upgraded Rust prefix. One installed ccb.exe lifecycle integration test passed, including correlated merge, completed replay and already-integrated no-op. sample-project Keeper remains stopped and Git status clean; no project/provider controls or runtime-state migration. Old foreground CCB entry exited before stop attempt. See native-worktree-lifecycle-installation-20261012.json."
   },
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\5.Tool\\sample-project",
     "candidate_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "next_action": "Offline worktree merge/retire/restore/purge/recovery is implemented and tested in disposable repositories. Next broaden real Pi/Codex/Claude interruption/approval acceptance. Preserve current sample-project sessions; the newly built source-repository binary is not installed over the existing prefix. Other providers, advanced workgroups/plan-tree and extra GUI remain optional backlog.",
-    "latest_evidence": "docs/analysis/native-worktree-lifecycle-20261012.json",
+    "next_action": "Offline worktree lifecycle release is installed and verified. Project runtimes remain stopped. Next broaden real Pi/Codex/Claude interruption/approval acceptance in scoped test resources; no automatic merge, cleanup or new provider launch in sample-project.",
+    "latest_evidence": "docs/analysis/native-worktree-lifecycle-installation-20261012.json",
     "herdr_preflight": {
       "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_",
       "session": "ccb-rust-ui-gjjd92m_",
@@ -686,10 +687,10 @@
   },
   "installed_candidate": {
     "prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "rust_source_commit": "dda34f62a12b86f33fd29e91de4e8634c9e8b294",
-    "binary_sha256": "e3a4421381c7abfe6f86f5ea2bdc2906819fb6e24466e7d030a579c6c997a573",
+    "rust_source_commit": "2f7c14d2",
+    "binary_sha256": "e4190dd00339525d2689d83d7bf749589988336104fa3c68d786a72ea53c4035",
     "account_default": true,
-    "evidence": "docs/analysis/native-herdr-shell-reconnect-20261012.json"
+    "evidence": "docs/analysis/native-worktree-lifecycle-installation-20261012.json"
   },
   "active_scope": {
     "platform": "Windows 11 + pwsh + Herdr",

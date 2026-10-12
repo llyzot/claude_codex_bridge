@@ -15,15 +15,14 @@ Simple shared-worktree bindings are checked for every affected configured agent.
 
 ## Commands in pwsh
 
-Use the new repository-built executable until the running installed version can
-be upgraded without interrupting your project:
+After installing or upgrading this release, use `ccb` directly from pwsh. The
+examples require a configured managed-worktree agent:
 
 ```powershell
-$ccb = 'C:\Users\user\Desktop\work\4.user\2.github\claude_codex_bridge\bin\ccb-native.exe'
 # Run these in your intended project. Substitute its actual worker and branch names.
-& $ccb worktree inspect worker
-& $ccb worktree merge worker --into main --dry-run
-& $ccb worktree merge worker --into main
+ccb worktree inspect worker
+ccb worktree merge worker --into main --dry-run
+ccb worktree merge worker --into main
 ```
 
 `inspect` returns the ownership binding, HEAD, changed/ignored file records,
@@ -45,8 +44,8 @@ and `stage_path`. The original target stays unchanged. Resolve files in that
 stage checkout, run `git add` there, then continue the same operation:
 
 ```powershell
-& $ccb worktree status <operation-id>
-& $ccb worktree recover <operation-id>
+ccb worktree status <operation-id>
+ccb worktree recover <operation-id>
 ```
 
 Unexpected checkout changes, target movement, ownership changes and unresolved
@@ -58,10 +57,10 @@ repaired with a hard reset or force removal.
 ## Recoverable retirement and final removal
 
 ```powershell
-& $ccb worktree retire worker --dry-run
-$retired = & $ccb worktree retire worker | ConvertFrom-Json
+ccb worktree retire worker --dry-run
+$retired = ccb worktree retire worker | ConvertFrom-Json
 # Restore the entire checkout, including its staged/unstaged/private files:
-& $ccb worktree restore $retired.operation_id
+ccb worktree restore $retired.operation_id
 ```
 
 Retirement moves the complete registered checkout to a sibling directory ending
@@ -75,10 +74,10 @@ Permanent removal is separate and explicit:
 
 ```powershell
 # Use a currently retired receipt, after its worker commit is merged:
-& $ccb worktree purge <retirement-id> --into main --dry-run
-& $ccb worktree purge <retirement-id> --into main
+ccb worktree purge <retirement-id> --into main --dry-run
+ccb worktree purge <retirement-id> --into main
 # Add this only when you also want the managed branch removed:
-& $ccb worktree purge <retirement-id> --into main --delete-branch
+ccb worktree purge <retirement-id> --into main --delete-branch
 ```
 
 Purge refuses modified, untracked or ignored user files and requires the archived

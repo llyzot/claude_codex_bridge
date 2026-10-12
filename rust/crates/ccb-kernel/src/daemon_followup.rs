@@ -3,8 +3,69 @@ use super::{now, Daemon};
 use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 const LOG: &str = "native-followups.jsonl";
+
+// Keep every receipt identity indefinitely: deleting it would make a retry of
+// an old operation ID a new provider side effect. Only terminal payload/history
+// is retired. First-admission order remains the order used by trace and FIFO.
+fn compact_history(bytes: &[u8], project: &Value) -> Result<(Vec<u8>, usize, usize)> {
+    ensure!(
+        bytes.is_empty() || bytes.last() == Some(&b'\n'),
+        "incomplete followup history tail"
+    );
+    let mut latest = BTreeMap::new();
+    let mut lines = Vec::new();
+    for line in std::str::from_utf8(bytes)?.split_inclusive('\n') {
+        if line.trim().is_empty() {
+            lines.push((line, None));
+            continue;
+        }
+        let row: Value = serde_json::from_str(line)?;
+        ensure!(
+            row["schema_version"] == 1 && row["record_type"] == "native_active_followup",
+            "unsupported followup history record"
+        );
+        ensure!(row["project_id"] == *project, "foreign followup history");
+        let id = crate::records::string(&row, "followup_id")?.to_owned();
+        ensure!(
+            [
+                "accepted",
+                "sending",
+                "injected",
+                "rejected",
+                "uncertain",
+                "terminal",
+                "too_late"
+            ]
+            .contains(&row["status"].as_str().unwrap_or("")),
+            "unknown followup history status"
+        );
+        latest.insert(id.clone(), row);
+        lines.push((line, Some(id)));
+    }
+    let mut emitted = BTreeSet::new();
+    let mut output = Vec::new();
+    let mut removed = 0;
+    for (line, id) in lines {
+        let Some(id) = id else {
+            output.extend_from_slice(line.as_bytes());
+            continue;
+        };
+        let row = &latest[&id];
+        if ["accepted", "sending"].contains(&row["status"].as_str().unwrap_or("")) {
+            output.extend_from_slice(line.as_bytes());
+        } else if emitted.insert(id) {
+            let mut receipt = row.clone();
+            receipt["message"] = json!("");
+            output.extend(serde_json::to_vec(&receipt)?);
+            output.push(b'\n');
+        } else {
+            removed += 1;
+        }
+    }
+    Ok((output, removed, emitted.len()))
+}
 fn public(mut row: Value) -> Value {
     if let Some(o) = row.as_object_mut() {
         o.remove("message");
@@ -12,7 +73,34 @@ fn public(mut row: Value) -> Value {
     }
     row
 }
+
 impl Daemon {
+    pub(super) fn compact_followups(&mut self, p: &Value) -> Result<Value> {
+        let options = p
+            .as_object()
+            .context("followup-compact requires an object")?;
+        ensure!(
+            options.keys().all(|k| k == "dry_run"),
+            "unknown followup-compact option"
+        );
+        let dry_run = match p.get("dry_run") {
+            None => false,
+            Some(v) => v.as_bool().context("dry_run must be boolean")?,
+        };
+        let original = self.kernel.store.bytes(LOG)?.unwrap_or_default();
+        let (compacted, removed, receipts) =
+            compact_history(&original, &self.config["project_id"])?;
+        let changed = original != compacted;
+        if changed && !dry_run {
+            // The normal authority transaction journals replacement and
+            // invalidates cached indices before the success response.
+            self.kernel.store.save_bytes(LOG, &compacted)?;
+        }
+        Ok(
+            json!({"dry_run":dry_run,"changed":changed,"records_removed":removed,
+            "terminal_receipts_retained":receipts,"bytes_before":original.len(),"bytes_after":compacted.len()}),
+        )
+    }
     pub(super) fn followups_for_jobs(&self, jobs: &[Value]) -> Result<Vec<Value>> {
         let ids = jobs
             .iter()
@@ -200,5 +288,60 @@ impl Daemon {
             self.kernel.store.commit()?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn row(id: &str, status: &str, message: &str) -> Value {
+        json!({"schema_version":1,"record_type":"native_active_followup","project_id":"p",
+            "followup_id":id,"status":status,"message":message,"message_sha256":"receipt-hash","future_field":42})
+    }
+    fn bytes(rows: &[Value]) -> Vec<u8> {
+        rows.iter()
+            .flat_map(|row| {
+                let mut b = serde_json::to_vec(row).unwrap();
+                b.push(b'\n');
+                b
+            })
+            .collect()
+    }
+    #[test]
+    fn compaction_preserves_active_bytes_and_admission_order() {
+        let first = row("a", "accepted", "retired payload");
+        let pending = row("b", "accepted", "still needed");
+        let sending = row("b", "sending", "");
+        let terminal = row("a", "injected", "");
+        let input = bytes(&[first, pending.clone(), terminal.clone(), sending.clone()]);
+        let (out, removed, receipts) = compact_history(&input, &json!("p")).unwrap();
+        assert_eq!((removed, receipts), (1, 1));
+        assert_eq!(out, bytes(&[terminal, pending, sending]));
+        assert!(!String::from_utf8_lossy(&out).contains("retired payload"));
+        assert_eq!(compact_history(&out, &json!("p")).unwrap().0, out);
+    }
+    #[test]
+    fn compaction_preserves_uncertain_receipt_and_future_fields() {
+        let input = bytes(&[
+            row("a", "accepted", "private"),
+            row("a", "uncertain", "private"),
+        ]);
+        let (out, _, _) = compact_history(&input, &json!("p")).unwrap();
+        let receipt: Value = serde_json::from_slice(&out).unwrap();
+        assert_eq!(receipt["status"], "uncertain");
+        assert_eq!(receipt["message"], "");
+        assert_eq!(receipt["message_sha256"], "receipt-hash");
+        assert_eq!(receipt["future_field"], 42);
+    }
+    #[test]
+    fn compaction_rejects_unrecognized_or_partial_history() {
+        let valid = bytes(&[row("a", "injected", "")]);
+        assert!(compact_history(&valid[..valid.len() - 1], &json!("p")).is_err());
+        assert!(compact_history(&valid, &json!("other")).is_err());
+        assert!(compact_history(&bytes(&[row("a", "new-state", "")]), &json!("p")).is_err());
+        let mut newer = row("a", "injected", "");
+        newer["schema_version"] = json!(2);
+        assert!(compact_history(&bytes(&[newer]), &json!("p")).is_err());
+        assert_eq!(compact_history(b"", &json!("p")).unwrap(), (vec![], 0, 0));
     }
 }

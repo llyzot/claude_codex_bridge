@@ -132,6 +132,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         return Ok(());
     }
     if args.first().is_some_and(|s| s == "--help") {
+        println!("ccb-native --state-root <dir> followup-compact [--dry-run] (remove terminal followup payload/history; retain deduplication receipts)");
         println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask [--compact] [--silence] [--chain] [--artifact-request|--inline-request] [--artifact-reply] <agent> [from <actor>] [--] <message...>\n  target accepts a configured agent or uniquely bound role ID; agents lists bindings\n  ask also reads redirected UTF-8 stdin; --artifact-io enables request/reply artifacts\n  --task-id <id>, --reply-to <id>, --mode <type>; native --from <actor> remains supported\nccb-native --state-root <dir> ask get|cancel <job-id>\nccb-native --state-root <dir> cancel <job-id> [--silent] | retry <job-id>\nccb-native --state-root <dir> watch <target> [--cursor <n>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> agents|ping|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> job-recovery|job-reconcile <job-id>\nccb-native --state-root <dir> provider-status <agent>\nccb-native --state-root <dir> provider-terminate <agent> [--silent]\nccb-native --state-root <dir> provider-recover <agent> <fault-id>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native workspace-tree <path> [--include-controller-state]\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
         println!("ccb-native [--project <directory>] [--state-root <dir>] reload [--config <json>|--executables <manifest>] [--dry-run] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> reload-status");
         println!("ccb-native --state-root <dir> start --resume-config [--timeout-ms <ms>] (restore committed Windows configuration after owner exit)");
@@ -736,6 +737,21 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     }
     if op == "followup" {
         return crate::cli_followup::run(&root, &args);
+    }
+    if op == "followup-compact" {
+        ensure!(
+            args.is_empty() || (args.len() == 1 && args[0] == "--dry-run"),
+            "followup-compact accepts only --dry-run"
+        );
+        println!(
+            "{}",
+            request(
+                &root,
+                "followup-compact",
+                json!({"dry_run":!args.is_empty()})
+            )?
+        );
+        return Ok(());
     }
     if op == "followup-status" {
         ensure!(args.len() == 1, "followup-status requires a followup ID");

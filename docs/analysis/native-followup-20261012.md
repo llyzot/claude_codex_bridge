@@ -43,9 +43,27 @@ exists. Provider rejection is reported without echoing raw provider error text.
 
 The new `native-followups.jsonl` stores operation history separately from legacy
 Python records. Public receipts and trace omit the message and its digest.
-Accepted outbox records contain the message required for sending; append-only
-history retains that earlier record even after later revisions clear the field.
-This is not cryptographic deletion or a retention-policy implementation.
+Accepted outbox records contain the message required for sending. Operators can
+retire payloads and redundant transitions for terminal followups:
+
+```powershell
+ccb-native --state-root <directory> followup-compact --dry-run
+ccb-native --state-root <directory> followup-compact
+```
+
+The preview reports bytes before/after, removed records and retained terminal
+receipts. The live daemon performs the replacement through its writer journal;
+restart recovery completes an interrupted replacement. Accepted and sending
+operations retain their history, content and admission order. Terminal receipts,
+including uncertain sends, retain their operation IDs, content digests and
+bindings so status/trace and duplicate-request rejection still work after
+restart. The command is idempotent. Foreign, unknown-version, unknown-status or
+incomplete histories are rejected without replacement.
+
+This is explicit history compaction, not secure erasure or an automatic age/size
+policy. One receipt per terminal operation remains indefinitely to prevent old
+operation IDs from becoming new sends. Provider transcripts and filesystem
+backups are not modified.
 
 Validation covers same-job result changes, acknowledgement versus completion,
 FIFO ordering, rejection/mismatched replies, no-ack timeouts, cancellation,
@@ -57,6 +75,6 @@ Exact results and binary hashes are recorded in the adjacent evidence file.
 
 Subsequent [real-model acceptance](native-followup-live-20261012.md) verified
 direct same-turn steering and automatic Pi review of a steered worker result.
-Legacy Unix socket adoption, other-provider steering, bounded log retention and
+Legacy Unix socket adoption, other-provider steering, automatic retention and
 production default promotion remain unfinished. The installed production prefix
 was not changed.

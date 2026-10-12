@@ -1,0 +1,42 @@
+{
+  "recorded_at": "2026-10-12T02:27:53.356273+00:00",
+  "base_commit": "0896f7ec",
+  "feature": "Native followup terminal history compaction",
+  "commands": [
+    "followup-compact --dry-run",
+    "followup-compact"
+  ],
+  "contract": [
+    "Preserve one terminal receipt per operation, including uncertain sends, with digest and binding for deduplication",
+    "Retain accepted/sending history bytes and first admission order",
+    "Journal replacement through existing single writer and invalidate cached history indices",
+    "Reject unknown schema/status, foreign project and incomplete tail before replacement"
+  ],
+  "validation": {
+    "integration": {
+      "tests": 26,
+      "failures": 0,
+      "errors": 0,
+      "seconds": 66.297,
+      "files": [
+        "test/test_native_followup.py",
+        "test/test_native_trace.py"
+      ]
+    },
+    "rust_full_before_final_store_case": "45 passed, 2 subprocess helper tests ignored (invoked by their parent tests)",
+    "rust_final_followup_selection": "4 passed, including replacement recovery before/after publication and a second reopen",
+    "clippy": "all-targets -D warnings passed after moving the test module to the end of its file",
+    "format": "cargo fmt passed",
+    "release": "build script passed; bin and release hashes equal"
+  },
+  "hashes": {
+    "ccb-kernel.exe": "76bc9f365bbd4d115360267a64ef39477c5dc24b1ca5519b101e673419d83f58",
+    "ccb-native.exe": "8793bfa25c3eb25849449670ce31f84dd1038f7bb86917576cf7cceb7ee80083"
+  },
+  "limitations": [
+    "Explicit compaction only; no automatic age/size retention",
+    "Terminal receipt identities remain indefinitely; this is not a globally bounded history store or secure erasure",
+    "No installed prefix, provider account settings, production service or default entrypoint changed",
+    "No real model call was required for this storage change"
+  ]
+}

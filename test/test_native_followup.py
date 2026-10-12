@@ -188,3 +188,54 @@ def test_cancelled_turn_refuses_new_followup(tmp_path):
         assert len([r for r in wire(trace) if r.get('method') == 'turn/steer']) == 1
     finally:
         server.close()
+
+
+@pytest.mark.parametrize('mode,status', [('followup-hold', 'injected'), ('followup-denied', 'rejected'), ('followup-no-ack', 'uncertain')])
+def test_compaction_retires_payload_but_preserves_receipt_after_restart(tmp_path, mode, status):
+    server, job, trace, agent = start(tmp_path, mode)
+    message = 'private payload to retire'
+    try:
+        receipt = admit(server, job, message)
+        done = settled(server, receipt)
+        assert done['status'] == status
+        path = server.root / 'native-followups.jsonl'
+        before = path.read_bytes()
+        assert message.encode() in before
+        # Populate public trace/index caches before replacing their history.
+        server.rpc('trace', {'target': receipt['followup_id']})
+        preview = cli('--state-root', server.root, 'followup-compact', '--dry-run')
+        assert preview.returncode == 0, preview.stderr
+        assert json.loads(preview.stdout)['records_removed'] >= 1
+        assert path.read_bytes() == before
+        result = cli('--state-root', server.root, 'followup-compact')
+        assert result.returncode == 0, result.stderr
+        compacted = path.read_bytes()
+        assert message.encode() not in compacted and len(compacted) < len(before)
+        assert server.rpc('followup-status', {'followup_id': receipt['followup_id']})['status'] == status
+        assert server.rpc('trace', {'target': receipt['followup_id']})['active_followups'][0]['status'] == status
+        assert not server.rpc('followup-compact')['changed']
+        assert path.read_bytes() == compacted
+    finally:
+        server.close()
+    restored = Server(server.root, {'worker': agent})
+    try:
+        assert admit(restored, job, message, receipt['operation_id'])['status'] == status
+        with pytest.raises(AssertionError, match='another request'):
+            admit(restored, job, 'different payload', receipt['operation_id'])
+        assert len([r for r in wire(trace) if r.get('method') == 'turn/steer']) == 1
+    finally:
+        restored.close()
+
+
+def test_compaction_empty_and_invalid_options_do_not_create_history(tmp_path):
+    server = Server(tmp_path / 'state', {'worker': spec()})
+    try:
+        assert not server.rpc('followup-compact')['changed']
+        for payload in [{'dry_run': 'false'}, {'erase_receipts': True}]:
+            with pytest.raises(AssertionError):
+                server.rpc('followup-compact', payload)
+        result = cli('--state-root', server.root, 'followup-compact', '--unexpected')
+        assert result.returncode != 0
+        assert not (server.root / 'native-followups.jsonl').exists()
+    finally:
+        server.close()

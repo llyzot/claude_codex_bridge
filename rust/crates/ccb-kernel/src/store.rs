@@ -589,6 +589,46 @@ mod tests {
     use super::*;
     use serde_json::json;
     #[test]
+    fn followup_history_replacement_recovers_before_and_after_publication() {
+        for applied in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let path = "native-followups.jsonl";
+            let mut store = Store::open(root.path()).unwrap();
+            store
+                .append(
+                    path,
+                    &json!({"followup_id":"once","status":"accepted","message":"retired"}),
+                )
+                .unwrap();
+            store
+                .append(
+                    path,
+                    &json!({"followup_id":"once","status":"uncertain","message":""}),
+                )
+                .unwrap();
+            store.commit().unwrap();
+            let receipt = store.latest_rows(path, "followup_id").unwrap();
+            let mut compacted = serde_json::to_vec(&receipt[0]).unwrap();
+            compacted.push(b'\n');
+            store.save_bytes(path, &compacted).unwrap();
+            atomic_write(
+                &root.path().join("kernel/pending.json"),
+                &serde_json::to_vec(&store.writes).unwrap(),
+            )
+            .unwrap();
+            if applied {
+                store.apply(&store.writes[0]).unwrap();
+            }
+            drop(store);
+            for _ in 0..2 {
+                let restored = Store::open(root.path()).unwrap();
+                assert_eq!(restored.bytes(path).unwrap().unwrap(), compacted);
+                assert_eq!(restored.latest_rows(path, "followup_id").unwrap(), receipt);
+                assert!(!root.path().join("kernel/pending.json").exists());
+            }
+        }
+    }
+    #[test]
     fn uncached_commit_does_not_query_index_signatures() {
         let root = tempfile::tempdir().unwrap();
         let mut store = Store::open(root.path()).unwrap();

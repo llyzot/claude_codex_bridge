@@ -453,6 +453,7 @@ impl Daemon {
         match op {
             "followup" => self.admit_followup(p),
             "followup-status" => self.followup_status(p),
+            "followup-compact" => self.compact_followups(p),
             "project_view" => self.project_view(p),
             "project_view_dismiss_comms" => self.dismiss_comms(p),
             "reload-plan" => Ok(json!({"plan":self.reload_plan(&p["config"])?})),

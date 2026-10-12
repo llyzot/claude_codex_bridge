@@ -1,0 +1,61 @@
+{
+  "recorded_at": "2026-10-12T04:24:26.804483+00:00",
+  "binary_sha256": "f89db5d9333d9cf0a1841acdfa182b7754398b09a087d788608c0261d71d83ca",
+  "scope": "Frozen pre-Pi-fix release; aggregated coverage across interrupted run, tail, and two corrected fixture observations; not a single clean full-suite run.",
+  "expected": 1199,
+  "counts": {
+    "passed": 1188,
+    "skipped": 11
+  },
+  "missing": [],
+  "failed": [],
+  "runs": {
+    "native-core-regression-20261012.xml": {
+      "name": "pytest",
+      "errors": "1",
+      "failures": "0",
+      "skipped": "11",
+      "tests": "1143",
+      "time": "3334.974",
+      "timestamp": "2026-10-12T11:21:29.843623+08:00",
+      "hostname": "HOST"
+    },
+    "native-core-regression-tail-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "2",
+      "skipped": "0",
+      "tests": "73",
+      "time": "230.495",
+      "timestamp": "2026-10-12T12:17:35.787355+08:00",
+      "hostname": "HOST"
+    },
+    "native-workspace-recheck-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "2",
+      "skipped": "0",
+      "tests": "2",
+      "time": "26.668",
+      "timestamp": "2026-10-12T12:22:27.846313+08:00",
+      "hostname": "HOST"
+    },
+    "native-workspace-observation-fixed-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "2",
+      "time": "29.377",
+      "timestamp": "2026-10-12T12:23:26.396021+08:00",
+      "hostname": "HOST"
+    }
+  },
+  "harness_findings": [
+    "Progress observer replace failed with WinError 5; pytest exited with internal error after 1131 passed and 11 skipped. Original failure evidence retained.",
+    "Tail rerun covered all 57 unrecorded cases and adjacent cases: 71 passed, 2 timeouts. Both failed again at the fixture 8-second subprocess deadline.",
+    "Startup CLI defaults to a 15-second observation window; these two negative workspace tests now use a 25-second harness deadline. Both returned the expected failure and preserved the workspace. Production runtime behavior was not changed."
+  ],
+  "real_models_enabled": false,
+  "release_fix_coverage": "Separate targeted release run required for e4dba8a6 Pi canonical reply/loader fix."
+}

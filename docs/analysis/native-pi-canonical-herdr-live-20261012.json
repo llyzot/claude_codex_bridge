@@ -145,12 +145,13 @@
     "test_server_pid_absent": 66468,
     "fixed_pi_pid_absent": 69356
   },
-  "release_status": "Fix tested with debug build; release rebuild and candidate refresh deferred until the frozen full regression process finishes.",
+  "release_status": "Release built from e4dba8a6; 19 focused tests passed and stopped ccb-rust candidate upgraded. See native-pi-canonical-release-install-20261012.json. Real Herdr test remains debug-build evidence.",
   "full_regression": {
     "tool_session_id": 18552,
     "pid": 67760,
     "scope": "1199 tests on pre-fix release, 76 Rust core files; legacy Python provider suites tracked separately",
-    "progress_file": "docs/analysis/native-core-regression-20261012-progress.json"
+    "progress_file": "docs/analysis/native-core-regression-20261012-progress.json",
+    "status": "Finished with retained observer error; tail and corrected harness observations completed aggregate baseline. See native-core-regression-summary-20261012.json."
   },
   "limits": [
     "No existing default Herdr session or production Workspace controlled",

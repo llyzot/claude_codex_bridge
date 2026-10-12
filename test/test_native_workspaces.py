@@ -169,7 +169,9 @@ def test_prepared_creation_recovery_requires_clean_matching_checkout(tmp_path,di
     intent=work.with_name('worker.ccb-native-worktree.json');data=record(intent);data['phase']='prepared';intent.write_text(json.dumps(data))
     marker.unlink()
     if dirty:(work/'source.txt').write_text('ambiguous change')
-    result=cli('start','--executables',manifest(root),cwd=root)
+    # Keeper observes bounded startup retries; the harness must outlive the
+    # command's 15-second observation window to inspect its actual result.
+    result=cli('start','--executables',manifest(root),cwd=root,timeout=25)
     if dirty:
         assert result.returncode!=0
         assert (work/'source.txt').read_text()=='ambiguous change' and not marker.exists()
@@ -199,7 +201,7 @@ def test_missing_registered_worktree_is_not_pruned_or_recreated(tmp_path):
     assert parked.parent.resolve().is_relative_to(tmp_path.resolve())
     work.rename(parked)
     before=git(root,'worktree','list','--porcelain').stdout
-    result=cli('start','--executables',manifest(root),cwd=root)
+    result=cli('start','--executables',manifest(root),cwd=root,timeout=25)
     assert result.returncode!=0
     assert not work.exists() and (parked/'source.txt').read_text()=='initial\n'
     assert git(root,'worktree','list','--porcelain').stdout==before

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="26.668" timestamp="2026-10-12T12:22:27.846313+08:00" hostname="HOST"><testcase classname="test.test_native_workspaces" name="test_prepared_creation_recovery_requires_clean_matching_checkout[True]" time="12.805"><failure message="subprocess.TimeoutExpired: Command '['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'start', '--executables', 'C:\\Users\\user\\AppData\\Local\\Temp\\pytest-of-user\\pytest-475\\test_prepared_creation_recover0\\project-executables.json']' timed out after 8 seconds">test\test_native_workspaces.py:172: in test_prepared_creation_recovery_requires_clean_matching_checkout
+    result=cli('start','--executables',manifest(root),cwd=root)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_cli_security.py:17: in cli
+    return subprocess.run([str(BIN),*map(str,args)],text=True,capture_output=True,encoding='utf-8',timeout=8,**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:557: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:1221: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:1664: in _communicate
+    raise TimeoutExpired(self.args, orig_timeout)
+E   subprocess.TimeoutExpired: Command '['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'start', '--executables', 'C:\\Users\\user\\AppData\\Local\\Temp\\pytest-of-user\\pytest-475\\test_prepared_creation_recover0\\project-executables.json']' timed out after 8 seconds</failure></testcase><testcase classname="test.test_native_workspaces" name="test_missing_registered_worktree_is_not_pruned_or_recreated" time="13.060"><failure message="subprocess.TimeoutExpired: Command '['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'start', '--executables', 'C:\\Users\\user\\AppData\\Local\\Temp\\pytest-of-user\\pytest-475\\test_missing_registered_worktr0\\project-executables.json']' timed out after 8 seconds">test\test_native_workspaces.py:202: in test_missing_registered_worktree_is_not_pruned_or_recreated
+    result=cli('start','--executables',manifest(root),cwd=root)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_cli_security.py:17: in cli
+    return subprocess.run([str(BIN),*map(str,args)],text=True,capture_output=True,encoding='utf-8',timeout=8,**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:557: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:1221: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:1664: in _communicate
+    raise TimeoutExpired(self.args, orig_timeout)
+E   subprocess.TimeoutExpired: Command '['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'start', '--executables', 'C:\\Users\\user\\AppData\\Local\\Temp\\pytest-of-user\\pytest-475\\test_missing_registered_worktr0\\project-executables.json']' timed out after 8 seconds</failure></testcase></testsuite></testsuites>

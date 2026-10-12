@@ -1,0 +1,14 @@
+{
+  "pid": 67760,
+  "phase": "finished",
+  "current_test": null,
+  "total": 1199,
+  "elapsed_seconds": 3335.3,
+  "completed": 1142,
+  "counts": {
+    "passed": 1131,
+    "skipped": 11
+  },
+  "failed_tests": [],
+  "exit_code": 3
+}

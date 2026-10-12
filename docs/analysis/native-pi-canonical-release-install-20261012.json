@@ -1,0 +1,87 @@
+{
+  "recorded_at": "2026-10-12T04:29:18.437073+00:00",
+  "rust_source_commit": "e4dba8a6",
+  "prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
+  "binary_sha256": "1dff79bd099b9ecc00d868071071cfdb80e2c1093840a2ed1971477025b2f3d1",
+  "kernel_sha256": "15742bf3b4dfc002827983ea05f4eb08f19df5579c657fa4553d7304194b3ad0",
+  "release_test": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "19",
+    "time": "223.580",
+    "timestamp": "2026-10-12T12:25:27.860756+08:00",
+    "hostname": "HOST"
+  },
+  "baseline_regression": "docs/analysis/native-core-regression-summary-20261012.json",
+  "actual_Herdr_acceptance": "docs/analysis/native-pi-canonical-herdr-live-20261012.json",
+  "plan": {
+    "active_use_check": "performed_on_apply",
+    "backup": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-8c7e511d-c7b5-40a2-8e5b-63403dec128a.backup",
+    "from": {
+      "binary_sha256": "f89db5d9333d9cf0a1841acdfa182b7754398b09a087d788608c0261d71d83ca",
+      "manifest_sha256": "96802e29ec97620d8922483ec2680e11bd33ef8d63d1bfa27d66c8faa7f72877",
+      "version": "8.7.10"
+    },
+    "operation_id": "8c7e511d-c7b5-40a2-8e5b-63403dec128a",
+    "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+    "requires_stopped_native_commands": true,
+    "runtime_state_changed": false,
+    "stage": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-8c7e511d-c7b5-40a2-8e5b-63403dec128a.stage",
+    "status": "planned",
+    "to_binary_sha256": "1dff79bd099b9ecc00d868071071cfdb80e2c1093840a2ed1971477025b2f3d1",
+    "to_version": "8.7.10"
+  },
+  "upgrade": {
+    "backup": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-8c7e511d-c7b5-40a2-8e5b-63403dec128a.backup",
+    "path_modified": false,
+    "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+    "provider_settings_modified": false,
+    "runtime_state_changed": false,
+    "stage": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-8c7e511d-c7b5-40a2-8e5b-63403dec128a.stage",
+    "state_compatibility": "not_checked",
+    "status": "upgraded",
+    "upgrade": {
+      "finished_at": "2026-10-12T04:29:17.841222Z",
+      "from": {
+        "binary_sha256": "f89db5d9333d9cf0a1841acdfa182b7754398b09a087d788608c0261d71d83ca",
+        "manifest_sha256": "96802e29ec97620d8922483ec2680e11bd33ef8d63d1bfa27d66c8faa7f72877",
+        "version": "8.7.10"
+      },
+      "operation_id": "8c7e511d-c7b5-40a2-8e5b-63403dec128a",
+      "phase": "committed",
+      "prefix_name": "ccb-rust",
+      "record_type": "ccb_native_upgrade",
+      "runtime_state_changed": false,
+      "schema_version": 1,
+      "started_at": "2026-10-12T04:29:17.679044300Z",
+      "to": {
+        "binary_sha256": "1dff79bd099b9ecc00d868071071cfdb80e2c1093840a2ed1971477025b2f3d1",
+        "manifest_sha256": "06d66d0130c01ed376bcd57b2f04908273b6ed97cdbb2e92582e10dcf69ea6c9",
+        "version": "8.7.10"
+      }
+    }
+  },
+  "verify": {
+    "binary_sha256": "1dff79bd099b9ecc00d868071071cfdb80e2c1093840a2ed1971477025b2f3d1",
+    "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+    "runtime": "rust",
+    "status": "verified",
+    "version": "8.7.10"
+  },
+  "alias_runtimes": {
+    "ccb": "rust",
+    "ask": "rust",
+    "ccb-native": "rust"
+  },
+  "default_entrypoint_changed": false,
+  "account_settings_changed": false,
+  "production_workspace_controlled": false,
+  "limits": [
+    "Actual Herdr model-backed callback and hot reload were tested on the debug build of the same Pi fix. Final release has 19 focused tests including installed Pi no-model extension loading; it does not repeat that model-backed UI run.",
+    "The 1199-case aggregated baseline is the preceding release, not this Pi-fix release.",
+    "Old processes with the monolithic Pi entry cached require one controlled cold restart. Future implementation changes use the stable loader for hot reload.",
+    "Account default still uses legacy Python CCB. Production migration remains incomplete."
+  ]
+}

@@ -14,7 +14,8 @@ ROOT=Path(__file__).resolve().parents[1]
 BIN=Path(os.environ.get('CCB_TEST_NATIVE_BIN') or ROOT/'rust'/'target'/'debug'/('ccb-native.exe' if os.name=='nt' else 'ccb-native'))
 
 def cli(*args,**kwargs):
-    return subprocess.run([str(BIN),*map(str,args)],text=True,capture_output=True,encoding='utf-8',timeout=8,**kwargs)
+    timeout=kwargs.pop('timeout',8)
+    return subprocess.run([str(BIN),*map(str,args)],text=True,capture_output=True,encoding='utf-8',timeout=timeout,**kwargs)
 
 
 @pytest.mark.parametrize('flag',['--help','--version','--print-version','--capabilities'])

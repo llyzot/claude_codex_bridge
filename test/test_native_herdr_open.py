@@ -126,6 +126,27 @@ def test_invalid_native_host_open_is_rejected_before_mutation(setup,root_value,e
     assert not (backend/'calls.jsonl').exists()
     assert not (root/'.ccb/ccbd/herdr/namespace.json').exists()
 
+def test_public_open_discovers_programs_and_hosts_codex_without_compiled_options(project):
+    from test_native_codex_tui_host import CODEX
+    from test_native_real_models import PI
+    if not CODEX.exists() or not PI.exists():pytest.skip('Installed providers required for no-model initialization')
+    p=project;home=p['root']/'default-codex-home';home.mkdir()
+    config='version=2\n[windows]\nmain="lead:pi; worker:codex"\n[agents.worker.env]\nCODEX_HOME='+json.dumps(str(home))+'\n'
+    (p['root']/'.ccb/ccb.config').write_text(config,encoding='utf-8')
+    p['options'].pop('config')
+    p['file'].write_text(json.dumps(p['options']),encoding='utf-8')
+    change(p['backend'],lambda s:s.update(shell_name='pwsh.exe'))
+    result=p['open']();assert result.returncode==0,result.stderr
+    wait_for(lambda:json.loads((p['native']/'herdr/herdr-open.json').read_text(encoding='utf-8'))['phase']=='running',timeout=20)
+    session=json.loads((p['native']/'providers/codex/worker/session.json').read_text(encoding='utf-8'))
+    assert session['state']['tui_host']['input_transport']=='authenticated_websocket'
+    assert Path(session['state']['tui_host']['path']).parent.samefile(p['native']/'herdr/codex-hosts/worker')
+    assert mutate_count(p['backend'],['agent','start'])==1
+    assert mutate_count(p['backend'],['pane','run'])==1
+    assert not p['prompts']()
+    assert p['open']().returncode==0
+    assert mutate_count(p['backend'],['pane','run'])==1
+
 def test_short_observation_returns_without_restarting_live_opener(project):
     p=project;fault(p['backend'],['agent','start'],'hang-after')
     before=time.monotonic();first=p['open'](0);assert first.returncode==0,first.stderr

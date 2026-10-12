@@ -40,13 +40,29 @@ fn read(root: &Path, name: &str) -> Result<Option<Value>> {
         Err(e) => Err(e.into()),
     }
 }
-fn command(options: &Value) -> Result<Vec<String>> {
+pub(crate) fn command(options: &Value) -> Result<Vec<String>> {
     if let Some(command) = options.get("command") {
-        return serde_json::from_value(command.clone()).context("Herdr command must be argv");
+        let command: Vec<String> =
+            serde_json::from_value(command.clone()).context("Herdr command must be argv")?;
+        ensure!(
+            !command.is_empty() && command.iter().all(|s| !s.is_empty()),
+            "Herdr command must be nonempty argv"
+        );
+        return Ok(command);
     }
     let mut candidates = Vec::new();
     if let Some(exe) = std::env::var_os("CCB_HERDR_EXE") {
-        candidates.push(PathBuf::from(exe));
+        let exe = PathBuf::from(exe);
+        ensure!(
+            exe.is_absolute() && exe.is_file(),
+            "CCB_HERDR_EXE must name an existing absolute executable"
+        );
+        return Ok(vec![crate::workspaces::portable(&exe.canonicalize()?)?]);
+    }
+    // Herdr's activated standalone release is authoritative even when PATH
+    // retains a previous version. Never pick a release by scanning versions.
+    if let Some(home) = std::env::var_os("USERPROFILE") {
+        candidates.push(PathBuf::from(home).join(".herdr/packages/standalone/current/herdr.exe"));
     }
     if let Some(path) = std::env::var_os("PATH") {
         candidates.extend(std::env::split_paths(&path).map(|p| p.join("herdr.exe")));
@@ -63,7 +79,23 @@ fn command(options: &Value) -> Result<Vec<String>> {
         .into_iter()
         .find(|p| p.is_file())
         .context("Herdr executable not found; pass --herdr-exe or set CCB_HERDR_EXE")?;
-    Ok(vec![exe.to_string_lossy().into_owned()])
+    Ok(vec![crate::workspaces::portable(&exe.canonicalize()?)?])
+}
+
+pub(crate) fn default_config(project: &Path, source: Value) -> Result<Value> {
+    let executables = crate::config::discover_executables(project, &source)?;
+    let mut config = crate::config::compile(project, source, &executables)?;
+    let hosts = crate::config::state_root(project)?.join("herdr/codex-hosts");
+    for (name, spec) in config["agents"].as_object_mut().context("missing agents")? {
+        if spec["provider"] == "codex" {
+            ensure!(spec["startup_args"].is_null() || spec["startup_args"].as_array().is_some_and(|a| a.is_empty()),
+                "default Codex host uses thread_options/turn_options; explicit terminal startup_args require --options configuration");
+            if spec["tui_host_root"].is_null() {
+                spec["tui_host_root"] = json!(hosts.join(name));
+            }
+        }
+    }
+    Ok(config)
 }
 fn launch_command(request: &Value) -> Result<Command> {
     let argv: Vec<String> = serde_json::from_value(request["command"].clone())?;
@@ -610,9 +642,10 @@ pub(crate) fn open(
     let has_host = config["agents"].as_object().unwrap().values().any(hosted);
     let root = runtime.join("herdr");
     if options["dry_run"] == true {
-        let agents=config["agents"].as_object().unwrap().iter().map(|(name,spec)|json!({"name":name,"provider":spec["provider"],"workspace_path":spec["workspace_path"]})).collect::<Vec<_>>();
+        let agents=config["agents"].as_object().unwrap().iter().map(|(name,spec)|json!({"name":name,"provider":spec["provider"],"workspace_path":spec["workspace_path"],
+            "program":spec["command"][0],"input_transport":if hosted(spec) {"authenticated_websocket"} else {"herdr_agent_prompt"},"tui_host_root":spec["tui_host_root"]})).collect::<Vec<_>>();
         return Ok(
-            json!({"status":"planned","project_id":config["project_id"],"agents":agents,"mutations":false}),
+            json!({"status":"planned","project_id":config["project_id"],"agents":agents,"herdr_executable":command(options)?[0],"mutations":false}),
         );
     }
     crate::herdr_namespace::unlinked(&runtime)?;

@@ -495,6 +495,9 @@ fn expanded_windows(root: &Path, document: &Value) -> Result<Value> {
     expanded["agents"] = json!(agents);
     Ok(expanded)
 }
+pub(crate) fn discover_executables(root: &Path, document: &Value) -> Result<Value> {
+    crate::executables::discover(&expanded_windows(root, document)?)
+}
 pub fn compile(root: &Path, document: Value, executables: &Value) -> Result<Value> {
     let source = document;
     let document = expanded_windows(root, &source)?;

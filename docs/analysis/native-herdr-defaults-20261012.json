@@ -1,0 +1,85 @@
+{
+  "source_base_commit": "ad715318",
+  "change": [
+    "Ordinary Herdr open discovers installed provider programs and defaults Codex to owned authenticated WebSocket input",
+    "Expand Windows layout before executable discovery for config compile, start and Herdr open",
+    "Select explicitly configured Herdr, otherwise activated standalone current before PATH; pin the resolved executable for opener and attach",
+    "Read-only preview reports selected programs/transport; missing programs and incompatible custom startup_args fail before runtime creation"
+  ],
+  "native_sha256": "00056c18804d79b04f1177879ac96101469d9a4baa27c7f4a7e0a6d24852498b",
+  "runs": {
+    "native-herdr-defaults-red-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "5",
+      "skipped": "0",
+      "tests": "5",
+      "time": "0.611",
+      "timestamp": "2026-10-12T12:47:13.566521+08:00",
+      "hostname": "HOST"
+    },
+    "native-herdr-defaults-debug-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "5",
+      "time": "1.319",
+      "timestamp": "2026-10-12T12:48:34.564988+08:00",
+      "hostname": "HOST"
+    },
+    "native-herdr-defaults-composition-debug-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "11",
+      "time": "12.579",
+      "timestamp": "2026-10-12T12:49:54.856086+08:00",
+      "hostname": "HOST"
+    },
+    "native-herdr-defaults-release-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "63",
+      "time": "142.494",
+      "timestamp": "2026-10-12T12:51:24.207293+08:00",
+      "hostname": "HOST"
+    }
+  },
+  "actual_project_dry_run": {
+    "agents": [
+      {
+        "input_transport": "authenticated_websocket",
+        "name": "codex_worker",
+        "program": "C:\\Users\\user\\scoop\\apps\\nodejs-lts\\current\\bin/node_modules\\@openai/codex/node_modules/@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\bin/codex.exe",
+        "provider": "codex",
+        "tui_host_root": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2\\.ccb/ccbd\\herdr/codex-hosts\\codex_worker",
+        "workspace_path": "\\\\?\\C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2"
+      },
+      {
+        "input_transport": "herdr_agent_prompt",
+        "name": "pi_lead",
+        "program": "C:\\Users\\user\\scoop\\apps\\nodejs-lts\\current\\node.exe",
+        "provider": "pi",
+        "tui_host_root": null,
+        "workspace_path": "\\\\?\\C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2"
+      }
+    ],
+    "herdr_executable": "C:\\Users\\user\\.herdr\\packages\\standalone\\releases\\0.9.3-x86_64-pc-windows-msvc\\herdr.exe",
+    "mutations": false,
+    "project_id": "f48a0cc655bf36adfe036f78227caf2cdd5ba92a44d0cee1fcb5a547cc934ebd",
+    "status": "planned"
+  },
+  "actual_config_sha256": "8256cc74177ee2bb8308db8b13d8118c73484195cd1a38c87208f106024cedcd",
+  "actual_config_changed": false,
+  "format": "passed",
+  "clippy": "all-targets -D warnings passed",
+  "limits": [
+    "Actual default composition test used fixture Herdr transport and installed Codex no-model initialization; actual model-backed UI chains remain earlier separately scoped evidence.",
+    "Explicit compiled --options configurations retain their chosen adapters.",
+    "No production startup, old daemon shutdown, runtime-root change or account PATH change."
+  ]
+}

@@ -384,7 +384,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         let executables: Value = if args.len() == 4 {
             serde_json::from_slice(&std::fs::read(Path::new(&args[3]))?)?
         } else {
-            crate::executables::discover(&document)?
+            crate::config::discover_executables(&root, &document)?
         };
         println!("{}", crate::config::compile(&root, document, &executables)?);
         return Ok(());
@@ -511,6 +511,8 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             index += 1;
         }
         ensure!(timeout <= 60000, "Herdr open observation limit is 60000ms");
+        // Pin the same resolved executable for the background opener and attach.
+        options["command"] = json!(crate::herdr_open::command(&options)?);
         let config = if let Some(config) = options.get("config") {
             config.clone()
         } else {
@@ -518,11 +520,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
                 &std::fs::read_to_string(project.join(".ccb/ccb.config"))?,
                 Some(project),
             )?;
-            crate::config::compile(
-                project,
-                source,
-                &json!({"pi":["pi"],"codex":["codex"],"claude":["claude"]}),
-            )?
+            crate::herdr_open::default_config(project, source)?
         };
         let result =
             crate::herdr_open::launch(project, config, &options, Duration::from_millis(timeout))?;
@@ -620,7 +618,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             let executables = if let Some(path) = manifest {
                 serde_json::from_slice(&std::fs::read(path)?)?
             } else {
-                crate::executables::discover(&document)?
+                crate::config::discover_executables(&project, &document)?
             };
             crate::config::compile(&project, document, &executables)?
         };

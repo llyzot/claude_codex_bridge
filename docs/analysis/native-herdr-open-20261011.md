@@ -1,5 +1,27 @@
 # Native Herdr open composition — 2026-10-11
 
+## Current ordinary-entry update — 2026-10-12
+
+Plain `ccb herdr open` now discovers the installed provider executables and
+automatically hosts Codex through authenticated WebSocket input. Windows
+`[windows]` layouts are expanded before executable discovery, including for
+`config compile` and `start`. An explicit compiled `--options` configuration
+retains its selected adapter. Custom Codex terminal `startup_args` require that
+explicit configuration; the default host does not silently discard them.
+
+Herdr selection is explicit `--herdr-exe`/options first, then `CCB_HERDR_EXE`,
+then the activated `.herdr/packages/standalone/current` release, PATH, and
+standard Windows application locations. An invalid explicit environment path
+fails rather than falling through. The resolved executable is pinned for the
+opener and foreground attachment. The read-only preview reports the selected
+programs and input transport, without emitting environment values or launching
+any provider. This fixes the observed local stale PATH entry for Herdr 0.9.0
+while the activated release is 0.9.3.
+
+The material below describes the earlier checkpoint. These defaults do not
+automatically take ownership of an existing legacy runtime or promote the
+account's command entrypoint.
+
 The experimental native CLI now composes the existing Rust namespace, Agent,
 terminal-history and daemon components through `herdr open`. It supports Pi and
 Codex terminal Agents in one workspace. This is not production/default promotion

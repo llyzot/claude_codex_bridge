@@ -1,4 +1,4 @@
-//! Explicit recovery of a quiescent, stopped CCB-owned Herdr server.
+//! Recovery of a quiescent stopped server or deliberately retired namespace.
 //! Preserve journals/history; retire only the uniquely recorded restored workspace.
 use super::{hash, prepare_request, read, server, RECORD};
 use anyhow::{ensure, Context, Result};
@@ -360,7 +360,9 @@ pub(super) fn step(
     let runtime = crate::config::state_root(project)?;
     let mut recovery = read(root, STATE)?.unwrap_or(Value::Null);
     if recovery.is_null() || recovery["phase"] == "complete" {
-        if options["recover_stopped"] != true {
+        let namespace = read(root, "namespace.json")?.unwrap_or(Value::Null);
+        let retired = namespace["status"] == "retired";
+        if !retired && options["recover_stopped"] != true {
             return Ok(true);
         }
         let status = crate::herdr_agents::rpc(
@@ -368,34 +370,51 @@ pub(super) fn step(
             vec!["status".into(), "server".into(), "--json".into()],
         )?;
         let status = status.get("server").unwrap_or(&status);
-        if status["running"] == true {
+        if !retired && status["running"] == true {
             return Ok(true);
         }
         ensure!(
-            status["running"] == false,
-            "recovery requires confirmed server absence"
+            status["running"].is_boolean(),
+            "recovery requires confirmed server state"
         );
-        let Some(namespace) = read(root, "namespace.json")? else {
+        if namespace.is_null() {
             return Ok(true);
-        };
-        ended(&open["server_process"])?;
+        }
+        if !retired || status["running"] == false {
+            ended(&open["server_process"])?;
+        }
         let mut inspect = request.clone();
         inspect["action"] = json!("inspect");
-        crate::herdr_namespace::inspect_prepared(request)?;
+        if retired {
+            crate::herdr_namespace::inspect_retired(request)?;
+        } else {
+            crate::herdr_namespace::inspect_prepared(request)?;
+        }
         let agents = crate::herdr_agents::execute(&inspect)?["mount"].clone();
         for row in agents["agents"]
             .as_object()
             .context("missing mounted recovery agents")?
             .values()
         {
+            if retired
+                && crate::startup::owner_alive(&json!({
+                    "pid":row["binding"]["process"]["pid"],"process":row["binding"]["process"]
+                }))?
+            {
+                open["phase"] = json!("waiting_for_retired_processes");
+                return Ok(false);
+            }
             ended(&row["binding"]["process"])?;
         }
         let mut kernel = quiet(&runtime, config)?;
         let sessions = resumes(root, &runtime, config, open, &agents, &mut kernel)?;
         recovery = json!({"schema_version":1,"operation_id":uuid::Uuid::new_v4().to_string(),"project_id":config["project_id"],"session":request["session"],
+            "kind":if retired {"retired_namespace"} else {"stopped_server"},
             "phase":"starting_server","source_hash":open["request_hash"],"previous_open":open,"namespace":namespace,"agents":agents,"sessions":sessions,"close_permitted":false});
-        open["server_start_permitted"] = json!(false);
-        open["server_process"] = Value::Null;
+        if !retired || status["running"] == false {
+            open["server_start_permitted"] = json!(false);
+            open["server_process"] = Value::Null;
+        }
         open["workspace_id"] = Value::Null;
         open["phase"] = json!("recovering_server");
         put(root, &recovery, open)?;
@@ -421,18 +440,25 @@ pub(super) fn step(
     if !server(request, root, open)? {
         return Ok(false);
     }
+    let retired = recovery["kind"] == "retired_namespace";
     let identity = &open["server_process"];
-    ensure!(
-        crate::owned_process::observe_external_process(
-            identity["pid"]
-                .as_u64()
-                .context("recovery has no new server process")? as u32
-        )? == *identity,
-        "recovery server lifetime changed"
-    );
+    if !retired || identity.is_object() {
+        ensure!(
+            crate::owned_process::observe_external_process(
+                identity["pid"]
+                    .as_u64()
+                    .context("recovery has no server process")? as u32
+            )? == *identity,
+            "recovery server lifetime changed"
+        );
+    }
     let mut observed = snapshot(request)?;
     no_other_session_users(&observed, &recovery)?;
     if target(&observed, &recovery)? {
+        ensure!(
+            !retired,
+            "retired workspace reappeared; refusing another close or replacement"
+        );
         safe_to_retire(request, &observed, &recovery)?;
         if recovery["close_permitted"] != true {
             recovery["close_permitted"] = json!(true);

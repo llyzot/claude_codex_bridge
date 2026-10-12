@@ -2,7 +2,15 @@
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 const config = JSON.parse(process.argv[2]);
+if (config.start_gate) {
+  const deadline = Date.now() + 30000;
+  while (!existsSync(config.start_gate)) {
+    if (Date.now() >= deadline) throw new Error('Pi fixture start gate expired');
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+}
 const bridge = (await import(pathToFileURL(config.extension).href)).default;
 let handlers;
 let currentSession = config.session_id;

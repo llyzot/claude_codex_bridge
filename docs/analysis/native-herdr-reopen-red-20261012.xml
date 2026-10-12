@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="9.554" timestamp="2026-10-12T13:29:48.492273+08:00" hostname="HOST"><testcase classname="test.test_native_herdr_reopen" name="test_reopen_after_kill_preserves_exact_session_and_running_server[codex]" time="4.608"><failure message="AssertionError: ccb-native: Herdr open failed: namespace is retiring or retired; explicit lifecycle recovery is required&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...', stderr='ccb-native: Herdr open failed: namespace is retiring or retired; explicit lifecycle recovery is required\n').returncode">test\test_native_herdr_reopen.py:27: in test_reopen_after_kill_preserves_exact_session_and_running_server
+    result=p['open']();assert result.returncode==0,result.stderr
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ccb-native: Herdr open failed: namespace is retiring or retired; explicit lifecycle recovery is required
+E
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...', stderr='ccb-native: Herdr open failed: namespace is retiring or retired; explicit lifecycle recovery is required\n').returncode</failure></testcase><testcase classname="test.test_native_herdr_reopen" name="test_reopen_after_kill_preserves_exact_session_and_running_server[claude]" time="4.536"><failure message="AssertionError: ccb-native: Herdr open failed: namespace is retiring or retired; explicit lifecycle recovery is required&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...', stderr='ccb-native: Herdr open failed: namespace is retiring or retired; explicit lifecycle recovery is required\n').returncode">test\test_native_herdr_reopen.py:27: in test_reopen_after_kill_preserves_exact_session_and_running_server
+    result=p['open']();assert result.returncode==0,result.stderr
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ccb-native: Herdr open failed: namespace is retiring or retired; explicit lifecycle recovery is required
+E
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...', stderr='ccb-native: Herdr open failed: namespace is retiring or retired; explicit lifecycle recovery is required\n').returncode</failure></testcase></testsuite></testsuites>

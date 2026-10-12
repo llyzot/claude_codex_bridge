@@ -1,0 +1,71 @@
+{
+  "source_base_commit": "fb868ed2",
+  "change": "Ordinary Herdr open recovers a confirmed retired namespace with verified native session continuity, preserving or restarting its proven owned server as needed.",
+  "native_sha256": "8b8c75e52f122d9b332e3613b645f32111ef2545f5ac4ca7c0d8b12003650e34",
+  "runs": {
+    "native-herdr-reopen-red-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "2",
+      "skipped": "0",
+      "tests": "2",
+      "time": "9.554",
+      "timestamp": "2026-10-12T13:29:48.492273+08:00",
+      "hostname": "HOST"
+    },
+    "native-herdr-reopen-debug-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "6",
+      "time": "40.977",
+      "timestamp": "2026-10-12T13:31:34.834248+08:00",
+      "hostname": "HOST"
+    },
+    "native-herdr-reopen-pi-debug-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "2",
+      "time": "33.056",
+      "timestamp": "2026-10-12T13:33:49.021500+08:00",
+      "hostname": "HOST"
+    },
+    "native-herdr-reopen-lifecycle-debug-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "2",
+      "time": "16.679",
+      "timestamp": "2026-10-12T13:35:45.723203+08:00",
+      "hostname": "HOST"
+    },
+    "native-herdr-reopen-release-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "44",
+      "time": "332.278",
+      "timestamp": "2026-10-12T13:38:12.284728+08:00",
+      "hostname": "HOST"
+    }
+  },
+  "format": "passed",
+  "clippy": "all-targets -D warnings passed",
+  "contracts": [
+    "Old foreground processes must exit before replacement; PID reuse uses lifetime identity",
+    "Old native session files/IDs/workspace must match before fresh namespace allocation",
+    "Duplicated live sessions and reappeared retired workspace IDs are rejected",
+    "Recovery archives/reset are durable; opener crash after Agent launch does not duplicate it",
+    "Pi/Codex fixture chain works after reopen; installed Codex no-model host resumes exact thread on a new process"
+  ],
+  "limits": [
+    "Unfinished jobs/mailboxes/callbacks/replies/provider faults still block automatic recovery.",
+    "Full model-backed retired-namespace acceptance is pending the scoped real test.",
+    "Production/default entrypoint migration remains unapproved; no production controls have occurred."
+  ]
+}

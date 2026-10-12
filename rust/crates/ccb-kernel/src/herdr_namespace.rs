@@ -888,14 +888,20 @@ pub(crate) fn with_prepared(
     action(&mut controller.store, &controller.plan, &controller.record)
 }
 pub(crate) fn inspect_prepared(request: &Value) -> Result<Value> {
+    inspect_status(request, "prepared")
+}
+pub(crate) fn inspect_retired(request: &Value) -> Result<Value> {
+    inspect_status(request, "retired")
+}
+fn inspect_status(request: &Value, expected: &str) -> Result<Value> {
     let mut request = request.clone();
     request["action"] = json!("inspect");
     let namespace = execute(&request)?["namespace"].clone();
     let plan = plan(&request)?;
     validate_record(&namespace, &plan, &hash(&plan)?)?;
     ensure!(
-        namespace["status"] == "prepared",
-        "Herdr namespace is not prepared"
+        namespace["status"] == expected,
+        "Herdr namespace is not {expected}"
     );
     Ok(namespace)
 }

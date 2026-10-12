@@ -24,9 +24,16 @@ blocked by foreign panes can therefore leave the authority stopped while keeping
 the workspace open. `--force` cleanup is not implemented and is rejected before
 stopping anything. Legacy Python runtimes require their original shutdown path.
 
-Reopening a deliberately retired namespace with verified session continuity
-remains to be connected. Ordinary preparation refuses retired records instead of
-silently creating fresh sessions. The material below records earlier checkpoints.
+Plain `ccb herdr open` now recognizes a confirmed retired namespace and restores
+verified Pi/Codex/Claude sessions under a new namespace owner. It waits for old
+foreground lifetimes to end, reuses a running server, and can restart a stopped
+CCB-owned server. Recovery archives the old namespace and session evidence before
+creating the replacement; an interrupted opener observes existing launch intents.
+Missing history, a duplicated live session, an old workspace ID that reappeared,
+or unfinished jobs/mailboxes/callbacks/faults block automatic reopening. A close
+whose outcome remains uncertain is not treated as confirmed retirement. The
+low-level preparation command still refuses retired records; only the verified
+open recovery path resets them. The material below records earlier checkpoints.
 
 Rust now has an internal `herdr-agents` controller for launching original Pi,
 Codex and Claude terminal programs into a previously prepared native namespace.

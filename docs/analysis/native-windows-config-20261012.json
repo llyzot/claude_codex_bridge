@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "base_commit": "b373a560",
+  "recorded_at": "2026-10-12T02:00:49.585932+00:00",
+  "implemented": [
+    "Expand a version-2 single [windows] layout into native agents using existing compact grammar/defaults while preserving source_config.",
+    "Apply referenced agent overlays, reject provider/role conflicts, and ignore stale overlays consistently with the existing Python reader.",
+    "Native Herdr topology consumes the declared window layout directly, preserving agent order, orientation and splits rather than sorting a fallback layout.",
+    "Reject multiple windows, cmd/default_agents/legacy-layout conflicts, unknown entry windows and unsupported tool-window/sidebar declarations instead of flattening or discarding them."
+  ],
+  "verification": {
+    "passed": 69,
+    "junit": "docs/analysis/native-windows-config-20261012.xml",
+    "oracle": "Python validate_project_config defaults and WindowSpec.agent_names",
+    "format_clippy_diff": "passed",
+    "full_repository_suite": false
+  },
+  "actual_project_read_only_check": {
+    "project": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2",
+    "source_config_sha256": "8256cc74177ee2bb8308db8b13d8118c73484195cd1a38c87208f106024cedcd",
+    "before_error": "config agents must be a table",
+    "after_compile_exit": 0,
+    "after_herdr_dry_run_status": "planned",
+    "agents": {
+      "pi_lead": "pi",
+      "codex_worker": "codex"
+    },
+    "source_config_changed": false,
+    "background_service_started": false,
+    "executable_manifest": "Command-name placeholders for compilation only; no provider execution or readiness claim"
+  },
+  "binary_sha256": {
+    "ccb-kernel.exe": "637ea5822c15d88ceab308640cfb1f9739c20b2ff6a8656a0400c9d4e32cced8",
+    "ccb-native.exe": "dc80ed286194ddbd044bf40586a7fc3b021c823be786941de67f64ad15766b5e"
+  },
+  "production_install_changed": false,
+  "limits": [
+    "Multiple windows, tool panes and sidebar configuration remain unsupported by this native topology path.",
+    "This checks compilation and topology/preflight, not actual Herdr GUI behavior or legacy-state migration.",
+    "Current user installation still invokes Python; do not switch it before migration/rollback checks."
+  ]
+}

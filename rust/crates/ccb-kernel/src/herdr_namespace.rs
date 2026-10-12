@@ -286,10 +286,7 @@ pub fn plan(request: &Value) -> Result<Value> {
     };
     ensure!((50..=60000).contains(&timeout), "invalid namespace timeout");
     let source = &config["source_config"];
-    ensure!(
-        source["windows"].is_null(),
-        "native namespace requires a single workspace layout"
-    );
+    let window_layout = crate::config::single_window_layout(source)?;
     let agents = config["agents"].as_object().unwrap();
     let mut ordered: Vec<String> = if source["default_agents"].is_array() {
         serde_json::from_value(source["default_agents"].clone())?
@@ -303,7 +300,9 @@ pub fn plan(request: &Value) -> Result<Value> {
         "invalid namespace default agents"
     );
     let layout = source.get("layout").or_else(|| source.get("layout_spec"));
-    let tree = if let Some(layout) = layout.filter(|v| !v.is_null()) {
+    let tree = if let Some(window) = window_layout {
+        crate::config::layout_tree(window, &root, &config["agents"])?
+    } else if let Some(layout) = layout.filter(|v| !v.is_null()) {
         crate::config::layout_tree(
             layout.as_str().context("layout must be text")?,
             &root,

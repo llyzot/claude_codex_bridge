@@ -391,7 +391,113 @@ impl Layout {
         Ok(LayoutText::leaf(render))
     }
 }
+pub(crate) fn single_window_layout(document: &Value) -> Result<Option<&str>> {
+    if document["windows"].is_null() {
+        return Ok(None);
+    }
+    ensure!(
+        document["version"] == 2,
+        "native windows topology requires config version 2"
+    );
+    let windows = document["windows"]
+        .as_object()
+        .context("windows must be a table")?;
+    ensure!(
+        windows.len() == 1,
+        "native topology currently requires exactly one configured window"
+    );
+    let (name, layout) = windows.iter().next().unwrap();
+    ensure!(
+        !name.trim().is_empty() && !name.contains('\0'),
+        "invalid window name"
+    );
+    for field in ["layout", "layout_spec", "cmd_enabled"] {
+        ensure!(
+            document.get(field).is_none(),
+            "{field} is not supported with windows topology"
+        );
+    }
+    ensure!(
+        document["default_agents"].is_null(),
+        "default_agents is not supported with windows topology"
+    );
+    ensure!(
+        document["entry_window"].is_null() || document["entry_window"] == *name,
+        "entry_window does not identify the configured window"
+    );
+    ensure!(
+        document["tool_windows"].is_null()
+            || document["tool_windows"]
+                .as_object()
+                .is_some_and(|v| v.is_empty()),
+        "native tool_windows topology is not implemented"
+    );
+    ensure!(
+        document["ui"].is_null(),
+        "native windows topology does not yet apply ui sidebar settings"
+    );
+    Ok(Some(layout.as_str().context("window layout must be text")?))
+}
+fn expanded_windows(root: &Path, document: &Value) -> Result<Value> {
+    let Some(layout) = single_window_layout(document)? else {
+        return Ok(document.clone());
+    };
+    let compact = parse_at(layout, Some(root))?;
+    ensure!(
+        compact["cmd_enabled"] == false,
+        "cmd is not supported in windows topology"
+    );
+    let mut agents = compact["agents"]
+        .as_object()
+        .context("window requires an agent layout")?
+        .clone();
+    if !document["agents"].is_null() {
+        let overlays = document["agents"]
+            .as_object()
+            .context("agents must be a table")?;
+        let mut seen = std::collections::BTreeSet::new();
+        for (raw, overlay) in overlays {
+            let name = raw.trim().to_lowercase();
+            crate::models::validate_agent(&name)?;
+            let Some(spec) = agents.get_mut(&name) else {
+                continue;
+            }; // Existing loader ignores stale overlays.
+            ensure!(
+                seen.insert(name.clone()),
+                "duplicate normalized agent overlay"
+            );
+            let overlay = overlay
+                .as_object()
+                .context("agent overlay must be a table")?;
+            if let Some(provider) = overlay.get("provider") {
+                ensure!(
+                    provider.as_str().is_some_and(|v| v
+                        .trim()
+                        .eq_ignore_ascii_case(spec["provider"].as_str().unwrap())),
+                    "agent provider conflicts with windows layout"
+                );
+            }
+            if !spec["role"].is_null() && overlay.contains_key("role") {
+                ensure!(
+                    crate::roles::normalized(&overlay["role"])?
+                        == crate::roles::normalized(&spec["role"])?,
+                    "agent role conflicts with windows shorthand"
+                );
+            }
+            for (key, value) in overlay {
+                if key != "provider" {
+                    spec[key] = value.clone();
+                }
+            }
+        }
+    }
+    let mut expanded = document.clone();
+    expanded["agents"] = json!(agents);
+    Ok(expanded)
+}
 pub fn compile(root: &Path, document: Value, executables: &Value) -> Result<Value> {
+    let source = document;
+    let document = expanded_windows(root, &source)?;
     let id = project_id(root)?;
     let mut agents = serde_json::Map::new();
     for (name, raw) in document["agents"]
@@ -477,7 +583,7 @@ pub fn compile(root: &Path, document: Value, executables: &Value) -> Result<Valu
         agents.insert(name.clone(), spec);
     }
     ensure!(!agents.is_empty(), "config has no agents");
-    let compiled = json!({"schema_version":2,"project_id":id,"project_root":root,"agents":agents,"source_config":document});
+    let compiled = json!({"schema_version":2,"project_id":id,"project_root":root,"agents":agents,"source_config":source});
     crate::workspaces::validate(&compiled)?;
     Ok(compiled)
 }

@@ -238,7 +238,8 @@
     "Confirmed pre-initialization Pi/Codex/Claude process exits persist startup faults, terminate unsent requests and return failure through existing Lead callback chains without automatic respawn",
     "Windows original Claude Herdr terminal composition, bound/deferred transcript observation, Lead/Worker callbacks and same-session stopped-server recovery implemented with offline acceptance; native paste envelopes and hook invalidation covered",
     "Shared Pi/Codex/Claude launch shortcut normalization and conflict validation; Claude protocol effort forwarding and Codex turn-option preservation verified",
-    "Explicit native manual/auto task-permission mapping, conflict checks, transient launch derivation and required-role fail_mount guards implemented; no production or real-agent permission changes"
+    "Explicit native manual/auto task-permission mapping, conflict checks, transient launch derivation and required-role fail_mount guards implemented; no production or real-agent permission changes",
+    "Existing version-2 single-window config expands into native agents and exact Herdr topology; actual sample-project-2 config compiles and dry-runs unchanged"
   ],
   "remaining": [
     "Broaden native Keeper real-model/Herdr foreground acceptance, legacy/cross-platform coexistence and unavailable-observation/storage recovery; evaluate optional OS-level restart of the Keeper itself and production/default rollout",
@@ -633,14 +634,13 @@
     "native_launch_options_evidence": "docs/analysis/native-launch-options-20261012.json",
     "native_launch_options_validation": "56 launch-options/config/startup/Claude Herdr composition cases passed. New red case reproduced missing normalization. All existing thinking levels, legacy prefix deduplication, option preservation, conflicts, type validation and no-mutation Herdr preflight covered. Formatting/Clippy/build/hash/diff passed. Top-level permission remains unconsumed by native runtime and is an explicit rollout blocker; no policy/default installation/model call changed.",
     "native_permission_evidence": "docs/analysis/native-permission-policy-20261012.json",
-    "native_permission_validation": "Initial selection: 112 passed, 1 manual malformed-role isolation regression. Fixed task-local error handling and sanitized auto-policy failure. Final permission/live-role selection: 41 passed. Added direct/attached Codex argv conflict guards; final permission selection: 24 passed. Formatting/Clippy/build/hash/diff verified; no full-suite or real-provider auto launch. Actual user Windows-layout config was read-only compiled and rejected for missing expanded agents, defining the next concrete rollout gate."
+    "native_permission_validation": "Initial selection: 112 passed, 1 manual malformed-role isolation regression. Fixed task-local error handling and sanitized auto-policy failure. Final permission/live-role selection: 41 passed. Added direct/attached Codex argv conflict guards; final permission selection: 24 passed. Formatting/Clippy/build/hash/diff verified; no full-suite or real-provider auto launch. Actual user Windows-layout config was read-only compiled and rejected for missing expanded agents, defining the next concrete rollout gate.",
+    "native_windows_config_evidence": "docs/analysis/native-windows-config-20261012.json",
+    "native_windows_config_validation": "69 native Windows-config, existing config, Herdr namespace and startup cases passed. Existing Python reader agrees on agent defaults/order; positive topology plan is read-only. Actual user config previously failed for absent agents and now compiles/dry-runs unchanged, identifying pi_lead and codex_worker. Clippy/fmt/build/hash/diff passed. No background service, real provider or installation change."
   },
   "next_rollout_action": {
-    "project": "C:/Users/user/Desktop/work/1.code/1.renesas/sample-project-2",
-    "observed_config": "version=2; [windows] main=\"pi_lead:pi, codex_worker:codex\"; [runtime.mux] backend=\"herdr\"",
-    "read_only_native_compile_exit": 1,
-    "error": "config agents must be a table",
-    "current_installation": "C:/Users/user/AppData/Local/ccb-pi-local/bin/ccb.cmd invokes its .venv/Scripts/python.exe",
-    "next_action": "Translate the existing Windows layout configuration through the native compiler before state migration and installation cutover."
+    "project": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2",
+    "config_compatibility": "verified for existing single-window document",
+    "next_action": "Inspect existing project runtime/session state and installed Python prefix; prepare native cutover and rollback without losing sessions or changing the source config."
   }
 }

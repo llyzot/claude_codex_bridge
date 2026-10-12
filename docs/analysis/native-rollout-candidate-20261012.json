@@ -75,9 +75,10 @@
     "classification": "Windows sharing violation (os error 32) during runtime read/execute ACL validation",
     "runtime": "C:/Users/user/AppData/Local/OpenAI/Codex/runtimes/cua_node/cfb32733c877621e/bin/node_repl.exe",
     "shared_runtime_processes_observed": 13,
-    "shared_processes_stopped": false,
+    "shared_processes_stopped": true,
     "sandbox_weakened": false,
-    "pending_decision": "User authorization is required before interrupting shared desktop JS/browser tool runtimes; prior workspace/agent shutdown permission does not clearly cover these unrelated tool sessions."
+    "authorized_retest_evidence": "docs/analysis/native-runtime-retest-20261012.json",
+    "retest_outcome": "13 matching processes stopped using verified image paths on held process handles. Same sandbox probe failed with the same sharing violation. Post-test process inventory and Windows Restart Manager did not identify a remaining owner."
   },
   "cutover_plan": {
     "candidate_ready": true,

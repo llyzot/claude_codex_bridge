@@ -643,6 +643,7 @@
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2",
     "candidate_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "next_action": "Obtain a decision on shared node_repl interruption or an approved equivalent runtime repair, validate tools without weakening the requested sandbox, then execute a reviewed state-preserving cutover."
+    "next_action": "Authorized shared-runtime shutdown and identical restricted IO retest completed, but sandbox setup still reports os error 32. Identify the remaining shared-runtime access conflict without relaxing sandbox settings; default cutover and actual Herdr UI acceptance remain outstanding.",
+    "latest_evidence": "docs/analysis/native-runtime-retest-20261012.json"
   }
 }

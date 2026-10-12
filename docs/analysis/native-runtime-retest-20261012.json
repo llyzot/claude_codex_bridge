@@ -1,0 +1,100 @@
+{
+  "recorded_at": "2026-10-12T02:22:41.580684+00:00",
+  "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-installed-io-retest-d_095mc7",
+  "script": "C:/Users/user/Desktop/work/ccb-runtime-retest-20261012.py",
+  "shared_process_stop_authorized": true,
+  "processes_stopped": [
+    {
+      "pid": 27784,
+      "created": "134361129767760057",
+      "image": "C:\\Users\\user\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\cfb32733c877621e\\bin\\node_repl.exe"
+    },
+    {
+      "pid": 56680,
+      "created": "134361129780154679",
+      "image": "C:\\Users\\user\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\cfb32733c877621e\\bin\\node_repl.exe"
+    },
+    {
+      "pid": 27308,
+      "created": "134361186098189648",
+      "image": "C:\\Users\\user\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\cfb32733c877621e\\bin\\node_repl.exe"
+    },
+    {
+      "pid": 31740,
+      "created": "134361364329269432",
+      "image": "C:\\Users\\user\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\cfb32733c877621e\\bin\\node_repl.exe"
+    },
+    {
+      "pid": 54252,
+      "created": "134361364330988647",
+      "image": "C:\\Users\\user\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\cfb32733c877621e\\bin\\node_repl.exe"
+    },
+    {
+      "pid": 45128,
+      "created": "134362033757373399",
+      "image": "C:\\Users\\user\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\cfb32733c877621e\\bin\\node_repl.exe"
+    },
+    {
+      "pid": 37972,
+      "created": "134362033758239055",
+      "image": "C:\\Users\\user\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\cfb32733c877621e\\bin\\node_repl.exe"
+    },
+    {
+      "pid": 17016,
+      "created": "134362406807703950",
+      "image": "C:\\Users\\user\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\cfb32733c877621e\\bin\\node_repl.exe"
+    },
+    {
+      "pid": 52168,
+      "created": "134362406809088797",
+      "image": "C:\\Users\\user\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\cfb32733c877621e\\bin\\node_repl.exe"
+    },
+    {
+      "pid": 62548,
+      "created": "134362406809891154",
+      "image": "C:\\Users\\user\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\cfb32733c877621e\\bin\\node_repl.exe"
+    },
+    {
+      "pid": 9616,
+      "created": "134362406811629701",
+      "image": "C:\\Users\\user\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\cfb32733c877621e\\bin\\node_repl.exe"
+    },
+    {
+      "pid": 61380,
+      "created": "134362411812913835",
+      "image": "C:\\Users\\user\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\cfb32733c877621e\\bin\\node_repl.exe"
+    },
+    {
+      "pid": 34208,
+      "created": "134362411813983872",
+      "image": "C:\\Users\\user\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\cfb32733c877621e\\bin\\node_repl.exe"
+    }
+  ],
+  "process_errors": [],
+  "sandbox": "workspace-write",
+  "approval_policy": "on-request",
+  "job_id": "job_e27e89aaf26e",
+  "provider_turn_status": "completed",
+  "provider_reply": "Tool error: exec_command failed to create the process: helper_unknown_error: setup refresh had errors.",
+  "file_verified": false,
+  "keeper_stopped": true,
+  "log_timestamp": "2026-10-12T02:22:00.937298300+00:00",
+  "log_failure": "runtime read/execute validation failed for node_repl.exe: open ACL target for root-only update, os error 32",
+  "post_test_node_repl_process_count": 0,
+  "restart_manager_query": {
+    "code": 0,
+    "locking_processes": []
+  },
+  "conclusion": "Stopping matching shared runtime processes did not resolve sandbox setup. The exact remaining sharing-conflict owner/cause is unconfirmed.",
+  "sandbox_weakened": false,
+  "manual_acl_change": false,
+  "account_settings_changed": false,
+  "production_cutover_performed": false,
+  "legacy_after_test": {
+    "serving_pid": 52968,
+    "health": "healthy",
+    "active_agent_count": 0,
+    "total_queue_depth": 0,
+    "total_pending_reply_count": 0
+  }
+}

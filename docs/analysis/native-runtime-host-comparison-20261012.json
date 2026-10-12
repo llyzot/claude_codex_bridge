@@ -1,0 +1,67 @@
+{
+  "recorded_at": "2026-10-12T02:33:20.572557+00:00",
+  "base_commit": "1ca5802d",
+  "probes": [
+    {
+      "host": "Codex desktop tool process",
+      "trial_root": "C:/Users/user/Desktop/work/ccb-native-installed-io-retest-dc3_b54s",
+      "sandbox": "workspace-write",
+      "approval_policy": "on-request",
+      "job_id": "job_8563b092ec1b",
+      "provider_turn_status": "completed",
+      "provider_reply": "Tool failed: `exec_command` could not create the process: `helper_unknown_error: setup refresh had errors`. Stopped without reading the file.",
+      "file_verified": false,
+      "keeper_stopped": true
+    },
+    {
+      "host": "Windows Terminal with Scoop pwsh",
+      "trial_root": "C:/Users/user/Desktop/work/ccb-native-installed-io-retest-rbto850a",
+      "sandbox": "workspace-write",
+      "approval_policy": "on-request",
+      "job_id": "job_79676c5aa163",
+      "provider_turn_status": "completed",
+      "provider_reply": "Error: exec_command failed to create the process: helper_unknown_error: setup refresh had errors.",
+      "file_verified": false,
+      "keeper_stopped": true
+    }
+  ],
+  "shared_processes_stopped_this_turn": false,
+  "account_settings_changed": false,
+  "production_default_changed": false,
+  "read_only_file_access": {
+    "canonical_opened_path": "C:/Users/user/AppData/Local/OpenAI/Codex/runtimes/cua_node/cfb32733c877621e/bin/node_repl.exe",
+    "hardlink_count": 1,
+    "read_control_write_dac_and_maximum_allowed_opened_successfully_from_current_process": true,
+    "acl_mutation_performed": false,
+    "limit": "Handle opens in the current process do not reproduce the sandbox helper security context or prove that its file access succeeds."
+  },
+  "sandbox_error": "Same node_repl.exe root-only ACL open sharing violation in both host paths",
+  "conclusion": "Moving invocation to Windows Terminal did not resolve the restricted-provider sandbox failure. Exact external lock/security-context cause remains unconfirmed. Do not repeat process kills or identical model probes without new evidence.",
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.162.1/codex-rs/windows-sandbox-rs/src/acl.rs",
+      "observation": "Public 0.162.1 source requests MAXIMUM_ALLOWED for root-only ACL update. This does not prove identical installed binary behavior or the remaining local lock owner."
+    },
+    {
+      "url": "https://github.com/openai/codex/issues/51601",
+      "observation": "Independent report of the same error; supporting context, not local root-cause proof."
+    }
+  ],
+  "acceptance_gate_repair": {
+    "file": "test/native_codex_io_probe.py",
+    "regression_tests": "3 passed in 0.50s",
+    "retained_real_windows_terminal_failure": "--verify-result returned exit 1, passed false, completed turn, file_verified false and keeper_stopped true",
+    "limits": "Live launch function extracted from the executed temporary harness; new full launch not rerun. Positive file proof and cleanup conditions have fixture tests; current real environment remains failing."
+  },
+  "legacy_after_test": {
+    "serving_pid": 52968,
+    "health": "healthy",
+    "active_agent_count": 0,
+    "total_queue_depth": 0,
+    "total_pending_reply_count": 0
+  },
+  "topology_scope": {
+    "multiwindow_runtime_implemented": false,
+    "finding": "Existing namespace ledger, mount controller and recovery all bind one workspace; relaxing config validation alone would be incorrect."
+  }
+}

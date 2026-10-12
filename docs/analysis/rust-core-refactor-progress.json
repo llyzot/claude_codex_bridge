@@ -641,12 +641,14 @@
     "native_rollout_candidate_evidence": "docs/analysis/native-rollout-candidate-20261012.json",
     "native_rollout_candidate_validation": "Installed and verified pure Rust candidate in Desktop/work/ccb-rust after detecting/removing an AppData-virtualized copy. Actual project config dry-runs from the installed executable. Installed Pi/Codex model chain and Keeper session recovery passed. A stricter workspace-write file IO probe failed at Codex sandbox runtime ACL refresh (node_repl.exe sharing violation); all owned probes stopped. Existing account defaults are danger-full-access/never and were not changed. Legacy CCB authenticated ping/queue is healthy and idle, persisted native histories empty; foreground state unverified. No production/default cutover.",
     "native_followup_compaction_evidence": "docs/analysis/native-followup-compaction-20261012.json",
-    "native_followup_compaction_validation": "26 followup/trace integration cases passed on final release in 66.85s; full Rust unit run 45 passed before final store recovery case, final four followup/storage units passed. Clippy, formatting, release/bin hash equality passed. Receipt replay after compaction/restart does not resend, including uncertain sends. Installed candidate/default unchanged."
+    "native_followup_compaction_validation": "26 followup/trace integration cases passed on final release in 66.85s; full Rust unit run 45 passed before final store recovery case, final four followup/storage units passed. Clippy, formatting, release/bin hash equality passed. Receipt replay after compaction/restart does not resend, including uncertain sends. Installed candidate/default unchanged.",
+    "native_runtime_host_comparison_evidence": "docs/analysis/native-runtime-host-comparison-20261012.json",
+    "native_runtime_host_comparison_validation": "Same restricted IO probe failed in both desktop process and actual Windows Terminal + Scoop pwsh; owned Keepers stopped. New reusable acceptance gate rejects completed turns with missing files and returns nonzero against retained real failure. Three regression tests pass. No ACL/account policy/default changes; exact helper-context sharing cause remains unconfirmed."
   },
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2",
     "candidate_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "next_action": "Authorized shared-runtime shutdown and identical restricted IO retest completed, but sandbox setup still reports os error 32. Identify the remaining shared-runtime access conflict without relaxing sandbox settings; default cutover and actual Herdr UI acceptance remain outstanding.",
-    "latest_evidence": "docs/analysis/native-runtime-retest-20261012.json"
+    "next_action": "Restricted IO failure reproduced in actual Windows Terminal as well as desktop tool process. Preserve policy; obtain new helper-context evidence or an upstream repair before another equivalent model probe. Continue remaining native lifecycle work; multiwindow requires coordinated namespace/mount/recovery support, not only config parsing.",
+    "latest_evidence": "docs/analysis/native-runtime-host-comparison-20261012.json"
   }
 }

@@ -2,6 +2,21 @@
 use anyhow::{ensure, Result};
 use serde_json::Value;
 
+/// An owned provider lifetime ended before initialization or work admission. Repeating the
+/// same launch would otherwise keep accepted tasks queued indefinitely.
+#[derive(Debug)]
+pub struct StartupExit(pub Option<i32>);
+impl std::fmt::Display for StartupExit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "provider exited before initialization or task admission: {:?}",
+            self.0
+        )
+    }
+}
+impl std::error::Error for StartupExit {}
+
 #[derive(Debug)]
 pub struct TransportClosed(pub &'static str);
 impl std::fmt::Display for TransportClosed {
@@ -69,6 +84,13 @@ pub fn scope_observation(row: &Value) -> Value {
     }
 }
 pub fn validate(row: &Value, provider: &Value, agent: &str, project: &Value) -> Result<()> {
+    ensure!(
+        row["exit_code"].is_null()
+            || row["exit_code"]
+                .as_i64()
+                .is_some_and(|code| i32::try_from(code).is_ok()),
+        "invalid provider startup exit code"
+    );
     ensure!(
         row["transport_closed"].is_null()
             || ["stdout", "stdin"].contains(&row["transport_closed"].as_str().unwrap_or("")),

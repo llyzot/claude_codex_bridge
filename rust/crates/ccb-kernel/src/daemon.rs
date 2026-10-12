@@ -1288,6 +1288,12 @@ impl Daemon {
         if self.faults.contains_key(agent) {
             return Ok(());
         }
+        let startup_exit = error.downcast_ref::<crate::provider_fault::StartupExit>();
+        let phase = if startup_exit.is_some() {
+            "startup"
+        } else {
+            phase
+        };
         let spec = self.spec(agent)?;
         let owned = self.owned_view(agent);
         let slot = json!({"state_id":self.state,"target_kind":"agent","target_name":agent});
@@ -1303,6 +1309,7 @@ impl Daemon {
             "pid":owned["pid"],"runtime_instance_id":owned["runtime_instance_id"],"daemon_instance_id":self.state,
             "job_id":job["job_id"],"execution_instance_id":job["provider_options"]["native_execution_instance"],"observed_at":now(),
             "io_error_kind":error.chain().find_map(|e| e.downcast_ref::<std::io::Error>()).map(|e|format!("{:?}", e.kind())),
+            "exit_code":startup_exit.and_then(|exit|exit.0),
             "transport_closed":error.chain().find_map(|e|e.downcast_ref::<crate::provider_fault::TransportClosed>()).map(|e|e.0)});
         // Preserve launch lifetime even when no task exists. Failure to observe
         // an OS scope must not prevent recording the original provider fault.

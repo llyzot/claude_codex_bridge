@@ -31,8 +31,8 @@ request=job['request']
 reply='worker result'
 status='completed'
 reason='task_complete'
-if mode=='lead':
-    if request['message_type']=='chain_continuation':reply='reviewed: worker result'
+if mode in {'lead','lead-echo'}:
+    if request['message_type']=='chain_continuation':reply=request['body'] if mode=='lead-echo' else 'reviewed: worker result'
     elif request['message_type']=='reply_delivery':reply='received: '+request['body']
     else:
         receipt=rpc('submit',dict(project_id=request['project_id'],to_agent='worker',from_actor=job['agent_name'],

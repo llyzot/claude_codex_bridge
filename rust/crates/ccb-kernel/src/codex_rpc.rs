@@ -61,6 +61,8 @@ pub struct Session {
     pub runtime: String,
     pub state: Value,
     pub ready: bool,
+    admitted: bool,
+    established: bool,
     pub closed: bool,
     pub quarantined: bool,
     forced: bool,
@@ -226,6 +228,8 @@ impl Session {
             runtime,
             state: Value::Null,
             ready: false,
+            admitted: false,
+            established: false,
             closed: false,
             quarantined: false,
             forced: false,
@@ -315,6 +319,7 @@ impl Session {
             self.send(turn)?;
             None
         };
+        self.admitted = true;
         self.active = Some(Active {
             context,
             skills,
@@ -422,6 +427,9 @@ impl Session {
                 control_diagnostics(&active, &mut decision);
                 self.refresh_pending_metadata();
                 return Ok(Some((active.job, decision)));
+            }
+            if !self.established && !self.admitted && !self.quarantined && !self.forced {
+                return Err(crate::provider_fault::StartupExit(exit.code()).into());
             }
             return Ok(None);
         }
@@ -792,6 +800,7 @@ impl Session {
             self.recreate_empty = false;
             self.saved_state = Value::Null;
             self.ready = thread["status"]["type"] == "idle";
+            self.established = true;
             self.dirty = true;
             return Ok(());
         }

@@ -40,6 +40,8 @@ pub struct Session {
     pub runtime: String,
     pub state: Value,
     pub ready: bool,
+    admitted: bool,
+    established: bool,
     pub closed: bool,
     pub quarantined: bool,
     forced: bool,
@@ -180,6 +182,8 @@ impl Session {
             runtime,
             state: Value::Null,
             ready: false,
+            admitted: false,
+            established: false,
             closed: false,
             quarantined: false,
             forced: false,
@@ -278,6 +282,7 @@ impl Session {
             self.input_closed |= !enqueue(&self.commands, prompt)?;
             None
         };
+        self.admitted = true;
         self.active = Some(Turn {
             context,
             skills,
@@ -380,6 +385,9 @@ impl Session {
                 }
                 control_diagnostics(&turn, &mut decision);
                 return Ok(Some((turn.job, decision)));
+            }
+            if !self.established && !self.admitted && !self.quarantined && !self.forced {
+                return Err(crate::provider_fault::StartupExit(exit.code()).into());
             }
             return Ok(None);
         }
@@ -526,6 +534,7 @@ impl Session {
                 "Pi resumed wrong session"
             );
             self.ready = idle(&self.state);
+            self.established = true;
             crate::context_session::restore_marker(
                 &mut self.state,
                 &self.saved_state,

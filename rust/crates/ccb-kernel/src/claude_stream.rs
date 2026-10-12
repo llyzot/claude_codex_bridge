@@ -43,6 +43,8 @@ pub struct Session {
     pub runtime: String,
     pub state: Value,
     pub ready: bool,
+    admitted: bool,
+    established: bool,
     pub dirty: bool,
     pub closed: bool,
     pub quarantined: bool,
@@ -200,6 +202,8 @@ impl Session {
         Ok(Self {
             staged_roles: None,
             ready: initialize.is_none(),
+            admitted: false,
+            established: false,
             initialize,
             surface,
             child,
@@ -329,6 +333,7 @@ impl Session {
                 .context("Claude input queue unavailable")?;
             None
         };
+        self.admitted = true;
         self.active = Some(Active {
             context,
             requests: crate::claude_requests::Broker::default(),
@@ -410,6 +415,9 @@ impl Session {
             self.closed = true;
             self.state["process_state"] = json!("exited");
             self.dirty = true;
+            if !self.established && !self.admitted && !self.quarantined && !self.forced {
+                return Err(crate::provider_fault::StartupExit(exit.code()).into());
+            }
             ensure!(
                 self.initialize.is_none(),
                 "Claude exited before role initialization"
@@ -741,6 +749,7 @@ impl Session {
                 "Claude initialized wrong session"
             );
             self.state["initialized"] = json!(true);
+            self.established = true;
             self.state["capabilities"] = json!(r["capabilities"]
                 .as_array()
                 .map(|values| values.iter().filter_map(Value::as_str).collect::<Vec<_>>())

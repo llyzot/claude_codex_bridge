@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "base_commit": "0f9002f0",
+  "recorded_at": "2026-10-12T00:52:09.290160+00:00",
+  "problem": "Providers exiting before initialization could be silently retained as closed and repeatedly respawned for pending work, leaving accepted tasks without a terminal result. Seen during real Codex argument-error acceptance.",
+  "implementation": [
+    "Track successful initialization and first task admission independently for each owned Pi/Codex/Claude lifetime.",
+    "After confirmed process-tree exit and drained stdout, classify an uninitialized unused lifetime as a typed startup failure, including exit code 0.",
+    "Persist startup fault with existing lifetime ownership and exit code; fail unsent queued requests using the existing failure/callback route.",
+    "Fault survives daemon restart; explicit recovery is required. Initialized idle exits, active unknown work and verified terminal results retain existing behavior."
+  ],
+  "validation": {
+    "red": "New Pi empty-startup test failed before implementation: provider fault was not recorded.",
+    "initial_selection": {
+      "cases": 82,
+      "passed": 79,
+      "failed": [
+        "test_preaccepted_jobs_fail_without_dispatch_or_automatic_respawn[pi]",
+        "test_preaccepted_jobs_fail_without_dispatch_or_automatic_respawn[codex]",
+        "test_failed_worker_startup_returns_through_registered_lead_chain"
+      ]
+    },
+    "final_new_tests": {
+      "cases": 9,
+      "passed": 9,
+      "failed": []
+    },
+    "effective_unique_passed_after_targeted_recheck": 82,
+    "test_repairs": [
+      "Two new queued-task queries omitted required agent_name.",
+      "Initial callback test used a canned Lead response; an opt-in echo fixture now verifies actual continuation contains failed child status and fault details."
+    ],
+    "rust_unit_passed": 35,
+    "parent_invoked_subprocess_worker_entries": 2,
+    "format_clippy_diff": "passed",
+    "full_repository_suite": false
+  },
+  "real_provider_check": {
+    "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-startup-exit-s066onxb",
+    "real_provider": "installed Codex CLI",
+    "model_invoked": false,
+    "credentials_copied": false,
+    "fault": {
+      "phase": "startup",
+      "reason": "provider_start_failed",
+      "exit_code": 2,
+      "job_id": null,
+      "fault_id": "3d3156d8-42c2-40bc-bd59-1ddf624b8c3e"
+    },
+    "daemon_remained_alive": true,
+    "owned_daemon_exited_cleanly": true
+  },
+  "binary_sha256": {
+    "ccb-kernel.exe": "35a3df542c0e4f3bb7dcde901a63ca69ad6f31be958f6ef4102f4327115d95b5",
+    "ccb-native.exe": "4e5a4b1291722225f8f39aa363c15fc947ad8954a62f275680ddbc0e8c0a85a1"
+  },
+  "production_install_changed": false,
+  "existing_agents_controlled": false,
+  "limits": [
+    "No new real-model inference in this patch; earlier Pi/Claude live acceptance tested the preceding build.",
+    "This fixes confirmed pre-initialization process exit. A silent live startup or inherited open handles are not declared dead by timeout.",
+    "Initialized idle session recreation remains supported. A provider repeatedly exiting after successful initialization is outside this new pre-initialization fault classification.",
+    "Default Rust promotion still requires remaining interface/foreground and migration acceptance; native Herdr open currently accepts Pi/Codex terminal adapters."
+  ]
+}

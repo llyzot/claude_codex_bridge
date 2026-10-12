@@ -17,6 +17,10 @@ first = not launches.exists()
 with launches.open('a', encoding='utf-8') as file:
     file.write(str(os.getpid()) + '\n')
 secret = 'do-not-persist-protocol-error-secret'
+if first and mode in {'startup-exit', 'startup-exit-zero'}:
+    (directory / 'startup-waiting').touch()
+    while not (directory / 'release-startup').exists(): time.sleep(.025)
+    sys.exit(0 if mode == 'startup-exit-zero' else 17)
 if mode == 'active-delayed':
     mode = 'active'
     delayed = True

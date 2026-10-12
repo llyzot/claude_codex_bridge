@@ -94,6 +94,13 @@ fn read(reader: &mut BufReader<TcpStream>) -> Result<Value> {
     Ok(serde_json::from_slice(&bytes)?)
 }
 pub fn run(mut args: Vec<OsString>) -> Result<()> {
+    if args.len() == 2
+        && args[0] == "kill"
+        && ["--help", "-h", "help"].iter().any(|s| args[1] == *s)
+    {
+        println!("{}", crate::project_kill::HELP);
+        return Ok(());
+    }
     // The Windows launcher forwards ask.exe metadata queries as `ask <flag>`.
     // They must work before project discovery, just like the native ask alias.
     if args.first().is_some_and(|s| s == "ask")
@@ -132,6 +139,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         return Ok(());
     }
     if args.first().is_some_and(|s| s == "--help") {
+        println!("{}", crate::project_kill::HELP);
         println!("ccb-native --state-root <dir> followup-compact [--dry-run] (remove terminal followup payload/history; retain deduplication receipts)");
         println!("ccb-native [--project <directory>] [--state-root <dir>] start [--executables <manifest>] [--timeout-ms <ms>]\nccb-native [--project <directory>] ask [--compact] [--silence] [--chain] [--artifact-request|--inline-request] [--artifact-reply] <agent> [from <actor>] [--] <message...>\n  target accepts a configured agent or uniquely bound role ID; agents lists bindings\n  ask also reads redirected UTF-8 stdin; --artifact-io enables request/reply artifacts\n  --task-id <id>, --reply-to <id>, --mode <type>; native --from <actor> remains supported\nccb-native --state-root <dir> ask get|cancel <job-id>\nccb-native --state-root <dir> cancel <job-id> [--silent] | retry <job-id>\nccb-native --state-root <dir> watch <target> [--cursor <n>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> daemon --config <json>\nccb-native --state-root <dir> agents|ping|queue [target]|inbox <agent>|stop|request <op> <json>\nccb-native --state-root <dir> job-recovery|job-reconcile <job-id>\nccb-native --state-root <dir> provider-status <agent>\nccb-native --state-root <dir> provider-terminate <agent> [--silent]\nccb-native --state-root <dir> provider-recover <agent> <fault-id>\nccb-native --state-root <dir> pending <agent>\nccb-native --state-root <dir> respond <agent> <request-id> <answer-json-file>\nccb-native workspace-tree <path> [--include-controller-state]\nccb-native config compile <project-directory> [<executables-json>]\nccb-native token-create <new-file>");
         println!("ccb-native [--project <directory>] [--state-root <dir>] reload [--config <json>|--executables <manifest>] [--dry-run] [--when-idle] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> reload-status\nccb-native --state-root <dir> reload-cancel <operation-id> (cancel a change still waiting for idle)");
@@ -404,10 +412,19 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         if args[0] == "--state-root" {
             explicit_root = Some(PathBuf::from(&args[1]));
         } else {
-            project = Some(crate::config::project_root(Path::new(&args[1]))?);
+            project = Some(PathBuf::from(&args[1]));
         }
         args.drain(..2);
     }
+    project = project
+        .map(|path| {
+            if args.first().is_some_and(|s| s == "kill") {
+                crate::config::shutdown_project_root(&path)
+            } else {
+                crate::config::project_root(&path)
+            }
+        })
+        .transpose()?;
     let inherited_root = if explicit_root.is_none() && project.is_none() {
         std::env::var_os("CCB_NATIVE_TOKEN_FILE")
             .and_then(|token| {
@@ -427,7 +444,11 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         None
     };
     if project.is_none() && explicit_root.is_none() && inherited_root.is_none() {
-        project = Some(crate::config::project_root(&std::env::current_dir()?)?);
+        project = Some(if args.first().is_some_and(|s| s == "kill") {
+            crate::config::shutdown_project_root(&std::env::current_dir()?)?
+        } else {
+            crate::config::project_root(&std::env::current_dir()?)?
+        });
     }
     let root = explicit_root
         .or(inherited_root)
@@ -446,6 +467,31 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         .remove(0)
         .into_string()
         .map_err(|_| anyhow::anyhow!("invalid command encoding"))?;
+    if op == "kill" {
+        if args.len() == 1 && ["--help", "-h", "help"].iter().any(|s| args[0] == *s) {
+            println!("{}", crate::project_kill::HELP);
+            return Ok(());
+        }
+        let timeout = if args.is_empty() {
+            15000
+        } else {
+            ensure!(
+                args.len() == 2 && args[0] == "--timeout-ms",
+                "kill accepts only --timeout-ms; force cleanup is not supported"
+            );
+            arg(&args, 1)?.parse::<u64>()?
+        };
+        ensure!(timeout <= 60000, "kill observation limit is 60000ms");
+        println!(
+            "{}",
+            crate::project_kill::execute(
+                &root,
+                project.as_deref(),
+                Duration::from_millis(timeout)
+            )?
+        );
+        return Ok(());
+    }
     if op == "keeper-status" {
         ensure!(args.is_empty(), "keeper-status takes no arguments");
         println!("{}", crate::keeper::status(&root)?);

@@ -1,0 +1,100 @@
+{
+  "source_base_commit": "51be9bcf",
+  "command": "ccb kill [--timeout-ms <0..60000>]",
+  "native_sha256": "d235893429a6cc8c6ace4c2a00a5ede62f4646a3ee5d4d5f58f89f86b08323f1",
+  "runs": {
+    "native-project-kill-red-20261012.xml": {
+      "name": "pytest",
+      "errors": "2",
+      "failures": "2",
+      "skipped": "0",
+      "tests": "5",
+      "time": "1.126",
+      "timestamp": "2026-10-12T13:10:35.258261+08:00",
+      "hostname": "HOST"
+    },
+    "native-project-kill-herdr-red-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "2",
+      "skipped": "0",
+      "tests": "2",
+      "time": "13.012",
+      "timestamp": "2026-10-12T13:10:46.812159+08:00",
+      "hostname": "HOST"
+    },
+    "native-project-kill-debug-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "1",
+      "skipped": "0",
+      "tests": "5",
+      "time": "19.244",
+      "timestamp": "2026-10-12T13:12:44.863991+08:00",
+      "hostname": "HOST"
+    },
+    "native-project-kill-debug-fixed-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "8",
+      "time": "32.195",
+      "timestamp": "2026-10-12T13:14:53.781610+08:00",
+      "hostname": "HOST"
+    },
+    "native-project-kill-release-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "47",
+      "time": "147.904",
+      "timestamp": "2026-10-12T13:17:00.758881+08:00",
+      "hostname": "HOST"
+    },
+    "native-project-kill-final-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "1",
+      "skipped": "0",
+      "tests": "10",
+      "time": "31.903",
+      "timestamp": "2026-10-12T13:21:33.403077+08:00",
+      "hostname": "HOST"
+    },
+    "native-project-kill-scope-fixed-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "23",
+      "time": "34.165",
+      "timestamp": "2026-10-12T13:23:25.034066+08:00",
+      "hostname": "HOST"
+    }
+  },
+  "fixes": [
+    "Public native kill stops and observes the daemon/Keeper before using the protected committed Herdr request for scoped namespace retirement",
+    "Missing ccb.config is supported from cwd and explicit --project; an absent project creates no state",
+    "Project IDs are checked before any shutdown and changed runtime references cannot redirect namespace closure",
+    "Shutdown observation expiry returns stopping; uncertain workspace close returns closing and is never resent",
+    "Config/history remain, unsupported force options and legacy Python ownership are rejected without shutdown"
+  ],
+  "retained_failure_explanations": [
+    "Initial two Herdr red tests lacked the imported setup fixture; imported it and reran both against the old release to reproduce the missing-command/path behavior.",
+    "The first debug empty-directory assertion included pre-existing .home/.stub-bin test fixtures; changed to compare the before/after directory set.",
+    "The first scope guard recheck found that explicit --project still required ccb.config before reaching the new check. Deferred project resolution until the command is known; final 23 release cases passed."
+  ],
+  "format": "passed",
+  "clippy": "all-targets -D warnings passed",
+  "installed_candidate_changed": false,
+  "production_changed": false,
+  "limits": [
+    "Deliberately retired namespace reopening/session continuity remains to be implemented.",
+    "Force cleanup, unconfirmed partial-startup cancellation and legacy Python kill are not implemented; explicit errors are returned.",
+    "Authority shutdown can complete while namespace closure remains blocked by foreign panes or uncertain transport.",
+    "Actual Herdr shutdown/model interruption acceptance remains separate; these tests use controlled local provider and Herdr fixtures.",
+    "The 47-case affected release pass preceded the final project-ID/root-resolution guard; final artifact has 23 affected cases rather than a repeated full suite."
+  ]
+}

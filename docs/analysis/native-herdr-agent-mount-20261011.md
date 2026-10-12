@@ -14,9 +14,18 @@ resending. A reappeared retired ID is rejected. This closes only the recorded
 workspace; the server and unrelated workspaces are preserved. Namespace records
 and provider histories remain available for lifecycle recovery.
 
-This is the low-level close operation. Public `ccb kill` orchestration and
-reopening a deliberately retired namespace with verified session continuity
-remain to be connected. Ordinary preparation refuses retired records instead of
+Public native `ccb kill [--timeout-ms <0..60000>]` now stops and observes the
+daemon/Keeper, then retires this namespace using its protected committed request.
+It works with an absent or edited `ccb.config` and preserves history. `stopping`
+means the same shutdown is still in progress; `closing` means the authority is
+stopped but the workspace close outcome remains uncertain. Repeating the command
+observes that operation without repeating an uncertain workspace close. A close
+blocked by foreign panes can therefore leave the authority stopped while keeping
+the workspace open. `--force` cleanup is not implemented and is rejected before
+stopping anything. Legacy Python runtimes require their original shutdown path.
+
+Reopening a deliberately retired namespace with verified session continuity
+remains to be connected. Ordinary preparation refuses retired records instead of
 silently creating fresh sessions. The material below records earlier checkpoints.
 
 Rust now has an internal `herdr-agents` controller for launching original Pi,

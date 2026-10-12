@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="13.012" timestamp="2026-10-12T13:10:46.812159+08:00" hostname="HOST"><testcase classname="test.test_native_project_kill" name="test_kill_closes_owned_workspace_once_and_preserves_history[False]" time="6.651"><failure message="AssertionError: ccb-native: no .ccb/ccb.config found above current directory&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...native.exe', 'kill'], returncode=1, stdout='', stderr='ccb-native: no .ccb/ccb.config found above current directory\n').returncode">test\test_native_project_kill.py:41: in test_kill_closes_owned_workspace_once_and_preserves_history
+    assert result.returncode==0,result.stderr
+E   AssertionError: ccb-native: no .ccb/ccb.config found above current directory
+E
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...native.exe', 'kill'], returncode=1, stdout='', stderr='ccb-native: no .ccb/ccb.config found above current directory\n').returncode</failure></testcase><testcase classname="test.test_native_project_kill" name="test_kill_closes_owned_workspace_once_and_preserves_history[True]" time="6.007"><failure message="AssertionError: ccb-native: no .ccb/ccb.config found above current directory&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...native.exe', 'kill'], returncode=1, stdout='', stderr='ccb-native: no .ccb/ccb.config found above current directory\n').returncode">test\test_native_project_kill.py:41: in test_kill_closes_owned_workspace_once_and_preserves_history
+    assert result.returncode==0,result.stderr
+E   AssertionError: ccb-native: no .ccb/ccb.config found above current directory
+E
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...native.exe', 'kill'], returncode=1, stdout='', stderr='ccb-native: no .ccb/ccb.config found above current directory\n').returncode</failure></testcase></testsuite></testsuites>

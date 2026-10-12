@@ -22,6 +22,21 @@ pub fn project_root(cwd: &Path) -> Result<PathBuf> {
         }
     }
 }
+pub(crate) fn shutdown_project_root(cwd: &Path) -> Result<PathBuf> {
+    let original = cwd.canonicalize()?;
+    let mut path = original.clone();
+    loop {
+        if let Some(project) = crate::workspaces::binding_project(&path)? {
+            return Ok(project);
+        }
+        if path.join(".ccb").is_dir() {
+            return Ok(path);
+        }
+        if !path.pop() {
+            return Ok(original);
+        }
+    }
+}
 pub fn project_id(root: &Path) -> Result<String> {
     let identity = root.join(".ccb/project.identity.json");
     if identity.is_file() {

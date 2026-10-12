@@ -249,7 +249,8 @@
     "Read-only worktree startup preflight rejects missing or unconfirmed checkouts before publishing a new daemon lifetime, preserving prior startup identity and retaining locked materialization checks",
     "Native takeover checks legacy Python Keeper liveness before daemon ownership or journal recovery; missing/unmounted daemon lease and stale stopped Keeper state do not authorize takeover",
     "Ordinary native Herdr open discovers provider executables, defaults Codex to authenticated hosted input, expands Windows topology before discovery, selects activated Herdr standalone release before stale PATH, and exposes these selections in read-only preview",
-    "Native namespace retirement journals one scoped close intent, rejects live authority/foreign panes/concurrent launch/retired ID reuse, and observes uncertain outcomes without resend; public kill/reopen integration remains pending"
+    "Native namespace retirement journals one scoped close intent, rejects live authority/foreign panes/concurrent launch/retired ID reuse, and observes uncertain outcomes without resend; public kill/reopen integration remains pending",
+    "Public native project kill stops and confirms authority exit, retires owned Herdr topology via protected configuration, preserves history, supports missing project config, exposes pending outcomes and checks project/root binding before mutation"
   ],
   "remaining": [
     "Broaden native Keeper real-model/Herdr foreground acceptance, legacy/cross-platform coexistence and unavailable-observation/storage recovery; evaluate optional OS-level restart of the Keeper itself and production/default rollout",
@@ -670,7 +671,8 @@
     "native_workspace_preflight": "53 affected release startup/worktree/Keeper cases passed; original release failed both actionable-error regressions, debug fix passed both. Existing native-start bytes and user workspace contents preserved on rejection. fmt/Clippy passed. Candidate installed at source 570093dc; default unchanged. Evidence native-workspace-preflight-20261012.json.",
     "native_legacy_keeper": "Old release incorrectly admitted all eight live/invalid legacy Keeper fixtures. Debug passed all nine; 41 final release daemon/Keeper/Herdr-recovery and handoff cases passed. Candidate installed from 79e17170, fmt and Clippy passed. Production daemon observed alive, legacy Keeper PID absent; no production controls. See native-legacy-keeper-20261012.json.",
     "native_herdr_defaults": "63 final-release ordinary-default/Herdr-open/startup/Windows-layout cases passed. New fixture transport integration uses installed Codex no-model initialization without supplying compiled options; reconnect does not duplicate pane launch. Real production config dry-run selected Herdr 0.9.3 and hosted Codex without writes. Candidate installed from 142a1bb4. See native-herdr-defaults-20261012.json.",
-    "native_herdr_retire": "Original release: 5 failed and 2 existing refusal cases passed. Debug primitive: 7 passed. Final release namespace/mount/retirement selection: 60 passed; added four real Windows launch-lock interference cases all passed. fmt/Clippy passed. Existing Rust candidate held at 142a1bb4 pending production migration approval. Evidence native-herdr-retire-20261012.json."
+    "native_herdr_retire": "Original release: 5 failed and 2 existing refusal cases passed. Debug primitive: 7 passed. Final release namespace/mount/retirement selection: 60 passed; added four real Windows launch-lock interference cases all passed. fmt/Clippy passed. Existing Rust candidate held at 142a1bb4 pending production migration approval. Evidence native-herdr-retire-20261012.json.",
+    "native_project_kill": "47 affected release cases passed before final project scope guard. Final 23 public-kill/startup cases passed after fixing explicit --project resolution for missing config. Covers normal and lost-ACK close, uncertain non-replay, no-state no-op/help, source config loss, timeout observation, legacy refusal, unsupported force and foreign project rejection before stop. fmt/Clippy passed. Candidate/production unchanged; evidence native-project-kill-20261012.json."
   },
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2",
@@ -684,7 +686,7 @@
       "authorization": "granted",
       "status": "executed; callback and hot reload passed after source fix"
     },
-    "independent_work_while_approval_pending": "Integrate durable namespace retirement into public project kill and implement deliberate-retirement reopening with verified native session continuity; do not treat kill as a stop alias."
+    "independent_work_while_approval_pending": "Implement deliberately retired Herdr namespace reopening with verified native session continuity. Public project kill is implemented and tested; production-specific outside-Herdr migration approval is still pending."
   },
   "installed_candidate": {
     "prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",

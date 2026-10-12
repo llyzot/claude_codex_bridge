@@ -61,6 +61,9 @@ pub struct Store {
     signature_reads: Cell<u64>,
 }
 impl Store {
+    pub(crate) fn root(&self) -> &Path {
+        &self.root
+    }
     pub fn open(root: &Path) -> Result<Self> {
         fs::create_dir_all(root)?;
         let root = root.canonicalize()?;

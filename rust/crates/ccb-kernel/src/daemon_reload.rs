@@ -230,7 +230,8 @@ pub(super) fn startup_guard(kernel: &mut Kernel, config: &Value) -> Result<()> {
             }
         })
         .collect();
-    ensure!(blockers(kernel, &changed)?.is_empty(),
+    let blocked = blockers(kernel, &changed)?;
+    ensure!(blocked.is_empty() || crate::herdr_open::recovery_handoff_allowed(kernel, config)?,
         "configuration change would strand unfinished work; restart with the prior agent configuration");
     Ok(())
 }

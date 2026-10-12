@@ -1,0 +1,212 @@
+//! Offline terminal reconciliation. No provider is spawned or prompted here.
+use super::{now, Daemon};
+use crate::{
+    admission, records,
+    terminal_history::{Baseline, Binding, ProviderReader},
+    Kernel,
+};
+use anyhow::{ensure, Context, Result};
+use serde_json::{json, Value};
+
+impl Daemon {
+    pub(crate) fn recover_closed_work(
+        kernel: Kernel,
+        config: Value,
+        agents: &Value,
+    ) -> Result<(Self, Value)> {
+        let mut daemon = Self::new(
+            kernel,
+            config,
+            &format!("recovery-{}", uuid::Uuid::new_v4()),
+        )?;
+        ensure!(
+            daemon.faults.is_empty(),
+            "unfinished recovery requires explicit provider fault repair"
+        );
+        let mut rows = Vec::new();
+        for agent in daemon.config["agents"].as_object().unwrap().keys() {
+            let jobs = records::dispatch(
+                &mut daemon.kernel.store,
+                "latest",
+                &json!({"stream":"jobs","identity":"job_id","agent_name":agent}),
+            )?;
+            rows.extend(
+                jobs.as_array()
+                    .context("invalid recovery jobs")?
+                    .iter()
+                    .cloned(),
+            );
+        }
+        let mut plans = Vec::new();
+        for job in &rows {
+            ensure!(
+                job["request"]["project_id"] == daemon.config["project_id"],
+                "recovery job belongs to another project"
+            );
+            let agent = records::string(job, "agent_name")?;
+            let spec = daemon.spec(agent)?;
+            if job["status"] == "running" {
+                if spec["driver_kind"] == "herdr_tui" {
+                    plans.push((
+                        job.clone(),
+                        Some(daemon.stopped_terminal_decision(job, &spec, agents)?),
+                    ));
+                } else {
+                    let observed = daemon.recovery_view(job);
+                    ensure!(
+                        observed["status"] == "stopped",
+                        "unfinished owned execution lacks stopped-scope proof"
+                    );
+                    plans.push((job.clone(), None));
+                }
+            } else if !["completed", "failed", "incomplete", "cancelled"]
+                .contains(&job["status"].as_str().unwrap_or(""))
+            {
+                ensure!(
+                    ["accepted", "queued", "pending"]
+                        .contains(&job["status"].as_str().unwrap_or(""))
+                        && job["provider_options"]["native_execution_instance"].is_null()
+                        && job["provider_options"]["herdr_dispatch"].is_null(),
+                    "unfinished queued execution may already have been sent"
+                );
+            }
+        }
+        // Validate every old execution before committing any reconciliation.
+        let mut recovered = Vec::new();
+        for (job, decision) in plans {
+            if let Some(decision) = decision {
+                let checkpoint = daemon.kernel.memory_checkpoint();
+                let outcome = (|| -> Result<Value> {
+                    let terminal = daemon.complete(&job, &decision)?;
+                    admission::event(
+                        &mut daemon.kernel,
+                        &terminal,
+                        "job_execution_reconciled",
+                        json!({"completion_authority":"stopped_herdr_history","automatic_replay":false}),
+                        &now(),
+                    )?;
+                    daemon.kernel.store.commit()?;
+                    Ok(terminal)
+                })();
+                match outcome {
+                    Ok(terminal) => recovered
+                        .push(json!({"job_id":terminal["job_id"],"status":terminal["status"]})),
+                    Err(error) => {
+                        daemon.kernel.store.rollback();
+                        daemon.kernel.restore_memory(checkpoint);
+                        return Err(error);
+                    }
+                }
+            } else {
+                let result = daemon.reconcile_execution(records::string(&job, "job_id")?)?;
+                ensure!(
+                    result["status"] == "reconciled",
+                    "owned execution reconciliation did not complete"
+                );
+                recovered.push(json!({"job_id":job["job_id"],"status":result["job"]["status"]}));
+            }
+        }
+        let report = json!({"schema_version":1,"provider_io":false,"automatic_replay":false,"jobs":recovered});
+        Ok((daemon, report))
+    }
+
+    fn stopped_terminal_decision(
+        &mut self,
+        job: &Value,
+        spec: &Value,
+        agents: &Value,
+    ) -> Result<Value> {
+        let agent = records::string(job, "agent_name")?;
+        let permit = &job["provider_options"]["herdr_dispatch"];
+        let cancel = &job["provider_options"]["native_cancel_intent"];
+        ensure!(
+            cancel.is_null() || cancel["record_reply"].is_boolean(),
+            "unfinished execution has invalid cancellation intent"
+        );
+        let execution = records::string(&job["provider_options"], "native_execution_instance")?;
+        uuid::Uuid::parse_str(execution)?;
+        let row = &agents["agents"][agent];
+        let identity = json!({"namespace_owner":agents["namespace_owner"],"workspace_id":agents["workspace_id"],
+            "herdr_name":row["herdr_name"],"pane_id":row["pane_id"],"terminal_id":row["terminal_id"],
+            "process":row["binding"]["process"],"plan_hash":agents["plan_hash"]});
+        ensure!(
+            identity["process"].is_object()
+                && !crate::startup::owner_alive(
+                    &json!({"pid":identity["process"]["pid"],"process":identity["process"]})
+                )?,
+            "old terminal process is live or unconfirmed"
+        );
+        let anchor = format!("{}:{execution}", records::string(job, "job_id")?);
+        let mut decision = None;
+        if !permit.is_null() {
+            ensure!(
+                permit["schema_version"] == 1
+                    && permit["job_id"] == job["job_id"]
+                    && permit["execution_instance_id"] == execution
+                    && permit["request_anchor"] == anchor
+                    && permit["identity"] == identity
+                    && permit["history_binding"] == spec["herdr_history"],
+                "stopped Herdr execution permit does not match its recorded owner"
+            );
+            let configured: Binding = serde_json::from_value(permit["history_binding"].clone())?;
+            let resolved: Binding =
+                serde_json::from_value(if permit["resolved_history_binding"].is_null() {
+                    permit["history_binding"].clone()
+                } else {
+                    permit["resolved_history_binding"].clone()
+                })?;
+            ensure!(
+                configured.root == resolved.root
+                    && configured.cwd == resolved.cwd
+                    && configured.session_id == resolved.session_id,
+                "stopped terminal history scope changed"
+            );
+            let baseline: Baseline = serde_json::from_value(permit["baseline"].clone())?;
+            if job["provider"] == "pi" {
+                let producer = baseline
+                    .producer
+                    .as_ref()
+                    .context("Pi execution producer missing")?;
+                ensure!(
+                    producer["owner"] == spec["pi_bridge_owner"]
+                        && producer["process"] == identity["process"],
+                    "stopped Pi producer differs from permitted input"
+                );
+            }
+            let mut reader = ProviderReader::new(
+                records::string(job, "provider")?,
+                resolved,
+                baseline,
+                anchor,
+            )?;
+            let candidate = reader.poll()?;
+            // Claude transcript text alone needed live idle confirmation. Death
+            // is not that confirmation; retain its history and mark interrupted.
+            if job["provider"] != "claude" {
+                decision = candidate;
+            }
+        }
+        let mut decision=decision.unwrap_or_else(||json!({"schema_version":2,"record_type":"completion_decision",
+            "terminal":true,"status":"incomplete","reason":"herdr_owner_stopped","confidence":"observed",
+            "reply":"The previous terminal process stopped without a confirmed terminal result. Work may already have taken effect. Inspect the saved session before explicitly retrying.",
+            "anchor_seen":false,"reply_started":false,"reply_stable":false,"provider_turn_ref":null,"source_cursor":null,
+            "finished_at":now(),"diagnostics":{}}));
+        decision["diagnostics"]["recovery_no_replay"] = json!(true);
+        decision["diagnostics"]["automatic_replay"] = json!(false);
+        decision["diagnostics"]["native_execution_instance"] = json!(execution);
+        decision["diagnostics"]["old_terminal_identity"] = identity;
+        decision["diagnostics"]["provider_prompt_permitted"] = json!(!permit.is_null());
+        if let Some(reply) =
+            job["provider_options"]["native_cancel_intent"]["record_reply"].as_bool()
+        {
+            decision["diagnostics"]["result_reply_enabled"] = json!(reply);
+            decision["diagnostics"]["cancel_requested"] = json!(true);
+            if decision["status"] != "completed" {
+                decision["status"] = json!("cancelled");
+            }
+        }
+        ensure!((job["request"]["message_type"]!="reply_delivery" && job["provider_options"]["reply_delivery"] != true) || decision["status"]=="completed",
+            "uncertain reply delivery requires explicit recovery; it cannot be redelivered automatically");
+        Ok(decision)
+    }
+}

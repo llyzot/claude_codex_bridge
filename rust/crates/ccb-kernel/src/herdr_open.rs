@@ -14,6 +14,9 @@ fn hosted(spec: &Value) -> bool {
 }
 #[path = "herdr_recovery.rs"]
 mod recovery;
+pub(crate) fn recovery_handoff_allowed(kernel: &mut crate::Kernel, config: &Value) -> Result<bool> {
+    recovery::handoff_allowed(kernel, config)
+}
 fn hash(v: &Value) -> Result<String> {
     Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(v)?)))
 }
@@ -23,6 +26,22 @@ fn save(root: &Path, record: &Value) -> Result<()> {
     store.commit()
 }
 fn read(root: &Path, name: &str) -> Result<Option<Value>> {
+    let deadline = Instant::now() + Duration::from_millis(200);
+    loop {
+        let result = read_once(root, name);
+        let retry = cfg!(windows)
+            && result.as_ref().err().is_some_and(|error| {
+                error
+                    .downcast_ref::<std::io::Error>()
+                    .is_some_and(|io| matches!(io.raw_os_error(), Some(5 | 32)))
+            });
+        if !retry || Instant::now() >= deadline {
+            return result.with_context(|| format!("reading Herdr state {name}"));
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+fn read_once(root: &Path, name: &str) -> Result<Option<Value>> {
     use std::io::Read;
     let path = root.join(name);
     crate::herdr_namespace::unlinked(&path)?;
@@ -848,6 +867,7 @@ pub(crate) fn open(
                         let daemon = daemon_configuration(&request, &record);
                         record["daemon_fingerprint"] = json!(crate::config::fingerprint(&daemon)?);
                         save(&root, &record)?;
+                        recovery::authorize_start(&runtime, &root, &record, &daemon)?;
                         let started = crate::startup::start(
                             &runtime,
                             daemon,

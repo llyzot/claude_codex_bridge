@@ -9,6 +9,9 @@ use std::{
     path::{Path, PathBuf},
 };
 const STATE: &str = "herdr-recovery.json";
+#[path = "herdr_work_handoff.rs"]
+mod work_handoff;
+pub(super) use work_handoff::{authorize_start, handoff_allowed};
 pub(super) fn expected_session(root: &Path, open: &Value, agent: &str) -> Result<Option<Value>> {
     let Some(recovery) = read(root, STATE)? else {
         return Ok(None);
@@ -475,11 +478,34 @@ pub(super) fn step(
             }
             ended(&row["binding"]["process"])?;
         }
-        let mut kernel = quiet(&runtime, config)?;
+        crate::daemon::verify_owner(&runtime)?;
+        let mut kernel = crate::Kernel::open(&runtime)?;
+        let committed = kernel
+            .store
+            .json("configuration.json")?
+            .context("recovery configuration missing")?;
+        let lease = kernel
+            .store
+            .json("lease.json")?
+            .context("recovery owner record missing")?;
+        ensure!(
+            lease["project_id"] == committed["project_id"]
+                && lease["config_signature"] == committed["config_fingerprint"],
+            "recovery configuration and owner record disagree"
+        );
+        let prior = crate::restart_config::restore(&committed)?;
+        ensure!(
+            prior["herdr"] == *request,
+            "recovery source configuration changed"
+        );
         let sessions = resumes(root, &runtime, config, open, &agents, &mut kernel)?;
+        let (mut offline, work) =
+            crate::daemon::Daemon::recover_closed_work(kernel, prior, &agents)?;
+        work_handoff::recoverable(&mut offline.kernel, config)?;
         recovery = json!({"schema_version":1,"operation_id":uuid::Uuid::new_v4().to_string(),"project_id":config["project_id"],"session":request["session"],
             "kind":if retired {"retired_namespace"} else {"stopped_server"},
-            "phase":"starting_server","source_hash":open["request_hash"],"previous_open":open,"namespace":namespace,"agents":agents,"sessions":sessions,"close_permitted":false});
+            "phase":"starting_server","source_hash":open["request_hash"],"previous_open":open,"namespace":namespace,"agents":agents,"sessions":sessions,"close_permitted":false,
+            "prior_config_fingerprint":committed["config_fingerprint"],"work_recovery":work});
         if !retired || status["running"] == false {
             open["server_start_permitted"] = json!(false);
             open["server_process"] = Value::Null;
@@ -505,7 +531,9 @@ pub(super) fn step(
         recovery["source_hash"] == open["request_hash"],
         "recovery source configuration changed"
     );
-    let _kernel = quiet(&runtime, config)?;
+    crate::daemon::verify_owner(&runtime)?;
+    let mut authority = crate::Kernel::open(&runtime)?;
+    work_handoff::recoverable(&mut authority, config)?;
     if !server(request, root, open)? {
         return Ok(false);
     }

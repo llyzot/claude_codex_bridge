@@ -63,13 +63,19 @@ def test_recover_quiet_server_archives_epoch_and_resumes_exact_history(stopped):
     assert mutate_count(p['backend'],['agent','start'])==2
     assert 'external' in server(p['backend'])['workspaces']
 
-def test_recovery_blocks_unfinished_jobs_before_server_start(stopped):
+def test_recovery_reconciles_stopped_work_without_repeating_its_prompt(stopped):
     p=stopped;asked=cli('--state-root',p['runtime'],'ask','worker','must not replay');assert asked.returncode==0,asked.stderr
     wait_for(lambda:mutate_count(p['backend'],['agent','prompt'])==1)
-    p['stop']();before=mutate_count(p['backend'],['agent','start'])
-    result=p['open'](True);assert result.returncode!=0 and 'unfinished' in result.stderr
-    assert not server(p['backend'])['server_running'] and mutate_count(p['backend'],['agent','start'])==before
-    assert not (p['state']/'herdr-recoveries.jsonl').exists()
+    p['stop']();replacement=p['helper']()
+    def restored_idle(s):
+        s['provider_pids']=[replacement.pid]
+        for agent in s['agents'].values():agent.update(agent_status='idle',interactive_ready=True)
+    change(p['backend'],restored_idle)
+    result=p['open'](True);assert result.returncode==0,result.stderr
+    watched=cli('--state-root',p['runtime'],'watch',json.loads(asked.stdout)['job_id'])
+    assert json.loads(watched.stdout)['status']=='incomplete'
+    assert mutate_count(p['backend'],['agent','prompt'])==1
+    assert (p['state']/'herdr-recoveries.jsonl').exists()
 
 def test_lost_close_ack_does_not_duplicate_retirement_or_launch(stopped):
     p=stopped;p['stop']();proc=p['helper']();change(p['backend'],lambda s:s.update(provider_pids=[proc.pid]))

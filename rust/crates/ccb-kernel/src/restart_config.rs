@@ -112,7 +112,7 @@ pub(crate) fn seal(config: &Value) -> Result<Value> {
     )
 }
 
-fn restore(record: &Value) -> Result<Value> {
+pub(crate) fn restore(record: &Value) -> Result<Value> {
     ensure!(
         record["schema_version"] == 1 && record["record_type"] == "native_configuration",
         "invalid committed configuration identity"

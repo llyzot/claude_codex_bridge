@@ -37,6 +37,8 @@ mod resubmit;
 mod trace;
 #[path = "wait_summary.rs"]
 mod wait_summary;
+#[path = "daemon_work_recovery.rs"]
+mod work_recovery;
 
 pub fn validate_startup(kernel: &mut Kernel, config: &Value) -> Result<()> {
     reload::startup_guard(kernel, config)

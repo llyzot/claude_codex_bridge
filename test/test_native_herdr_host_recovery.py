@@ -50,7 +50,7 @@ def test_reopen_replaces_only_dead_display_and_keeps_native_thread(hosted,lost_a
     replacement=p['helper']();change(p['backend'],lambda s:s.update(provider_pids=[replacement.pid]))
     if lost_ack:fault(p['backend'],['pane','run'],'after-error')
     result=p['open']();assert result.returncode==0,result.stderr
-    assert read(p['native']/'herdr/herdr-open.json')['phase']=='running'
+    wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=20)
     after=read(p['native']/'herdr/herdr-agents.json')['agents']['worker']
     assert after['binding']['process']['pid']==replacement.pid and after['operation_id']!=before['operation_id']
     assert read(p['native']/'providers/codex/worker/session.json')['pid']==session['pid']

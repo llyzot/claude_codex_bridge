@@ -15,7 +15,7 @@ test\test_native_herdr_claude.py:118: in opened
     request['config']['agents']={'worker':worker};request['config']['source_config']={'layout':'worker:claude'}
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 E   AssertionError: ccb-native: no .ccb/ccb.config found above current directory
-E     
+E
 E   assert 1 == 0
 E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...imeout-ms', '15000'], returncode=1, stdout='', stderr='ccb-native: no .ccb/ccb.config found above current directory\n').returncode</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_public_open_mounts_original_claude_and_reconnects_without_relaunch[True]" time="0.211"><failure message="AssertionError: ccb-native: no .ccb/ccb.config found above current directory&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...imeout-ms', '15000'], returncode=1, stdout='', stderr='ccb-native: no .ccb/ccb.config found above current directory\n').returncode">test\test_native_herdr_claude.py:120: in test_public_open_mounts_original_claude_and_reconnects_without_relaunch
     history=project/'claude-history';history.mkdir();session=str(uuid.uuid4())
@@ -24,6 +24,6 @@ test\test_native_herdr_claude.py:118: in opened
     request['config']['agents']={'worker':worker};request['config']['source_config']={'layout':'worker:claude'}
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 E   AssertionError: ccb-native: no .ccb/ccb.config found above current directory
-E     
+E
 E   assert 1 == 0
 E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...imeout-ms', '15000'], returncode=1, stdout='', stderr='ccb-native: no .ccb/ccb.config found above current directory\n').returncode</failure></testcase></testsuite></testsuites>

@@ -376,7 +376,7 @@ impl Daemon {
             agents.push(json!({"name":name,"display_name":name,"provider":preview(&spec["provider"],64),"provider_display_name":preview(&spec["provider"],64),"window":"native","order":order,"pane_id":null,"active":false,
                 "activity_state":activity,"activity_symbol":symbol,"activity_color":color,"activity_source":"native_authority","activity_reason":reason,"current_job_id":active,"queue_depth":queued.len().max(mailbox["queue_depth"].as_u64().unwrap_or(0) as usize),"pending_requests":requests,
                 "callback_parent_job_id":waiting.get(name).map(|e|e["parent_job_id"].clone()),"dispatch_blocked_by_reload_drain":self.reload_frozen(name),
-                "reload_drain":if self.reload_frozen(name){json!({"intent_kind":if reload["action"] == "restart" {"restart"} else {"configuration"},"phase":reload["status"],"status":reload["status"]})}else{Value::Null},
+                "reload_drain":if self.reload_affected(name){json!({"intent_kind":if reload["action"] == "restart" {"restart"} else {"configuration"},"phase":reload["status"],"status":reload["status"],"admission_paused":self.reload_frozen(name)})}else{Value::Null},
                 "fault_id":fault.map(|f|f["fault_id"].clone()),"last_progress_at":current["updated_at"]}));
         }
         let mut lineages = BTreeMap::<(String, String), (u64, String)>::new();

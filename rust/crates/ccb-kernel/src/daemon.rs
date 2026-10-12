@@ -458,6 +458,7 @@ impl Daemon {
             "project_view_dismiss_comms" => self.dismiss_comms(p),
             "reload-plan" => Ok(json!({"plan":self.reload_plan(&p["config"])?})),
             "reload" => self.request_reload(p),
+            "reload-cancel" => self.cancel_waiting_reload(p),
             "reload-status" => Ok(json!({"reload":self.kernel.store.json("reload.json")?})),
             "project_restart_panes" | "restart" => self.request_restart(p),
             "restart-status" => self.restart_status(p),
@@ -723,6 +724,7 @@ impl Daemon {
                 Ok(json!({"job_id":id,"agent_name":agent,"status":"cancellation_requested"}))
             }
             "shutdown" => {
+                self.interrupt_waiting_reload()?;
                 ensure!(
                     self.reload.is_none(),
                     "configuration reload in progress; observe reload-status before shutdown"

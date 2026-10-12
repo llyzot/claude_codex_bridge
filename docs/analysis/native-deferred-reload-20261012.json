@@ -1,0 +1,60 @@
+{
+  "recorded_at": "2026-10-12T02:47:46.910360+00:00",
+  "base_commit": "28a9c955",
+  "feature": "Deferred native configuration reload after quiescence",
+  "commands": [
+    "ccb-native --state-root <directory> reload --config <json> --when-idle",
+    "ccb-native --state-root <directory> reload --config <json> --when-idle --wait --timeout-ms 15000",
+    "ccb-native --state-root <directory> reload-status",
+    "ccb-native --state-root <directory> reload-cancel <operation-id>"
+  ],
+  "semantics": [
+    "Default reload behavior still rejects busy affected Agents unless --when-idle is supplied",
+    "Waiting records the operation and fingerprint, while existing/new work, FIFO, reply delivery and callback continuation keep progressing",
+    "Periodic revalidation requires all existing blocker checks to clear before workspace preparation and provider retirement begin",
+    "New submissions may extend waiting indefinitely; this is deferred application, not a closed admission drain",
+    "Exact operation ID cancels only the still-waiting configuration change, never Agent tasks; repeated cancellation is idempotent until superseded",
+    "Normal shutdown marks waiting reload interrupted; a restarted daemon also marks a still-waiting receipt interrupted and retains committed old configuration",
+    "Desired configuration secrets are kept in memory, not copied into the reload journal; applying after a restart requires a new explicit request",
+    "ProjectView reports waiting state and admission_paused separately"
+  ],
+  "validation": {
+    "runs": {
+      "native-deferred-reload-20261012.xml": {
+        "tests": "31",
+        "failures": "1",
+        "errors": "0",
+        "time": "78.188"
+      },
+      "native-deferred-reload-final-20261012.xml": {
+        "tests": "24",
+        "failures": "0",
+        "errors": "0",
+        "time": "50.347"
+      },
+      "native-deferred-reload-view-20261012.xml": {
+        "tests": "26",
+        "failures": "0",
+        "errors": "0",
+        "time": "47.941"
+      }
+    },
+    "initial_failure": "Shutdown rejected a waiting operation under the preexisting all-reloads shutdown guard; fixture had to terminate daemon after its bounded wait. Fixed by interrupting only the not-yet-preparing operation before shutdown.",
+    "fixed_restart_selection": "24 passed in 50.93s, including normal shutdown, abrupt process death and existing restart cases",
+    "final_view_selection": "26 passed in 48.05s after exposing waiting status in ProjectView",
+    "clippy": "all-targets -D warnings passed",
+    "format": "cargo fmt passed",
+    "release_build": "passed"
+  },
+  "hashes": {
+    "ccb-native.exe": "a6466f368d7a09f625ead65ca9a375d9ffb92f4a8f8a74a266f1a3491cce4348",
+    "ccb-kernel.exe": "f99d55edd269852f63864e3d3c328b057b38c67525e3896142239aeecdc906c9"
+  },
+  "limits": [
+    "No production service/default entry/installed candidate or account configuration changed",
+    "Provider execution tests use controlled protocol/command fixtures; no new real model call",
+    "Herdr externally owned providers remain subject to existing retirement-scope blockers; this is not full Herdr reload or multiwindow migration",
+    "No automatic replay of deferred configuration after daemon restart",
+    "Separate account-default real file test still awaits user decision; workspace-write tool failure remains unresolved"
+  ]
+}

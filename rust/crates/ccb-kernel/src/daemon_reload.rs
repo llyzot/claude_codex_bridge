@@ -16,6 +16,7 @@ pub(super) struct Pending {
     record: Value,
     prepared: mpsc::Receiver<bool>,
     idle_claude: BTreeMap<String, Instant>,
+    next_idle_check: Instant,
 }
 
 fn hash(value: &Value) -> Result<String> {
@@ -253,7 +254,9 @@ impl Daemon {
         self.reset_session_bindings(&next)?;
         self.kernel.store.save("configuration.json", &next)?;
         if let Some(mut record) = self.kernel.store.json("reload.json")? {
-            if ["preparing", "retiring"].contains(&record["status"].as_str().unwrap_or("")) {
+            if ["waiting_for_idle", "preparing", "retiring"]
+                .contains(&record["status"].as_str().unwrap_or(""))
+            {
                 record["status"] = json!("interrupted");
                 record["reason"] = json!("owner_restarted_explicit_configuration_required");
                 record["finished_at"] = json!(now());
@@ -283,12 +286,19 @@ impl Daemon {
         }
         Ok(())
     }
-    pub(super) fn reload_frozen(&self, agent: &str) -> bool {
+    pub(super) fn reload_affected(&self, agent: &str) -> bool {
         self.reload.as_ref().is_some_and(|p| {
             p.affected
                 .iter()
                 .any(|s| s.eq_ignore_ascii_case(agent.trim()))
         })
+    }
+    pub(super) fn reload_frozen(&self, agent: &str) -> bool {
+        self.reload_affected(agent)
+            && self
+                .reload
+                .as_ref()
+                .is_some_and(|p| p.record["status"] != "waiting_for_idle")
     }
     pub(super) fn reload_guard(&self, agent: &str) -> Result<()> {
         ensure!(
@@ -361,6 +371,10 @@ impl Daemon {
         )
     }
     pub(super) fn request_reload(&mut self, request: &Value) -> Result<Value> {
+        ensure!(
+            request["when_idle"].is_null() || request["when_idle"].is_boolean(),
+            "reload when_idle must be boolean"
+        );
         let desired = &request["config"];
         let fingerprint = crate::config::fingerprint(desired)?;
         if let Some(pending) = &self.reload {
@@ -380,6 +394,26 @@ impl Daemon {
             "configuration reload fingerprint mismatch"
         );
         if plan["can_apply"] != true {
+            if request["when_idle"] == true {
+                let affected = serde_json::from_value(plan["affected"].clone())?;
+                let record = json!({"schema_version":1,"record_type":"native_reload","operation_id":uuid::Uuid::new_v4().to_string(),
+                    "action":"reload","daemon_instance_id":self.state,"status":"waiting_for_idle","started_at":now(),
+                    "when_idle":true,"current_fingerprint":plan["current_fingerprint"],"desired_fingerprint":fingerprint,"plan":plan});
+                self.save_reload_record(&record)?;
+                self.kernel.store.commit()?;
+                // No provider retirement or workspace preparation before all
+                // existing jobs, replies and callbacks have reached quiescence.
+                let (_, prepared) = mpsc::channel();
+                self.reload = Some(Pending {
+                    config: desired.clone(),
+                    affected,
+                    record: record.clone(),
+                    prepared,
+                    idle_claude: BTreeMap::new(),
+                    next_idle_check: Instant::now(),
+                });
+                return Ok(json!({"reload":record}));
+            }
             return Ok(json!({"reload":{"status":"blocked","plan":plan}}));
         }
         self.begin_change(
@@ -389,6 +423,52 @@ impl Daemon {
             Value::Null,
             uuid::Uuid::new_v4().to_string(),
         )
+    }
+    pub(super) fn cancel_waiting_reload(&mut self, request: &Value) -> Result<Value> {
+        let id = records::string(request, "operation_id")?;
+        uuid::Uuid::parse_str(id)?;
+        let mut record = self
+            .kernel
+            .store
+            .json("reload.json")?
+            .context("no reload operation")?;
+        ensure!(
+            record["operation_id"] == id,
+            "reload operation identity mismatch"
+        );
+        if record["status"] == "cancelled" {
+            return Ok(json!({"reload":record}));
+        }
+        ensure!(
+            self.reload.as_ref().is_some_and(
+                |p| p.record["operation_id"] == id && p.record["status"] == "waiting_for_idle"
+            ),
+            "only a reload still waiting for idle can be cancelled"
+        );
+        record["status"] = json!("cancelled");
+        record["finished_at"] = json!(now());
+        record["reason"] = json!("operator_cancelled_pending_configuration");
+        self.save_reload_record(&record)?;
+        self.kernel.store.commit()?;
+        self.reload = None;
+        Ok(json!({"reload":record}))
+    }
+    pub(super) fn interrupt_waiting_reload(&mut self) -> Result<()> {
+        let Some(pending) = self
+            .reload
+            .as_ref()
+            .filter(|p| p.record["status"] == "waiting_for_idle")
+        else {
+            return Ok(());
+        };
+        let mut record = pending.record.clone();
+        record["status"] = json!("interrupted");
+        record["reason"] = json!("owner_shutdown_before_configuration_change");
+        record["finished_at"] = json!(now());
+        self.save_reload_record(&record)?;
+        self.kernel.store.commit()?;
+        self.reload = None;
+        Ok(())
     }
     pub(super) fn restart_status(&self, request: &Value) -> Result<Value> {
         ensure!(
@@ -529,9 +609,15 @@ impl Daemon {
     ) -> Result<Value> {
         let fingerprint = crate::config::fingerprint(desired)?;
         let affected: Vec<String> = serde_json::from_value(plan["affected"].clone())?;
-        let record = json!({"schema_version":1,"record_type":"native_reload","operation_id":operation_id,"action":action,"requested_agents":requested_agents,
+        let mut record = json!({"schema_version":1,"record_type":"native_reload","operation_id":operation_id,"action":action,"requested_agents":requested_agents,
             "daemon_instance_id":self.state,"status":"preparing","started_at":now(),
             "current_fingerprint":plan["current_fingerprint"],"desired_fingerprint":fingerprint,"plan":plan});
+        if let Some(pending) = self.reload.as_ref().filter(|p| {
+            p.record["operation_id"] == operation_id && p.record["status"] == "waiting_for_idle"
+        }) {
+            record["when_idle"] = json!(true);
+            record["waiting_since"] = pending.record["started_at"].clone();
+        }
         self.save_reload_record(&record)?;
         self.kernel.store.commit()?;
         let mut prepare = desired.clone();
@@ -559,6 +645,7 @@ impl Daemon {
             record: record.clone(),
             prepared,
             idle_claude: BTreeMap::new(),
+            next_idle_check: Instant::now(),
         });
         if spawned.is_some_and(|value| value.is_err()) {
             self.fail_reload("workspace_preparation_unavailable")?;
@@ -577,6 +664,33 @@ impl Daemon {
         Ok(())
     }
     pub(super) fn tick_reload(&mut self) -> Result<()> {
+        if let Some(pending) = self
+            .reload
+            .as_mut()
+            .filter(|p| p.record["status"] == "waiting_for_idle")
+        {
+            if Instant::now() < pending.next_idle_check {
+                return Ok(());
+            }
+            pending.next_idle_check = Instant::now() + std::time::Duration::from_millis(250);
+            let desired = pending.config.clone();
+            let operation = records::string(&pending.record, "operation_id")?.to_owned();
+            let plan = match self.reload_plan(&desired) {
+                Ok(plan) => plan,
+                Err(_) => return self.fail_reload("deferred_configuration_validation_failed"),
+            };
+            if plan["can_apply"] != true {
+                let pending = self.reload.as_mut().unwrap();
+                if pending.record["plan"]["blockers"] != plan["blockers"] {
+                    pending.record["plan"]["blockers"] = plan["blockers"].clone();
+                    let record = pending.record.clone();
+                    self.save_reload_record(&record)?;
+                    self.kernel.store.commit()?;
+                }
+                return Ok(());
+            }
+            self.begin_change(&desired, plan, "reload", Value::Null, operation)?;
+        }
         let Some(pending) = &self.reload else {
             return Ok(());
         };

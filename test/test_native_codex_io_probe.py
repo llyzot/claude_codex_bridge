@@ -58,3 +58,22 @@ def test_provider_response_must_match_requested_restrictions(tmp_path):
     report['thread_policy_observation']['thread_id'] = 'another-thread'
     path.write_text(json.dumps(report), encoding='utf-8')
     assert not verdict(path)['passed']
+
+
+def test_account_default_success_is_not_restricted_sandbox_acceptance(tmp_path):
+    path, report = evidence(tmp_path)
+    (tmp_path / 'project/probe.txt').write_text(report['marker'] + '\n', encoding='utf-8')
+    report.update(test_mode='account-default',sandbox=None,approval_policy=None,permission_overrides_supplied=False,
+                  account_policy_snapshot={'sandbox_mode':'danger-full-access','approval_policy':'never'})
+    report['thread_policy_observation'].update(sandbox_type='dangerFullAccess',approval_policy='never')
+    path.write_text(json.dumps(report),encoding='utf-8')
+    assert verdict(path,'account-default')['passed']
+    assert not verdict(path)['passed']
+    report['permission_overrides_supplied']=True
+    path.write_text(json.dumps(report),encoding='utf-8')
+    assert not verdict(path,'account-default')['passed']
+    report['permission_overrides_supplied']=False
+    report['thread_policy_observation']['approval_policy']=None
+    report['account_policy_snapshot']['approval_policy']=None
+    path.write_text(json.dumps(report),encoding='utf-8')
+    assert not verdict(path,'account-default')['passed']

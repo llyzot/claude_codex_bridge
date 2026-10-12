@@ -243,7 +243,8 @@
     "Native followup-compact API/CLI provides dry-run and journaled retirement of terminal payload/history while preserving active records, admission order and permanent idempotency receipts; restart and uncertain-send deduplication validated",
     "Native Codex thread binding reports provider-observed sandbox/approval/reviewer modes through session metadata and provider-status; resume/clear refresh and compact retention verified; restricted IO acceptance now requires actual matching provider modes before submitting a model task",
     "Native reload --when-idle defers configuration cutover until jobs, mailboxes, callback edges and provider retirement checks clear, without freezing queue/continuation progress; exact-ID cancellation, shutdown/crash interruption, CLI observation timeout and ProjectView waiting status are verified",
-    "Native Claude MCP elicitation broker supports explicitly answered bounded form/URL requests, session-level attribution, execution replay/identity fences, withdrawal and secret-free metadata. Authenticated Claude 2.1.296 plus local MCP fixture performed exactly one tool call and form answer, then completed the same task; Keeper stopped."
+    "Native Claude MCP elicitation broker supports explicitly answered bounded form/URL requests, session-level attribution, execution replay/identity fences, withdrawal and secret-free metadata. Authenticated Claude 2.1.296 plus local MCP fixture performed exactly one tool call and form answer, then completed the same task; Keeper stopped.",
+    "Refreshed independent Rust installation to e35f6a1a source. Installed Pi and Claude Leads each completed Codex callbacks across Keeper recovery with stable sessions. New binary resumed a stopped prior-build Pi/Codex project and recalled both markers without its deleted launch source. User-authorized existing-default file write/read verified from actual tool records, separately from still-failing restricted mode."
   ],
   "remaining": [
     "Broaden native Keeper real-model/Herdr foreground acceptance, legacy/cross-platform coexistence and unavailable-observation/storage recovery; evaluate optional OS-level restart of the Keeper itself and production/default rollout",
@@ -652,13 +653,21 @@
     "native_deferred_reload_evidence": "docs/analysis/native-deferred-reload-20261012.json",
     "native_deferred_reload_validation": "Initial reload selection: 30 passed, one waiting-shutdown regression. Fixed interruption-before-shutdown; 24 deferred/restart cases passed. Final deferred/ProjectView selection: 26 passed. Codex active task completed before replacement; Lead callback and FIFO survived; crash restarted old config and interrupted pending change. Formatting, Clippy, build and release/bin hash equality passed. No production/default change or model inference.",
     "native_claude_elicitation_evidence": "docs/analysis/native-claude-elicitation-20261012.json",
-    "native_claude_elicitation_validation": "83-case interaction regression: 82 passed, one incorrect no-echo cancellation expectation; corrected case passed separately without weakening runtime completion. Real authenticated Claude/local-MCP form round trip passed after removing test safe-mode that disabled MCP; one call/answer and exact final reply, owned Keeper stopped. No account config/credential copy/default change. Clippy, formatting, build and bin hashes verified."
+    "native_claude_elicitation_validation": "83-case interaction regression: 82 passed, one incorrect no-echo cancellation expectation; corrected case passed separately without weakening runtime completion. Real authenticated Claude/local-MCP form round trip passed after removing test safe-mode that disabled MCP; one call/answer and exact final reply, owned Keeper stopped. No account config/credential copy/default change. Clippy, formatting, build and bin hashes verified.",
+    "native_installed_refresh_evidence": "docs/analysis/native-installed-refresh-20261012.json",
+    "native_installed_refresh_validation": "Installed image matches release. Pi/Codex and Claude/Codex real chains plus Keeper recovery passed; Lead initial turns ended before Worker completion. Old native test state resumed under the new image with stable IDs and correct recall. Actual dangerFullAccess/never defaults, without permission overrides, produced successful WriteAllText/ReadAllText records and verified marker. All test Keepers stopped. Legacy read transient was rechecked: same PID 52968 healthy, project config unchanged. Five IO gate tests passed. No default cutover or Herdr UI acceptance."
   },
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2",
     "candidate_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "next_action": "Restricted IO failure reproduced in actual Windows Terminal as well as desktop tool process. Preserve policy; obtain new helper-context evidence or an upstream repair before another equivalent model probe. Continue remaining native lifecycle work; multiwindow requires coordinated namespace/mount/recovery support, not only config parsing.",
-    "latest_evidence": "docs/analysis/native-runtime-host-comparison-20261012.json",
-    "permission_decision_pending": "Separately test the intended account-default manual configuration, currently danger-full-access/never, without changing user settings; do not label this restricted sandbox acceptance. User selection requested before execution."
+    "next_action": "Account-default IO is now authorized and verified separately. Proceed toward actual scoped Herdr foreground acceptance and state-preserving legacy-to-native cutover; restricted sandbox setup remains an external limitation, not a passed gate.",
+    "latest_evidence": "docs/analysis/native-installed-refresh-20261012.json"
+  },
+  "installed_candidate": {
+    "prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
+    "rust_source_commit": "e35f6a1a9aae08b75078f0868ea1ea20474cd372",
+    "binary_sha256": "f89db5d9333d9cf0a1841acdfa182b7754398b09a087d788608c0261d71d83ca",
+    "account_default": false,
+    "evidence": "docs/analysis/native-installed-refresh-20261012.json"
   }
 }

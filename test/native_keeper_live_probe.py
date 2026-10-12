@@ -152,10 +152,10 @@ def main():
         assert review2 in result2['reply'] and review1 in result2['reply'],result2['reply']
         after=metadata();ids=session_ids(after)
         assert ids==report['first_session_ids'],ids
-        report.update(status='passed',second_reply=result2['reply'],restored_session_ids=ids,
+        report.update(status='chain_verification_completed',second_reply=result2['reply'],restored_session_ids=ids,
                       lead_state=after['lead']['state'],worker_state=after['worker']['state'])
         report['callbacks']=request('trace',{'target':parent2})
-        save();print(json.dumps({'phase':'passed','trial_root':str(trial)}),flush=True)
+        save();print(json.dumps({'phase':'chain_verification_completed','trial_root':str(trial)}),flush=True)
     except Exception as error:
         report['status']='failed';report['error']=str(error);save();raise
     finally:
@@ -169,7 +169,14 @@ def main():
                 row=cli('--state-root',state,'keeper-status')
                 return row if not row['alive'] and row['keeper']['phase']=='stopped' else None
             try:report['final_keeper']=until(stopped_owner,25)
-            except TimeoutError:report['cleanup_observation']='incomplete; inspect this exact trial before further controls'
+            except Exception:
+                report['status']='cleanup_unverified'
+                report['cleanup_observation']='incomplete; inspect this exact trial before further controls'
+                save()
+                raise
+            if report['status']=='chain_verification_completed':
+                report['status']='passed'
+                print(json.dumps({'phase':'passed','trial_root':str(trial)}),flush=True)
             save()
 
 if __name__=='__main__':main()

@@ -1,0 +1,166 @@
+{
+  "recorded_at": "2026-10-12T03:11:36.902965+00:00",
+  "rust_source_commit": "e35f6a1a9aae08b75078f0868ea1ea20474cd372",
+  "candidate_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
+  "installed_binary_sha256": "f89db5d9333d9cf0a1841acdfa182b7754398b09a087d788608c0261d71d83ca",
+  "upgrade": {
+    "operation_id": "e697a020-5c20-41a5-9098-48554355b91d",
+    "phase": "committed",
+    "from_sha256": "dc80ed286194ddbd044bf40586a7fc3b021c823be786941de67f64ad15766b5e",
+    "backup": "C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-e697a020-5c20-41a5-9098-48554355b91d.backup",
+    "program_file_rollback_retained": true,
+    "user_path_modified": false,
+    "provider_settings_modified": false,
+    "runtime_state_changed_by_installer": false
+  },
+  "installed_real_chains": [
+    {
+      "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-keeper-live-zy77dxn8",
+      "lead_provider": "pi",
+      "binary_sha256": "f89db5d9333d9cf0a1841acdfa182b7754398b09a087d788608c0261d71d83ca",
+      "first_reply": "REVIEW_ONE_4031b60d",
+      "second_reply": "REVIEW_TWO_4031b60d PREVIOUS=REVIEW_ONE_4031b60d",
+      "worker_recall": "WORKER_MEMORY_4031b60d",
+      "first_session_ids": {
+        "lead": "01a12e0e-a795-744b-a52d-233df3e81e7b",
+        "worker": "01a12e0e-a76e-75b1-9d79-ce1d23e3eace"
+      },
+      "restored_session_ids": {
+        "lead": "01a12e0e-a795-744b-a52d-233df3e81e7b",
+        "worker": "01a12e0e-a76e-75b1-9d79-ce1d23e3eace"
+      },
+      "initial_daemon": 54948,
+      "restored_daemon": 51068,
+      "keeper_stopped": true,
+      "parent_transport_status": "incomplete",
+      "parent_business_status": "completed",
+      "lead_released_before_worker_seconds": 3.748215,
+      "callback_state": "done"
+    },
+    {
+      "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-keeper-live-ny20bpyn",
+      "lead_provider": "claude",
+      "binary_sha256": "f89db5d9333d9cf0a1841acdfa182b7754398b09a087d788608c0261d71d83ca",
+      "first_reply": "REVIEW_ONE_aa949a56",
+      "second_reply": "REVIEW_TWO_aa949a56 PREVIOUS=REVIEW_ONE_aa949a56",
+      "worker_recall": "WORKER_MEMORY_aa949a56",
+      "first_session_ids": {
+        "lead": "eb9ddae1-03b0-49ed-af39-077cceccb799",
+        "worker": "01a12e0f-e484-7bf2-95a5-9556235fcf37"
+      },
+      "restored_session_ids": {
+        "lead": "eb9ddae1-03b0-49ed-af39-077cceccb799",
+        "worker": "01a12e0f-e484-7bf2-95a5-9556235fcf37"
+      },
+      "initial_daemon": 41612,
+      "restored_daemon": 63844,
+      "keeper_stopped": true,
+      "parent_transport_status": "completed",
+      "parent_business_status": "completed",
+      "lead_released_before_worker_seconds": 0.786658,
+      "callback_state": "done"
+    }
+  ],
+  "cross_build_stopped_session_resume": {
+    "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-keeper-live-7c6hd6vz",
+    "before_binary_sha256": "dc80ed286194ddbd044bf40586a7fc3b021c823be786941de67f64ad15766b5e",
+    "after_binary_sha256": "f89db5d9333d9cf0a1841acdfa182b7754398b09a087d788608c0261d71d83ca",
+    "prior_session_ids": {
+      "lead": "01a12ddd-2958-73a7-a604-ca938d9d6488",
+      "worker": "01a12ddd-2a24-7b91-9a75-6de98c493890"
+    },
+    "previous_keeper_confirmed_stopped": true,
+    "source_launch_present": false,
+    "passed": true,
+    "start": {
+      "keeper": {
+        "created": "134362478604586213",
+        "pid": 2412,
+        "windows_session": 1
+      },
+      "keeper_instance_id": "54e1d171-dae1-4626-af7f-dd16083e15a5",
+      "pid": 54028,
+      "project_id": "dbe01f76b1877d3be12c9a00f480a94f5e0d906098f180dd2aec158aff6a6ee4",
+      "startup_id": "f7067005-7911-4ac8-b917-ed8a9ab33816",
+      "state_root": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-native-keeper-live-7c6hd6vz\\project\\.ccb\\ccbd",
+      "status": "running"
+    },
+    "worker_job": "job_bb08bbc9d85e",
+    "worker_reply": "WORKER_MEMORY_a24eb735",
+    "lead_job": "job_ea3d1bdeffa9",
+    "lead_reply": "REVIEW_TWO_a24eb735",
+    "resumed_session_ids": {
+      "lead": "01a12ddd-2958-73a7-a604-ca938d9d6488",
+      "worker": "01a12ddd-2a24-7b91-9a75-6de98c493890"
+    },
+    "worker_policy": {
+      "approval_policy": "never",
+      "approval_reviewer": "user",
+      "observed_at": "2026-10-12T03:04:21.539168600Z",
+      "sandbox_type": "readOnly",
+      "scope": "thread_binding_modes",
+      "source": "thread/resume",
+      "thread_id": "01a12ddd-2a24-7b91-9a75-6de98c493890"
+    },
+    "task_passed": true,
+    "stop": {
+      "api_version": 2,
+      "keeper_instance_id": "54e1d171-dae1-4626-af7f-dd16083e15a5",
+      "ok": true,
+      "status": "stopping"
+    },
+    "keeper_stopped": true
+  },
+  "account_default_io": {
+    "user_authorized": true,
+    "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-io-al1xmda3",
+    "provider_observed_policy": {
+      "approval_policy": "never",
+      "approval_reviewer": "user",
+      "observed_at": "2026-10-12T03:07:14.261973800Z",
+      "sandbox_type": "dangerFullAccess",
+      "scope": "thread_binding_modes",
+      "source": "thread/start",
+      "thread_id": "01a12e14-14c3-7660-9757-daa7663c75f9"
+    },
+    "permission_overrides_supplied": false,
+    "file_verified": true,
+    "readback_tool_verified": true,
+    "reply": "CCB_RUST_IO_877441c469df",
+    "keeper_stopped": true,
+    "transcript": "C:\\Users\\user\\.codex\\sessions\\2026\\10\\12\\rollout-2026-10-12T11-07-14-01a12e14-14c3-7660-9757-daa7663c75f9.jsonl",
+    "transcript_sha256": "90d586f2af1169731ffe78716859ceb3f50bb07824e2a4fe29cfe77b8c9d9f5f",
+    "tool_calls": {
+      "WriteAllText": "call_26e3ee98fbc74662b792344b550cf0ff",
+      "ReadAllText": "call_704dde52c55e456dac388ea8b4a21733"
+    },
+    "tool_exit_codes": {
+      "WriteAllText": 0,
+      "ReadAllText": 0
+    },
+    "restricted_mode_passed": false
+  },
+  "legacy_after_tests": {
+    "health": "healthy",
+    "pid": 52968,
+    "active": 0,
+    "queued": 0,
+    "pending_replies": 0,
+    "prior_transient_observation": "One read-only auth handshake failed; fresh re-observation succeeded against the same PID, without restart or other service control.",
+    "project_config_sha256": "8256cc74177ee2bb8308db8b13d8118c73484195cd1a38c87208f106024cedcd"
+  },
+  "user_path_observation": {
+    "legacy_bin_present": true,
+    "rust_candidate_bin_present": false
+  },
+  "harness_changes": [
+    "Restricted and account-default IO gates are separate. Missing/inconsistent provider modes fail; five regression tests passed.",
+    "Keeper probe reports passed only after confirmed cleanup; uncertain cleanup now raises. This reporting change followed the successful real chains, whose final Keeper records were independently verified."
+  ],
+  "limits": [
+    "Account-default IO passed; the separate workspace-write sandbox failure remains unresolved and is not relabeled.",
+    "Cross-build compatibility covers one quiescent stopped native Pi/Codex test project, not arbitrary legacy Python state, active jobs or all rollback paths.",
+    "Pure Rust candidate refreshed; legacy default entrypoint and production Workspace were not switched.",
+    "Actual Herdr UI/foreground acceptance and remaining migration work are outstanding."
+  ]
+}

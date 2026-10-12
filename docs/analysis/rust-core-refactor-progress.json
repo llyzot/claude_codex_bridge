@@ -2,7 +2,7 @@
   "objective": "Migrate CCB core to Rust, preserving Windows Herdr and Pi/Codex/Claude asynchronous collaboration",
   "baseline_commit": "16f16d24",
   "complete": false,
-  "production_install_changed": false,
+  "production_install_changed": true,
   "existing_agents_controlled": false,
   "existing_runtime_control_authorization": {
     "may_close_when_needed": true,
@@ -11,11 +11,12 @@
     "note": "This supersedes the earlier preservation constraint; actual controls are recorded separately"
   },
   "runtime_selection": {
-    "transition_default": "python",
+    "transition_default": "rust_for_account_windows_cli",
     "experimental_mode": "CCB_CORE_RUNTIME=rust",
     "binary_override": "CCB_KERNEL_BIN",
     "final_requirement": "Rust must own the default core runtime; an optional sidecar alone is not completion",
-    "native_prefix_default": "Explicit fresh Windows prefixes installed by ccb-native install or install.ps1 -Runtime rust default to Rust directly; account/production default remains Python pending parity"
+    "native_prefix_default": "User PATH now selects Desktop/work/ccb-rust/bin for ccb/ask. Legacy Python prefix retained; other existing project workspaces are not migrated by PATH selection.",
+    "account_default_native": true
   },
   "completed": [
     "Cross-platform ccb-kernel crate and persistent versioned stdio transport",
@@ -256,7 +257,8 @@
     "Stopped Herdr fixed-history executions reconcile through old protected configuration without provider IO or automatic replay; completed child results and uncertain interruption notices wake Pi Lead once, unsent FIFO queues survive, and exact generation-bound configuration/session handoff preserves existing reload blockers",
     "Stopped deferred-discovery Herdr tasks recover the unique anchored native session, supersede stale caches, and preserve callback/FIFO delivery without input replay; missing/foreign/ambiguous evidence refuses replacement",
     "Claude original-terminal idle/transcript confirmation is committed before finalization with execution/session/process/file-boundary identity; cold recovery rereads current history and rejects hook continuation, changed reply or corrupt evidence. New attempts drop old native permissions and observation receipts",
-    "User-selected sample-project now runs the installed Rust CCB in its own named Herdr session with Pi Lead and native Codex Worker. Actual read-only chain returned 5767, callback done, one Lead dispatch tool and first-turn release 2.653887 seconds before Worker completion; tracked application source clean and global PATH unchanged"
+    "User-selected sample-project now runs the installed Rust CCB in its own named Herdr session with Pi Lead and native Codex Worker. Actual read-only chain returned 5767, callback done, one Lead dispatch tool and first-turn release 2.653887 seconds before Worker completion; tracked application source clean and global PATH unchanged",
+    "Ordinary pwsh Herdr reconnect now retains the protected implicit launch PATH without ignoring actual config changes. Account default ccb/ask selects the verified Rust prefix; sample-project direct reconnect passed with same Workspace, Pi process/session and Codex thread, and helper startup script is obsolete"
   ],
   "remaining": [
     "Broaden native Keeper real-model/Herdr foreground acceptance, legacy/cross-platform coexistence and unavailable-observation/storage recovery; evaluate optional OS-level restart of the Keeper itself and production/default rollout",
@@ -683,13 +685,14 @@
     "native_resume_binding": "Prior release incorrectly returned running for all three wrong-session cases. Debug: 12 passed plus one transient observer PermissionError; bounded reader retry and hosted/deferred recheck passed. All 38 final-release reopen/stopped-server/native-host tests passed; fmt/Clippy and installed candidate verification passed. Latest model-backed acceptance remains bb5a0f6a. Evidence native-herdr-resume-binding-20261012.json.",
     "native_herdr_work_recovery": "100 final-release cases passed in 588.16s; Rust 46 passed and two parent-invoked helper entries ignored; fmt/Clippy passed. Completed/interrupted child callback, unsent A/B FIFO, opener death, changed model/env, corrupt permit/cancel intent, mismatched lease and silent cancellation verified. Debug 44 passed/1 bounded-observation assertion corrected; retained XML. Candidate refreshed to bc366d09. No new paid model inference or production/default promotion. See native-herdr-work-recovery-20261012.json.",
     "native_herdr_deferred_claude_recovery": "165 final-release cases passed in 961.01s; Rust 47 passed and two parent-invoked helper entries ignored; fmt/Clippy passed. Positive/uncertain deferred callbacks and FIFO, stale-cache replacement, duplicate/missing/foreign refusal, actual Claude receipt emission, simulated post-receipt pre-finalization recovery, hook invalidation, changed execution/history and fresh retry permission covered. Large/partial-history unit coverage added. Original red cases and initial cursor-schema regression retained. Candidate refreshed to 2ea63fac; no new paid model inference or production/default cutover. See native-herdr-deferred-claude-recovery-20261012.json.",
-    "native_sample-project_project": "Actual installed 2ea63fac / f6c5ec25 project rollout passed; project session ccb-native-77324b3f209d and workspace w1 remain active/idle for user. Exact original chain verified after correcting a prompt/judge punctuation mismatch; no resubmission. Startup through project open.ps1 reuses the same runtime and preserves its launch PATH. See native-sample-project-rollout-20261012.json."
+    "native_sample-project_project": "Actual installed 2ea63fac / f6c5ec25 project rollout passed; project session ccb-native-77324b3f209d and workspace w1 remain active/idle for user. Exact original chain verified after correcting a prompt/judge punctuation mismatch; no resubmission. Startup through project open.ps1 reuses the same runtime and preserves its launch PATH. See native-sample-project-rollout-20261012.json.",
+    "native_shell_reconnect": "Original release failed the caller-PATH-only test with the same migration error. Debug 3 passed. Final release 86 passed in 753.59s; fmt/Clippy passed. Project backend upgraded under stopped-image guards, same Pi PID/session and Codex thread preserved, direct fresh-account-path pwsh ccb herdr open returned running, and foreground Herdr client observed. Legacy Python installation retained and User PATH rollback saved. See native-herdr-shell-reconnect-20261012.json."
   },
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\5.Tool\\sample-project",
     "candidate_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "next_action": "User selected sample-project instead of sample-project-2. Project-specific Rust rollout and real Pi/Codex callback acceptance passed; agents remain active for use. Account-default ccb/ask remains the existing installation. Continue real in-flight recovery and Claude foreground acceptance in separate authorized test resources; do not resume the superseded sample-project-2 migration.",
-    "latest_evidence": "docs/analysis/native-sample-project-rollout-20261012.json",
+    "next_action": "sample-project is active on Rust and account ccb/ask selection is now Rust. Continue scoped real interrupted-turn/Claude foreground acceptance and remaining parity; existing legacy project workspaces remain untouched and require their own explicit migration.",
+    "latest_evidence": "docs/analysis/native-herdr-shell-reconnect-20261012.json",
     "herdr_preflight": {
       "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_",
       "session": "ccb-rust-ui-gjjd92m_",
@@ -697,14 +700,14 @@
       "authorization": "granted",
       "status": "executed; callback and hot reload passed after source fix"
     },
-    "independent_work_while_approval_pending": "The previously requested sample-project-2 exception is superseded by user selection of sample-project. Use the explicitly scoped new project session only; account-default promotion was not applied.",
+    "independent_work_while_approval_pending": "No pending sample-project entrypoint action. Superseded sample-project-2 migration remains unapplied; do not infer its migration from account PATH promotion.",
     "project_rollout_status": "active_verified"
   },
   "installed_candidate": {
     "prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "rust_source_commit": "2ea63fac60af4416c10c57c3eb97ea3802511098",
-    "binary_sha256": "f6c5ec25056c59e57cffdbf74bc467476c377580f8c03b10091fb10b16842f18",
-    "account_default": false,
-    "evidence": "docs/analysis/native-herdr-deferred-claude-recovery-20261012.json"
+    "rust_source_commit": "dda34f62a12b86f33fd29e91de4e8634c9e8b294",
+    "binary_sha256": "e3a4421381c7abfe6f86f5ea2bdc2906819fb6e24466e7d030a579c6c997a573",
+    "account_default": true,
+    "evidence": "docs/analysis/native-herdr-shell-reconnect-20261012.json"
   }
 }

@@ -1,0 +1,53 @@
+{
+  "source_commit": "dda34f62a12b86f33fd29e91de4e8634c9e8b294",
+  "binary_sha256": "e3a4421381c7abfe6f86f5ea2bdc2906819fb6e24466e7d030a579c6c997a573",
+  "defect": "Inherited caller PATH was included in the Herdr launch signature. Opening the same project from another pwsh environment wrongly required migration.",
+  "fix": "Recover the protected original request and retain only implicit provider PATH when all other request fields are exactly unchanged. Explicit PATH/model/home/policy/binding changes retain their existing refusal behavior.",
+  "red_xml": "docs/analysis/native-herdr-shell-reconnect-red-20261012.xml",
+  "debug_xml": "docs/analysis/native-herdr-shell-reconnect-debug-20261012.xml",
+  "release_xml": "docs/analysis/native-herdr-shell-reconnect-release-20261012.xml",
+  "release": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "86",
+    "time": "745.820",
+    "timestamp": "2026-10-12T18:14:18.266722+08:00",
+    "hostname": "HOST"
+  },
+  "format": "passed",
+  "clippy": "all-targets -D warnings passed",
+  "project": "C:\\Users\\user\\Desktop\\work\\1.code\\5.Tool\\sample-project",
+  "live_reconnect": {
+    "status": "running",
+    "workspace_id": "w1",
+    "pi_session_preserved": true,
+    "pi_process_preserved": true,
+    "codex_thread_preserved": true,
+    "source_commit": "dda34f62a12b86f33fd29e91de4e8634c9e8b294",
+    "native_sha256": "e3a4421381c7abfe6f86f5ea2bdc2906819fb6e24466e7d030a579c6c997a573"
+  },
+  "direct_fresh_pwsh_verified": true,
+  "direct_command": "ccb herdr open",
+  "account_default": "rust",
+  "legacy_python_install_retained": true,
+  "entrypoint_rollback_receipt": "C:\\Users\\user\\Desktop\\work\\1.code\\5.Tool\\sample-project\\.ccb\\entrypoint-change.json",
+  "global_path_modified": true,
+  "upgrade_operation_id": "333b8513-a3f3-4666-a63c-75884cd8f8be",
+  "upgrade_backup": "C:/Users/user/Desktop/work/.ccb-rust.ccb-native-upgrade-333b8513-a3f3-4666-a63c-75884cd8f8be.backup",
+  "foreground_herdr_client": {
+    "pid": 65160,
+    "parent_pid": 27068,
+    "session": "ccb-native-77324b3f209d"
+  },
+  "obsolete_helpers": [
+    ".ccb/open.ps1.obsolete",
+    ".ccb/launch-path.txt.obsolete"
+  ],
+  "limits": [
+    "Only the new sample-project native backend was stopped/restarted for the guarded upgrade; original Pi process/session and Codex thread were preserved.",
+    "Global command selection now uses Rust. Other project workspaces were not stopped or migrated; legacy live-state takeover remains fenced.",
+    "Program rollback does not roll back project/runtime state; restore PATH only when it still matches this change."
+  ]
+}

@@ -1,5 +1,6 @@
-//! Read-only workspace plans and recoverable Git materialization. Never resets,
-//! prunes or removes a checkout, branch, or original project tree.
+//! Read-only workspace plans and recoverable Git materialization. Startup never
+//! resets, prunes or removes checkouts. Explicit offline retirement and cleanup
+//! are handled by the identity-bound lifecycle module.
 use anyhow::{ensure, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -12,6 +13,9 @@ use std::{
 };
 
 const MARKER: &str = ".ccb-workspace.json";
+#[path = "workspace_lifecycle.rs"]
+mod lifecycle;
+pub(crate) use lifecycle::execute;
 pub(crate) fn portable(path: &Path) -> Result<String> {
     let text = path.to_str().context("workspace path must be UTF-8")?;
     #[cfg(windows)]
@@ -482,6 +486,7 @@ impl Plan {
         Ok(value)
     }
     fn inspect(&self, materializing: bool) -> Result<()> {
+        lifecycle::startup_guard(self)?;
         ensure!(
             self.schema_version == 1
                 && ["agent", "group", "external"].contains(&self.scope.as_str()),

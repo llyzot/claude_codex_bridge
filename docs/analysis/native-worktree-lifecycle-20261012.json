@@ -1,0 +1,195 @@
+{
+  "source_base_commit": "7e108586ae606ca76a169c8832eb1f1a74165e68",
+  "scope": "Windows native offline managed-worktree lifecycle; three-provider runtime only",
+  "complete_for_offline_workflow": true,
+  "installed_prefix_changed": false,
+  "production_project_controlled": false,
+  "commands": [
+    "worktree inspect",
+    "worktree merge --into",
+    "worktree retire",
+    "worktree restore",
+    "worktree purge --into [--delete-branch]",
+    "worktree recover",
+    "worktree status"
+  ],
+  "implementation": [
+    "Committed configuration and Git ownership binding",
+    "Stopped daemon/Keeper/provider and pending-job/reply/callback/fault fences",
+    "Repository and materialization locks",
+    "Detached merge stage; exact parents/nonce; original target preserved on conflict",
+    "Recorded result fast-forward publication; already-integrated no-op",
+    "Whole registered checkout moves preserve staged/unstaged/untracked/ignored files",
+    "Immutable archive commit pin and optional compare-and-delete branch cleanup",
+    "Intent-before-effect receipts, pointer gap recovery and newer-operation protection"
+  ],
+  "validation": {
+    "final_release_lifecycle_cases": 22,
+    "final_release_batches": [
+      {
+        "file": "docs/analysis/native-worktree-lifecycle-stage-fixture-20261012.xml",
+        "tests": 15,
+        "errors": 0,
+        "failures": 1,
+        "seconds": 197.705,
+        "passed": [
+          "test.test_native_worktree_lifecycle::test_merge_and_replay_publish_only_one_correlated_result",
+          "test.test_native_worktree_lifecycle::test_retirement_moves_dirty_index_untracked_and_ignored_files_and_restores",
+          "test.test_native_worktree_lifecycle::test_conflict_keeps_target_and_recovery_commits_operator_resolution",
+          "test.test_native_worktree_lifecycle::test_live_daemon_blocks_lifecycle_without_git_changes",
+          "test.test_native_worktree_lifecycle::test_clean_integrated_archive_can_be_purged_without_branch_loss",
+          "test.test_native_worktree_lifecycle::test_branch_removal_is_explicit_and_archive_commit_remains_pinned",
+          "test.test_native_worktree_lifecycle::test_retired_workspace_is_not_recreated_and_old_recovery_preserves_new_pointer",
+          "test.test_native_worktree_lifecycle::test_dirty_source_and_unmerged_archive_are_refused",
+          "test.test_native_worktree_lifecycle::test_recovery_rejects_tampered_archive_path",
+          "test.test_native_worktree_lifecycle::test_completed_receipt_repairs_lost_final_pointer",
+          "test.test_native_worktree_lifecycle::test_prepared_receipt_without_pointer_or_pin_can_resume",
+          "test.test_native_worktree_lifecycle::test_recover_does_not_silently_accept_mutation_options",
+          "test.test_native_worktree_lifecycle::test_merge_target_movement_during_conflict_blocks_publication",
+          "test.test_native_worktree_lifecycle::test_operation_id_replay_rejects_changed_retirement_arguments"
+        ]
+      },
+      {
+        "file": "docs/analysis/native-worktree-lifecycle-release-20261012.xml",
+        "tests": 8,
+        "errors": 0,
+        "failures": 0,
+        "seconds": 134.215,
+        "passed": [
+          "test.test_native_worktree_lifecycle::test_retained_stage_user_files_block_target_publication",
+          "test.test_native_worktree_lifecycle::test_missing_archive_without_removal_intent_is_uncertain",
+          "test.test_native_worktree_lifecycle::test_process_death_after_git_effect_recovers_without_duplicate_or_file_loss[merge-commit]",
+          "test.test_native_worktree_lifecycle::test_process_death_after_git_effect_recovers_without_duplicate_or_file_loss[merge-publish]",
+          "test.test_native_worktree_lifecycle::test_process_death_after_git_effect_recovers_without_duplicate_or_file_loss[merge-remove]",
+          "test.test_native_worktree_lifecycle::test_process_death_after_git_effect_recovers_without_duplicate_or_file_loss[retire-move]",
+          "test.test_native_worktree_lifecycle::test_process_death_after_git_effect_recovers_without_duplicate_or_file_loss[restore-move]",
+          "test.test_native_worktree_lifecycle::test_process_death_after_git_effect_recovers_without_duplicate_or_file_loss[purge-remove]"
+        ]
+      }
+    ],
+    "already_integrated_followup": {
+      "file": "docs/analysis/native-worktree-lifecycle-noop-20261012.xml",
+      "tests": 1,
+      "errors": 0,
+      "failures": 0,
+      "seconds": 18.494,
+      "passed": [
+        "test.test_native_worktree_lifecycle::test_merge_and_replay_publish_only_one_correlated_result"
+      ]
+    },
+    "preflight_release_regression": {
+      "file": "docs/analysis/native-worktree-lifecycle-release-preflight-20261012.xml",
+      "tests": 60,
+      "errors": 0,
+      "failures": 0,
+      "seconds": 373.919,
+      "passed": [
+        "test.test_native_worktree_lifecycle::test_merge_and_replay_publish_only_one_correlated_result",
+        "test.test_native_worktree_lifecycle::test_retirement_moves_dirty_index_untracked_and_ignored_files_and_restores",
+        "test.test_native_worktree_lifecycle::test_conflict_keeps_target_and_recovery_commits_operator_resolution",
+        "test.test_native_worktree_lifecycle::test_live_daemon_blocks_lifecycle_without_git_changes",
+        "test.test_native_worktree_lifecycle::test_clean_integrated_archive_can_be_purged_without_branch_loss",
+        "test.test_native_worktree_lifecycle::test_branch_removal_is_explicit_and_archive_commit_remains_pinned",
+        "test.test_native_worktree_lifecycle::test_retired_workspace_is_not_recreated_and_old_recovery_preserves_new_pointer",
+        "test.test_native_worktree_lifecycle::test_dirty_source_and_unmerged_archive_are_refused",
+        "test.test_native_worktree_lifecycle::test_recovery_rejects_tampered_archive_path",
+        "test.test_native_worktree_lifecycle::test_completed_receipt_repairs_lost_final_pointer",
+        "test.test_native_worktree_lifecycle::test_prepared_receipt_without_pointer_or_pin_can_resume",
+        "test.test_native_worktree_lifecycle::test_recover_does_not_silently_accept_mutation_options",
+        "test.test_native_worktree_lifecycle::test_merge_target_movement_during_conflict_blocks_publication",
+        "test.test_native_worktree_lifecycle::test_operation_id_replay_rejects_changed_retirement_arguments",
+        "test.test_native_worktree_lifecycle::test_process_death_after_git_effect_recovers_without_duplicate_or_file_loss[merge-commit]",
+        "test.test_native_worktree_lifecycle::test_process_death_after_git_effect_recovers_without_duplicate_or_file_loss[merge-publish]",
+        "test.test_native_worktree_lifecycle::test_process_death_after_git_effect_recovers_without_duplicate_or_file_loss[merge-remove]",
+        "test.test_native_worktree_lifecycle::test_process_death_after_git_effect_recovers_without_duplicate_or_file_loss[retire-move]",
+        "test.test_native_worktree_lifecycle::test_process_death_after_git_effect_recovers_without_duplicate_or_file_loss[restore-move]",
+        "test.test_native_worktree_lifecycle::test_process_death_after_git_effect_recovers_without_duplicate_or_file_loss[purge-remove]",
+        "test.test_native_workspaces::test_read_only_plans_match_existing_workspace_planner[default]",
+        "test.test_native_workspaces::test_read_only_plans_match_existing_workspace_planner[root]",
+        "test.test_native_workspaces::test_read_only_plans_match_existing_workspace_planner[group]",
+        "test.test_native_workspaces::test_read_only_plans_match_existing_workspace_planner[external]",
+        "test.test_native_workspaces::test_native_start_creates_and_binds_worktree_and_runs_provider_there",
+        "test.test_native_workspaces::test_reuse_preserves_dirty_worktree_and_does_not_follow_new_source_head",
+        "test.test_native_workspaces::test_group_agents_share_one_registered_checkout",
+        "test.test_native_workspaces::test_external_checkout_is_used_without_binding_mutation",
+        "test.test_native_workspaces::test_conflicting_or_unconfirmed_workspaces_are_not_replaced[unborn]",
+        "test.test_native_workspaces::test_conflicting_or_unconfirmed_workspaces_are_not_replaced[occupied-branch]",
+        "test.test_native_workspaces::test_conflicting_or_unconfirmed_workspaces_are_not_replaced[nonempty-path]",
+        "test.test_native_workspaces::test_conflicting_or_unconfirmed_workspaces_are_not_replaced[foreign-repo]",
+        "test.test_native_workspaces::test_conflicting_or_unconfirmed_workspaces_are_not_replaced[wrong-branch]",
+        "test.test_native_workspaces::test_conflicting_or_unconfirmed_workspaces_are_not_replaced[tracked-binding]",
+        "test.test_native_workspaces::test_conflicting_or_unconfirmed_workspaces_are_not_replaced[unbound]",
+        "test.test_native_workspaces::test_invalid_workspace_configuration_has_no_filesystem_effects[workspace_path=\"x\"\\nworkspace_group=\"g\"]",
+        "test.test_native_workspaces::test_invalid_workspace_configuration_has_no_filesystem_effects[workspace_root=\"x\"\\nworkspace_group=\"g\"]",
+        "test.test_native_workspaces::test_invalid_workspace_configuration_has_no_filesystem_effects[workspace_group=\"g\"\\nbranch_template=\"ccb/custom\"]",
+        "test.test_native_workspaces::test_invalid_workspace_configuration_has_no_filesystem_effects[branch_template=\"ccb/{unknown}\"]",
+        "test.test_native_workspaces::test_invalid_workspace_configuration_has_no_filesystem_effects[branch_template=\"--bad\"]",
+        "test.test_native_workspaces::test_prepared_creation_recovery_requires_clean_matching_checkout[False]",
+        "test.test_native_workspaces::test_prepared_creation_recovery_requires_clean_matching_checkout[True]",
+        "test.test_native_workspaces::test_explicit_base_and_branch_template_are_applied",
+        "test.test_native_workspaces::test_missing_registered_worktree_is_not_pruned_or_recreated",
+        "test.test_native_workspaces::test_materialization_does_not_execute_checkout_hook",
+        "test.test_native_workspaces::test_startup_observation_expiry_reuses_one_creator_and_checkout",
+        "test.test_native_workspaces::test_custom_runtime_state_root_places_managed_workspaces_consistently",
+        "test.test_native_startup::test_background_start_survives_parent_and_ordinary_ask_infers_project_id",
+        "test.test_native_startup::test_repeated_start_attaches_same_daemon_and_changed_config_does_not_replace_it",
+        "test.test_native_startup::test_readiness_observation_expiry_reuses_live_startup_owner",
+        "test.test_native_startup::test_stale_start_intent_does_not_adopt_recycled_pid",
+        "test.test_native_startup::test_foreign_project_cannot_adopt_a_live_state_root",
+        "test.test_native_startup::test_project_compact_config_starts_native_provider_from_nested_directory",
+        "test.test_native_startup::test_project_state_placement_matches_existing_rules[env]",
+        "test.test_native_startup::test_project_state_placement_matches_existing_rules[reference]",
+        "test.test_native_startup::test_missing_provider_is_preflight_failure_without_runtime_mutation",
+        "test.test_native_startup::test_discovery_reads_existing_node_packages_and_native_claude_without_execution",
+        "test.test_native_startup::test_invalid_configuration_is_rejected_before_runtime_files_are_created",
+        "test.test_native_startup::test_two_start_clients_publish_only_one_live_daemon",
+        "test.test_native_startup::test_agent_environment_can_route_ask_without_project_directory"
+      ]
+    },
+    "unchanged_workspace_startup_regression_cases": 40,
+    "rust_existing_units": {
+      "passed": 47,
+      "ignored": 2
+    },
+    "rust_added_hosted_lifetime_guard": {
+      "passed": 1
+    },
+    "format": "passed",
+    "clippy": "all-targets -D warnings passed",
+    "diff_check": "passed"
+  },
+  "binaries": {
+    "native_sha256": "e4190dd00339525d2689d83d7bf749589988336104fa3c68d786a72ea53c4035",
+    "kernel_sha256": "c561f187bcc2f9460fb474f633bb380de5966d0887e1e60b66cd42bb666d137b",
+    "installed_sha256": "e3a4421381c7abfe6f86f5ea2bdc2906819fb6e24466e7d030a579c6c997a573"
+  },
+  "crash_points": [
+    "merge commit created",
+    "target fast-forward applied",
+    "integration stage removed",
+    "dirty checkout moved to archive",
+    "archive moved back",
+    "archive removed"
+  ],
+  "fixture_repairs": [
+    "Wait for terminated CCB process before releasing inherited Git output pipes",
+    "Raise fixture startup observation from 8 to 30 seconds; runtime settings unchanged; timed-out fixture Keeper was stopped and verified inactive",
+    "Strip Windows extended-path prefix in fixture Git worktree add; native implementation already uses portable paths"
+  ],
+  "limitations": [
+    "Offline commands require explicitly stopped affected runtime/providers; no automatic agent drain",
+    "Same-source-repository committed configuration only; external checkouts refused",
+    "Keep workspace configuration during recovery; remove retired agent configuration after final purge",
+    "Uncertain partial Git operations remain blocked for operator inspection; no hard reset/forced cleanup",
+    "Independent Git writers do not participate in CCB advisory locks",
+    "No push, automatic worktree recreation, live installation replacement or real-model call"
+  ],
+  "production": {
+    "project": "C:\\Users\\user\\Desktop\\work\\1.code\\5.Tool\\sample-project",
+    "head": "573e2952fefb6d92d9b10bfbf9364bdfcf096b92",
+    "branch": "docs/branch-issue-commit-conventions",
+    "tracked_and_untracked_status_clean": true,
+    "read_only_checks_only": true
+  },
+  "guide": "docs/native-worktree-lifecycle.md"
+}

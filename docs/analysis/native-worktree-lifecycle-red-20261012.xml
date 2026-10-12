@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="4.212" timestamp="2026-10-12T19:21:17.679147+08:00" hostname="HOST"><testcase classname="test.test_native_worktree_lifecycle" name="test_merge_and_replay_publish_only_one_correlated_result" time="3.923"><failure message="AssertionError: ccb-native: unsupported native command: worktree&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\bin\\ccb-native.e...94c9-ecbec1d6a159', '--dry-run'], returncode=1, stdout='', stderr='ccb-native: unsupported native command: worktree\n').returncode">test\test_native_worktree_lifecycle.py:29: in test_merge_and_replay_publish_only_one_correlated_result
+    dry=invoke(root,'merge','worker','--into','main','--operation-id',operation,'--dry-run')
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_worktree_lifecycle.py:11: in invoke
+    if ok:assert result.returncode==0,result.stderr
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ccb-native: unsupported native command: worktree
+E
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\bin\\ccb-native.e...94c9-ecbec1d6a159', '--dry-run'], returncode=1, stdout='', stderr='ccb-native: unsupported native command: worktree\n').returncode</failure></testcase></testsuite></testsuites>

@@ -159,6 +159,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native [--project <directory>] wait-any|wait-all <id> [--timeout <seconds>]\nccb-native [--project <directory>] wait-quorum <count> <id> [--timeout <seconds>]");
         println!("ccb-native [--project <directory>] trace <submission|message|attempt|reply|job ID> [--limit <1..1000>] [--offset <n>]");
         println!("ccb-native codex-tui-attach <host-directory> (experimental native Codex TUI)");
+        println!("ccb-native [--project <dir>] worktree inspect|merge|retire <agent> [--into <branch>] [--operation-id <uuid>] [--dry-run]\nccb-native [--project <dir>] worktree recover|status|restore|purge <operation-id> [--into <branch>] [--delete-branch] [--operation-id <uuid>] [--dry-run]\nMutations require a stopped native runtime and resolved jobs/replies. Retire preserves the entire checkout in an archive; purge refuses remaining user files.");
         println!("ccb-native [--project <directory>] herdr open [--herdr-exe <path>] [--session <name>] [--options <json>] [--no-attach] [--timeout-ms <0..60000>] [--dry-run] [--recover-stopped]");
         println!("ccb-native --state-root <dir> clear|compact [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> context-status <operation-id>");
         println!("ccb-native --state-root <dir> restart [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> restart-status [operation-id]");
@@ -467,6 +468,39 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         .remove(0)
         .into_string()
         .map_err(|_| anyhow::anyhow!("invalid command encoding"))?;
+    if op == "worktree" {
+        ensure!(
+            args.len() >= 2,
+            "worktree requires an action and agent/operation ID"
+        );
+        let action = arg(&args, 0)?;
+        let target = arg(&args, 1)?;
+        let mut options = json!({});
+        let mut index = 2;
+        while index < args.len() {
+            match arg(&args, index)? {
+                "--dry-run" => options["dry_run"] = json!(true),
+                "--delete-branch" => options["delete_branch"] = json!(true),
+                flag @ ("--into" | "--operation-id") => {
+                    index += 1;
+                    let key = if flag == "--into" {
+                        "into"
+                    } else {
+                        "operation_id"
+                    };
+                    ensure!(options[key].is_null(), "duplicate worktree option");
+                    options[key] = json!(arg(&args, index)?);
+                }
+                _ => bail!("unsupported worktree option"),
+            }
+            index += 1;
+        }
+        println!(
+            "{}",
+            crate::workspaces::execute(&root, project.as_deref(), action, target, &options)?
+        );
+        return Ok(());
+    }
     if op == "kill" {
         if args.len() == 1 && ["--help", "-h", "help"].iter().any(|s| args[0] == *s) {
             println!("{}", crate::project_kill::HELP);

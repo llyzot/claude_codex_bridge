@@ -252,7 +252,8 @@
     "Native namespace retirement journals one scoped close intent, rejects live authority/foreign panes/concurrent launch/retired ID reuse, and observes uncertain outcomes without resend; public kill/reopen integration remains pending",
     "Public native project kill stops and confirms authority exit, retires owned Herdr topology via protected configuration, preserves history, supports missing project config, exposes pending outcomes and checks project/root binding before mutation",
     "Deliberately retired Herdr namespaces reopen from verified Pi/Codex/Claude histories without duplicating Agents; real installed Pi/Codex kill/reopen/recall and automatic callback acceptance passed in the authorized named test session",
-    "Herdr recovery now confirms the actual terminal native session ID and history path before authority startup, rejects fresh/wrong Pi/Codex/Claude sessions, and waits for deferred session publication without duplicate Agent launch"
+    "Herdr recovery now confirms the actual terminal native session ID and history path before authority startup, rejects fresh/wrong Pi/Codex/Claude sessions, and waits for deferred session publication without duplicate Agent launch",
+    "Stopped Herdr fixed-history executions reconcile through old protected configuration without provider IO or automatic replay; completed child results and uncertain interruption notices wake Pi Lead once, unsent FIFO queues survive, and exact generation-bound configuration/session handoff preserves existing reload blockers"
   ],
   "remaining": [
     "Broaden native Keeper real-model/Herdr foreground acceptance, legacy/cross-platform coexistence and unavailable-observation/storage recovery; evaluate optional OS-level restart of the Keeper itself and production/default rollout",
@@ -276,7 +277,7 @@
     "Complete operator-directed repair/reassignment for ambiguous legacy Agent-journal parents and verify older mixed-version/cross-platform migration; current cooperative ownership checks do not govern arbitrary direct filesystem edits or unmodified alternate-root writers",
     "Complete other-provider native clear/compact, graphical context controls and authenticated Claude model/cancellation/error scenarios; verify general empty-startup recovery, explicit Codex old-thread unloading, large-history compaction, real-model restart continuity, broader retained-history migration and runtime/context-control journal retention",
     "Resolve or externally repair the now-isolated Codex sandbox runtime ACL/sharing failure on desktop node_repl.exe; authorized shared-process interruption and identical retest failed to resolve the conflict, and sandbox policy must not be weakened",
-    "Finish running-task recovery, partially bound/uncertain startup repair and server launch-argument parity; migrate legacy terminal configurations before native default/production promotion",
+    "Finish deferred-discovery running-task recovery, Claude terminal evidence, model-backed in-flight recovery acceptance, partially bound/uncertain startup repair and server launch-argument parity; migrate legacy terminal configurations before native default/production promotion",
     "Validate the implemented original Claude TUI adapter against actual Herdr/Claude interaction; finish TUI context-switch/approval/interactive-input coordination and cancellation/error scenarios beyond structured transcript plus idle completion. Native Codex uses authenticated WebSocket input; legacy terminal migration and production rollout remain pending.",
     "Broaden real-model native Codex followup acceptance beyond the verified direct and Pi-callback happy paths; evaluate other-provider steering/legacy socket adoption and complete automatic outbox retention (explicit terminal-history compaction is implemented); uncertain sends remain intentionally non-replayed",
     "Broaden transport acceptance to inherited open pipes/blocked writers/silent hangs and legacy idle fault lifetime repair and cross-Windows-session recovery; observed output EOF and first-write input failures now have three-provider coverage",
@@ -676,13 +677,14 @@
     "native_herdr_retire": "Original release: 5 failed and 2 existing refusal cases passed. Debug primitive: 7 passed. Final release namespace/mount/retirement selection: 60 passed; added four real Windows launch-lock interference cases all passed. fmt/Clippy passed. Existing Rust candidate held at 142a1bb4 pending production migration approval. Evidence native-herdr-retire-20261012.json.",
     "native_project_kill": "47 affected release cases passed before final project scope guard. Final 23 public-kill/startup cases passed after fixing explicit --project resolution for missing config. Covers normal and lost-ACK close, uncertain non-replay, no-state no-op/help, source config loss, timeout observation, legacy refusal, unsupported force and foreign project rejection before stop. fmt/Clippy passed. Candidate/production unchanged; evidence native-project-kill-20261012.json.",
     "native_retired_namespace_reopen": "44 final-release reopen/stopped-server/host/kill cases passed. Original release failed both baseline retired-open cases; debug 6 lifecycle cases, 2 Pi/Codex combinations and 2 exit/server variants passed. Real installed candidate bb5a0f6a then completed two model-backed Pi/Codex review chains across kill/reopen with stable session IDs, new processes, exact prior-marker recall, one dispatch tool per chain, callback done, and Lead initial turns ending 4.819722s/2.720717s before Worker completion. Both project kills returned closed; 17 recorded lifetimes ended; named test server stopped after verifying its only remaining pane was the approved-base idle shell. See native-herdr-reopen-live-20261012.json. No production/default controls.",
-    "native_resume_binding": "Prior release incorrectly returned running for all three wrong-session cases. Debug: 12 passed plus one transient observer PermissionError; bounded reader retry and hosted/deferred recheck passed. All 38 final-release reopen/stopped-server/native-host tests passed; fmt/Clippy and installed candidate verification passed. Latest model-backed acceptance remains bb5a0f6a. Evidence native-herdr-resume-binding-20261012.json."
+    "native_resume_binding": "Prior release incorrectly returned running for all three wrong-session cases. Debug: 12 passed plus one transient observer PermissionError; bounded reader retry and hosted/deferred recheck passed. All 38 final-release reopen/stopped-server/native-host tests passed; fmt/Clippy and installed candidate verification passed. Latest model-backed acceptance remains bb5a0f6a. Evidence native-herdr-resume-binding-20261012.json.",
+    "native_herdr_work_recovery": "100 final-release cases passed in 588.16s; Rust 46 passed and two parent-invoked helper entries ignored; fmt/Clippy passed. Completed/interrupted child callback, unsent A/B FIFO, opener death, changed model/env, corrupt permit/cancel intent, mismatched lease and silent cancellation verified. Debug 44 passed/1 bounded-observation assertion corrected; retained XML. Candidate refreshed to bc366d09. No new paid model inference or production/default promotion. See native-herdr-work-recovery-20261012.json."
   },
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2",
     "candidate_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
     "next_action": "Production migration plan remains prepared and awaiting its outside-Herdr exception. Candidate now includes verified ordinary startup, project kill and retired-namespace reopen. On approval recheck old owner/queues/workspace, preserve legacy state, start native under the new runtime reference, accept callbacks, then promote user PATH with rollback.",
-    "latest_evidence": "docs/analysis/native-herdr-resume-binding-20261012.json",
+    "latest_evidence": "docs/analysis/native-herdr-work-recovery-20261012.json",
     "herdr_preflight": {
       "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_",
       "session": "ccb-rust-ui-gjjd92m_",
@@ -690,13 +692,13 @@
       "authorization": "granted",
       "status": "executed; callback and hot reload passed after source fix"
     },
-    "independent_work_while_approval_pending": "Implement interrupted-work recovery now that resumed native-session confirmation is enforced. Reuse stopped old-config Daemon completion transactions rather than duplicating finalization/callback logic. Validate owned-scope or immutable Herdr dispatch/history evidence, never replay uncertain side effects, and authorize only a generation-bound old/new configuration handoff for retained queues. Do not simply remove the quiet/startup guards; Claude transcript candidates without independent idle/terminal evidence cannot become success."
+    "independent_work_while_approval_pending": "Fixed-history Herdr and owned-protocol interrupted-work recovery implemented and release-validated. Next cover deferred-discovery terminal proofs and independently captured Claude terminal evidence, then perform scoped model-backed in-flight recovery acceptance. Production/default cutover still requires the pending outside-Herdr exception."
   },
   "installed_candidate": {
     "prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "rust_source_commit": "2e829bb83f5e1489f8f9e79aed3c341ca282669c",
-    "binary_sha256": "fb61b268f97c956a1c9054790397e7d7cab7493437cc36ac720284f42a3bb3d8",
+    "rust_source_commit": "bc366d095863087d8ff4f5f556e82e3dff875bde",
+    "binary_sha256": "5224b59ffa725cebbc72b33ebeacaf5e37aaf8c163569ac254d15e6e897821eb",
     "account_default": false,
-    "evidence": "docs/analysis/native-herdr-resume-binding-20261012.json"
+    "evidence": "docs/analysis/native-herdr-work-recovery-20261012.json"
   }
 }

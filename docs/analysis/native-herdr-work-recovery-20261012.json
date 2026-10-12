@@ -1,0 +1,115 @@
+{
+  "source_base_commit": "85ea0046",
+  "source_commit": "bc366d095863087d8ff4f5f556e82e3dff875bde",
+  "candidate_install": {
+    "plan": {
+      "active_use_check": "performed_on_apply",
+      "backup": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-17564b5e-7049-41bc-9aac-acf4a27efdd7.backup",
+      "from": {
+        "binary_sha256": "fb61b268f97c956a1c9054790397e7d7cab7493437cc36ac720284f42a3bb3d8",
+        "manifest_sha256": "3223084894a17d067b5b753070cca44daf2625c410e4b322d58f5ed62a13b1ac",
+        "version": "8.7.10"
+      },
+      "operation_id": "17564b5e-7049-41bc-9aac-acf4a27efdd7",
+      "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+      "requires_stopped_native_commands": true,
+      "runtime_state_changed": false,
+      "stage": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-17564b5e-7049-41bc-9aac-acf4a27efdd7.stage",
+      "status": "planned",
+      "to_binary_sha256": "5224b59ffa725cebbc72b33ebeacaf5e37aaf8c163569ac254d15e6e897821eb",
+      "to_version": "8.7.10"
+    },
+    "result": {
+      "backup": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-17564b5e-7049-41bc-9aac-acf4a27efdd7.backup",
+      "path_modified": false,
+      "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+      "provider_settings_modified": false,
+      "runtime_state_changed": false,
+      "stage": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-17564b5e-7049-41bc-9aac-acf4a27efdd7.stage",
+      "state_compatibility": "not_checked",
+      "status": "upgraded",
+      "upgrade": {
+        "finished_at": "2026-10-12T07:48:40.446368600Z",
+        "from": {
+          "binary_sha256": "fb61b268f97c956a1c9054790397e7d7cab7493437cc36ac720284f42a3bb3d8",
+          "manifest_sha256": "3223084894a17d067b5b753070cca44daf2625c410e4b322d58f5ed62a13b1ac",
+          "version": "8.7.10"
+        },
+        "operation_id": "17564b5e-7049-41bc-9aac-acf4a27efdd7",
+        "phase": "committed",
+        "prefix_name": "ccb-rust",
+        "record_type": "ccb_native_upgrade",
+        "runtime_state_changed": false,
+        "schema_version": 1,
+        "started_at": "2026-10-12T07:48:40.278034400Z",
+        "to": {
+          "binary_sha256": "5224b59ffa725cebbc72b33ebeacaf5e37aaf8c163569ac254d15e6e897821eb",
+          "manifest_sha256": "14246b2e8880ee564cea3c0a876b3f8d4529feb3b117a640c238a6eb65dda028",
+          "version": "8.7.10"
+        }
+      }
+    },
+    "verification": {
+      "status": "verified",
+      "aliases": [
+        "ccb.exe",
+        "ask.exe",
+        "ccb-native.exe"
+      ],
+      "binary_sha256": "5224b59ffa725cebbc72b33ebeacaf5e37aaf8c163569ac254d15e6e897821eb",
+      "runtime": "rust",
+      "version": "8.7.10",
+      "live_repository_release_processes": [],
+      "tool_process_path_resolves_ccb": false,
+      "legacy_entrypoint_exists": true,
+      "user_path_contains_legacy": true,
+      "user_path_contains_candidate": false
+    },
+    "account_default": false
+  },
+  "change": "Reconcile unfinished stopped Herdr executions through the prior protected Daemon configuration and existing completion transactions. Carry unsent queues, replies and callbacks only through a verified recovery operation with exact old/new configuration fingerprints and confirmed resumed sessions.",
+  "native_sha256": "5224b59ffa725cebbc72b33ebeacaf5e37aaf8c163569ac254d15e6e897821eb",
+  "behavior": [
+    "Validate every old execution owner and dispatch proof before terminal reconciliation; do not spawn or prompt providers in the offline actor.",
+    "Reuse explicit correlated terminal Pi/Codex history. Without authoritative completion, return incomplete with automatic replay disabled; side effects may already exist.",
+    "Reuse owned-scope reconciliation for protocol workers, including authenticated terminal snapshots, cancellation and uncertain reply-delivery fences.",
+    "Retain genuinely unsent queued tasks in their mailbox order and use existing completion/callback transactions for exactly one continuation.",
+    "Require a recovery receipt bound to the old protected configuration, new configuration, operation, namespace and resumed sessions; preserve ordinary configuration-change blockers.",
+    "Keep the quiescence requirement for restarting only a daemon while its old terminal providers remain alive.",
+    "Retry transient Windows state-reader sharing/access errors for at most 200 ms. Persistent failures, linked paths and malformed JSON still fail."
+  ],
+  "validation": {
+    "release_pending": false,
+    "release": "100 passed in 588.16 seconds, covering Herdr unfinished-work/reopen/stopped-server/native-host recovery, protected restart configuration, ordinary reload blockers and owned execution recovery",
+    "debug": "44 passed, 1 failed in 432.18 seconds. Existing display-rebind test asserted running immediately after a bounded observation expired; replaced that assertion with bounded readiness observation, preserving launch-count and identity checks.",
+    "debug_xml": "docs/analysis/native-herdr-work-recovery-debug-20261012.xml",
+    "release_xml": "docs/analysis/native-herdr-work-recovery-release-20261012.xml",
+    "rust_units": "46 passed, 2 subprocess helper entries ignored; their parent process-death tests passed",
+    "format": "passed",
+    "clippy": "all-targets -D warnings passed",
+    "new_cases": [
+      "Completed old child result wakes Pi Lead once; queued A then B execute once in original order",
+      "Uncertain old child returns interruption, wakes Pi Lead, and is not replayed",
+      "Opener process death after reconciliation and an agent launch does not duplicate child work, continuation or launches",
+      "Changed model/environment, corrupt dispatch identity, malformed cancellation intent or mismatched lease/config generation refuse recovery",
+      "Committed silent cancellation remains cancelled without a generated reply"
+    ],
+    "release_junit": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "100",
+      "time": "587.968",
+      "timestamp": "2026-10-12T15:36:17.416881+08:00",
+      "hostname": "HOST"
+    }
+  },
+  "limits": [
+    "This does not provide exactly-once external side effects. Unconfirmed old execution or reply delivery remains uncertain rather than being automatically retried.",
+    "Running deferred-discovery terminal jobs without a fixed immutable history_binding are still conservatively refused; this increment covers fixed-history terminal dispatch and owned protocol recovery.",
+    "Claude transcript candidates without independently captured idle/terminal evidence are interrupted rather than reported successful.",
+    "The new unfinished-work path uses controlled provider/Herdr fixtures and real Windows process lifetimes, not new paid model inference. Prior model-backed kill/reopen acceptance is separately scoped to bb5a0f6a.",
+    "No account-default or production Workspace migration is performed by this increment."
+  ]
+}

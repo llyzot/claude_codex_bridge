@@ -1,0 +1,89 @@
+{
+  "recorded_at": "2026-10-12T02:58:49.494984+00:00",
+  "base_commit": "f3817f28",
+  "feature": "Claude MCP form/URL elicitation through native request broker",
+  "sources": {
+    "claude_code_version": "2.1.296",
+    "publisher_sdk_types": "C:\\Users\\user\\AppData\\Local\\Temp\\ccb-claude-protocol-9dc5229c2e6c4c43b1960afa42311a18\\sdk-0.3.296.d.ts",
+    "sdk_sha256": "fc2866dfe2c01468edb19b1d94f26156bfacecdf1e7f1452b276ed2f8cc0b08f",
+    "request_type": "SDKControlElicitationRequest",
+    "response_type": "ElicitationResult / MCP ElicitResult",
+    "mcp_specification": "https://modelcontextprotocol.io/specification/2025-11-25/client/elicitation"
+  },
+  "semantics": [
+    "Explicit accept/decline/cancel through pending/respond; no automatic consent or URL navigation",
+    "Flat primitive form fields and string selection arrays; bounded JSON Schema validation without schema references or unknown answer fields",
+    "URL answers cannot carry form content",
+    "Attribution is explicitly session_request_during_active_execution because Claude supplies no tool-use identity on this envelope",
+    "Require replayed active input and exact runtime/execution/job/request identity; do not infer task completion from an answer",
+    "Withdrawn, cancelled and completed requests cannot be answered; CCB durable metadata/audit excludes form body and URL parameters"
+  ],
+  "validation": {
+    "runs": {
+      "native-claude-elicitation-20261012.xml": {
+        "tests": "83",
+        "failures": "1",
+        "errors": "0",
+        "time": "189.550"
+      },
+      "native-claude-elicitation-recheck-20261012.xml": {
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "time": "3.193"
+      }
+    },
+    "effective_unique_cases": 83,
+    "initial_failure": "New missing-echo test incorrectly expected completion after cancellation despite no input anchor. Updated to assert pending request retirement while terminal outcome remains unproven; runtime completion rule was not weakened.",
+    "clippy": "all-targets -D warnings passed",
+    "format": "cargo fmt passed",
+    "build": "release build and bin hash equality passed"
+  },
+  "real_acceptance": {
+    "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-claude-elicitation-live-m6fv5n0x",
+    "passed": true,
+    "job_id": "job_f01fd9d88f2e",
+    "request": {
+      "request_id": "crq-7ab232f1b9a14d48b03156627a5a6912",
+      "method": "elicitation",
+      "status": "awaiting_user",
+      "attribution": "session_request_during_active_execution",
+      "job_id": "job_f01fd9d88f2e",
+      "runtime_instance_id": "f6f1a286-6226-4612-93e6-815391bad905",
+      "execution_instance_id": "66a46f01-6fd4-4d13-8c75-6b03836b2ddd"
+    },
+    "mcp_tool_calls": 1,
+    "mcp_form_answers": 1,
+    "reply": "CCB_ELICITATION_OK_bef9af9a alpha",
+    "keeper_stopped": true,
+    "mcp_client_info": {
+      "name": "claude-code",
+      "title": "Claude Code",
+      "version": "2.1.296",
+      "description": "Anthropic's agentic coding tool",
+      "websiteUrl": "https://claude.com/claude-code"
+    },
+    "credential_copy_performed": false,
+    "account_settings_modified": false,
+    "external_mcp_servers_configured": false,
+    "builtin_tools_enabled": false
+  },
+  "initial_real_probe": {
+    "trial_root": "C:/Users/user/Desktop/work/ccb-claude-elicitation-live-yh7lp6kz",
+    "passed": false,
+    "cause": "--safe-mode disables even the explicitly supplied MCP fixture; no tools/call occurred",
+    "correction": "Use a process-local disableAllHooks setting, strict fixture MCP config, no builtin tools and allow only the named fixture tool; preserve existing authentication. No permission-bypass flags."
+  },
+  "limits": [
+    "Real model validation covers one local form round trip, not every MCP server or URL authentication flow",
+    "Graphical forms, browser navigation, background/unowned request recovery and persistent permissions remain outside this change",
+    "Current active task attribution is routing context, not proof of which tool originated the session request",
+    "Provider history and caller answer files may retain data independently of CCB metadata",
+    "Harness cleanup reporting was hardened after the real run; no additional model request was made for that reporting-only change",
+    "No production/default installation change; Codex account-default test remains pending user decision"
+  ],
+  "hashes": {
+    "ccb-native.exe": "2c760d274aa05f4d688b9566493fd410a3730ac597b60cc54b5982955c6d3d0f",
+    "ccb-kernel.exe": "80dc4c1a912edf2a52dc5089aff4b33d1cc8581ceed841a635121c6e3d68bc5d"
+  }
+}

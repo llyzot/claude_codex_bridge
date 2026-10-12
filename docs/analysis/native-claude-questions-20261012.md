@@ -78,6 +78,8 @@ credentials are copied or permission-bypass flags used.
 This proves CLI/control-protocol behavior, not authenticated Claude inference or
 Claude Lead reasoning. The default local account reported `loggedIn: false` and
 `authMethod: none` in `C:\Users\user\.claude`. A question about the user's
-alternate configuration/launcher is pending. Original Claude TUI integration,
-MCP elicitation, other native dialogs, authenticated Lead callbacks, broader
+alternate configuration/launcher was pending at that checkpoint. Later
+`native-keeper-live-20261012.json` records authenticated Lead callbacks, and
+`native-claude-elicitation-20261012.json` records an authenticated local MCP form
+round trip. Original Claude TUI acceptance, other native dialogs, broader
 interface parity and default/production promotion remain unfinished.

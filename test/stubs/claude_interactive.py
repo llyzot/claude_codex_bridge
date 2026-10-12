@@ -30,7 +30,10 @@ for line in sys.stdin:
     row=json.loads(line)
     with open(os.environ['CCB_FIXTURE_TRACE'],'a',encoding='utf-8') as trace:trace.write(json.dumps(row)+'\n')
     if row['type']=='user':
-        current=row;emit(row);uid=row['uuid'];tool_id='tool-'+uid
+        current=row
+        if mode=='elicitation-late-anchor':later(.6,lambda user=row:emit(user))
+        elif mode!='elicitation-no-anchor':emit(row)
+        uid=row['uuid'];tool_id='tool-'+uid
         name='AskUserQuestion' if mode.startswith('question') else 'Read'
         if mode=='mixed-stamp':
             emit(dict(type='stream_event',session_id=session,parent_tool_use_id=None,user_message_uuid=uid,event={'type':'message_start'}))
@@ -39,7 +42,7 @@ for line in sys.stdin:
         elif mode=='subagent':
             tool(row,'parent-'+uid,'Agent')
             tool(row,tool_id,name,False,'parent-'+uid)
-        elif mode not in ('late-anchor','unknown','dialog'):
+        elif mode not in ('late-anchor','unknown','dialog') and not mode.startswith('elicitation'):
             tool(row,tool_id,name,mode not in ('no-stamp','question-no-anchor'),'foreign-parent' if mode=='foreign-parent' else None,mode=='partial')
         request=dict(subtype='can_use_tool',tool_name=name,tool_use_id=tool_id,
             input={'file_path':'SECRET_FIXTURE_INPUT'},decision_reason='SECRET_PERMISSION_REASON',
@@ -54,13 +57,22 @@ for line in sys.stdin:
             if mode=='question-duplicate':request['input']['questions']*=2
         if mode=='unknown':request={'subtype':'unregistered_hook','payload':'SECRET_UNSUPPORTED'}
         if mode=='dialog':request={'subtype':'request_user_dialog','dialog_kind':'not-advertised','payload':{}}
+        if mode.startswith('elicitation'):
+            request={'subtype':'elicitation','mcp_server_name':'fixture-server','message':'Choose fixture settings',
+                     'requested_schema':{'type':'object','properties':{'name':{'type':'string','minLength':3},'count':{'type':'integer','minimum':0,'maximum':4},'choices':{'type':'array','items':{'type':'string','enum':['one','two']}}},'required':['name','count']}}
+            if mode=='elicitation-url':
+                request.pop('requested_schema');request.update(mode='url',url='https://auth.example.test/setup?code=FIXTURE_URL_TOKEN',elicitation_id='url-'+uid)
+            if mode=='elicitation-schema-ref':request['requested_schema']['properties']['name']={'$ref':'file:///SECRET_SCHEMA_PATH'}
+            if mode=='elicitation-schema-nested':request['requested_schema']['properties']['name']={'type':'object','properties':{}}
+            if mode=='elicitation-invalid-url':
+                request.pop('requested_schema');request.update(mode='url',url='file:///SECRET_SCHEMA_PATH',elicitation_id='url-'+uid)
         packet=dict(type='control_request',request_id='permission-'+uid,request=request)
-        if mode=='foreign-session':packet['session_id']='foreign-session'
+        if mode in ('foreign-session','elicitation-foreign-session'):packet['session_id']='foreign-session'
         emit(packet)
-        if mode=='duplicate':emit(packet)
+        if mode in ('duplicate','elicitation-duplicate'):emit(packet)
         if mode=='reuse':emit(dict(packet,request=dict(request,input={'file_path':'changed'})))
         if mode=='late-anchor':later(.6,lambda user=row:tool(user,'tool-'+user['uuid']))
-        if mode=='withdraw':later(.4,lambda rid=packet['request_id']:emit(dict(type='control_cancel_request',request_id=rid)))
+        if mode in ('withdraw','elicitation-withdraw'):later(.4,lambda rid=packet['request_id']:emit(dict(type='control_cancel_request',request_id=rid)))
         if mode in ('complete','dialog'):later(.4,lambda user=row:finish(user))
         if mode=='late-request':later(.2,lambda user=row,packet=packet:(finish(user),later(.3,lambda:emit(packet))))
     elif row['type']=='control_response':
@@ -73,7 +85,7 @@ for line in sys.stdin:
                 jobs=[json.loads(s) for s in events.with_name('jobs.jsonl').read_text().splitlines()]
                 assert jobs[-1]['provider_options']['native_cancel_intent']['record_reply'] is True
             later(.35,lambda user=current,interrupted=interrupted:finish(user,interrupted))
-        elif mode in ('unknown','foreign-session'):later(.1,lambda user=current:finish(user))
+        elif mode in ('unknown','foreign-session','elicitation-foreign-session','elicitation-schema-ref','elicitation-schema-nested','elicitation-invalid-url'):later(.1,lambda user=current:finish(user))
     elif row['type']=='control_request':
         kind=row['request']['subtype']
         emit(dict(type='control_response',response=dict(subtype='success',request_id=row['request_id'],response={})))

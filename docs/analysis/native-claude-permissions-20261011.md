@@ -57,13 +57,15 @@ partial attribution, nested calls, early requests, allow/deny, idempotence,
 invalid/widening answers, identity fences, cancellation, withdrawal, fault
 isolation, unsupported dialogs and CLI routing/display.
 
-This does not claim complete Claude interaction support. MCP elicitation,
-structured question/dialog rendering, host hook callbacks, persistent permission
+This checkpoint did not claim complete Claude interaction support. Subsequent
+structured-question support is recorded in `native-claude-questions-20261012.md`.
+Host hook callbacks, general dialog rendering, persistent permission
 configuration and unowned/background or inherited request recovery still need
 work. The local control-plane token remains an administrative capability; this
 interface does not attest that an API caller is human, so callers must obtain
-the required user authorization. Claude remains unauthenticated in this
-environment, and successful real model/tool approval has not been verified.
+the required user authorization. At this checkpoint, successful authenticated
+Claude inference had not been verified; later Keeper/Lead tests and the MCP
+acceptance below supersede that limitation.
 The earlier Codex policy rejection remains unresolved. Production installation
 and the default runtime were not changed.
 
@@ -72,3 +74,32 @@ the final fencing refinements. The final rebuilt release passed all 40 new
 Claude permission cases and the Windows Unicode/argv case (41 total). Rust
 tests (11), formatting and Clippy with warnings denied passed; both repository
 binary hashes match release outputs. The full 455-case inventory was not run.
+
+## MCP elicitation (2026-10-12)
+
+`pending <agent>` now exposes Claude `elicitation` requests through the same
+live request handle. `respond <agent> <request-id> <answer-json-file>` accepts
+`{"action":"accept","content":{"choice":"alpha"}}` for a matching form,
+or `{"action":"decline"}` / `{"action":"cancel"}`. URL-mode answers carry
+only an action. CCB does not open URLs or treat acceptance as proof that an
+external authentication flow has finished.
+
+The request includes the MCP server name, message and form schema or URL.
+Form answers are checked against the bounded flat schema and cannot introduce
+unrequested fields. Nested object forms and schema references are rejected.
+Answer bodies and URL parameters are not written to CCB's session metadata or
+action audit. The provider and the caller's answer file have their own retention.
+
+Claude's elicitation envelope has no tool-use ID. These entries explicitly say
+`session_request_during_active_execution`, rather than claiming stamped tool-call
+attribution. The current execution must first be acknowledged by its replayed
+user request; runtime, execution, job and request handles still fence responses.
+Unowned requests require recovery. Withdrawal, cancellation and completion
+invalidate pending handles. An answer is not a completion signal.
+
+The authenticated installed Claude CLI called a local test MCP tool once,
+received one explicit form answer and returned its value in the same task.
+The test Keeper stopped. URL responses have controlled-protocol coverage;
+browser navigation, GUI rendering and unowned/background request recovery remain
+unverified or unimplemented. See `native-claude-elicitation-20261012.json` for
+tests, sources, retained initial failures and real-run evidence.

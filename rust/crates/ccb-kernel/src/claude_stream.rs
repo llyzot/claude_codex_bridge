@@ -631,7 +631,9 @@ impl Session {
                 .as_str()
                 .filter(|id| !id.is_empty() && id.len() <= 256)
                 .context("invalid Claude control request identity")?;
-            if r["request"]["subtype"] == "can_use_tool"
+            if ["can_use_tool", "elicitation"]
+                .iter()
+                .any(|kind| r["request"]["subtype"] == *kind)
                 && (r["session_id"].is_null() || r["session_id"] == self.session_id)
             {
                 ensure!(
@@ -889,6 +891,7 @@ impl Session {
                 .is_some_and(|line| line.trim() == expected)
             {
                 active.anchor = true;
+                active.requests.bind_execution();
             }
         }
         if r["type"] == "assistant" && active.anchor {

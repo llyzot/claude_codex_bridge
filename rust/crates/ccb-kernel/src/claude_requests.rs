@@ -16,8 +16,12 @@ pub struct Broker {
     retired: HashSet<String>,
     assistant_bound: bool,
     stream_bound: bool,
+    execution_bound: bool,
 }
 impl Broker {
+    pub fn bind_execution(&mut self) {
+        self.execution_bound = true;
+    }
     pub fn consistent(&self, wire: &str, params: &Value) -> bool {
         self.pending
             .iter()
@@ -93,26 +97,30 @@ impl Broker {
     }
     pub fn add(&mut self, wire: &str, params: &Value) -> Result<()> {
         text(&json!(wire))?;
-        ensure!(
-            params["subtype"] == "can_use_tool",
-            "unsupported Claude control request"
-        );
-        text(&params["tool_name"])?;
-        text(&params["tool_use_id"])?;
-        ensure!(
-            params["input"].is_object(),
-            "invalid Claude permission input"
-        );
-        for key in [
-            "requires_user_interaction",
-            "suppress_always_allow_rule",
-            "default_to_no",
-            "classifier_approvable",
-        ] {
+        if params["subtype"] == "elicitation" {
+            crate::claude_elicitation::validate(params)?;
+        } else {
             ensure!(
-                params[key].is_null() || params[key].is_boolean(),
-                "invalid Claude consent metadata"
+                params["subtype"] == "can_use_tool",
+                "unsupported Claude control request"
             );
+            text(&params["tool_name"])?;
+            text(&params["tool_use_id"])?;
+            ensure!(
+                params["input"].is_object(),
+                "invalid Claude permission input"
+            );
+            for key in [
+                "requires_user_interaction",
+                "suppress_always_allow_rule",
+                "default_to_no",
+                "classifier_approvable",
+            ] {
+                ensure!(
+                    params[key].is_null() || params[key].is_boolean(),
+                    "invalid Claude consent metadata"
+                );
+            }
         }
         ensure!(!self.retired.contains(wire), "Claude request was withdrawn");
         if let Some(prior) = self.pending.iter().find(|p| p.wire == wire) {
@@ -142,26 +150,33 @@ impl Broker {
         Ok(())
     }
     fn anchored(&self, p: &Pending) -> bool {
+        if p.params["subtype"] == "elicitation" {
+            return self.execution_bound;
+        }
         p.params["tool_use_id"]
             .as_str()
             .and_then(|id| self.tools.get(id))
             .is_some_and(|name| p.params["tool_name"] == *name)
     }
     fn needs_ui(p: &Pending) -> bool {
+        if p.params["subtype"] == "elicitation" {
+            return false;
+        }
         if p.params["tool_name"] == "AskUserQuestion" {
             return crate::claude_questions::validate(&p.params["input"]).is_err();
         }
         p.params["requires_user_interaction"] == true
     }
     pub fn rows(&self, job: &Value, runtime: &str) -> Value {
-        json!(self.pending.iter().map(|p| json!({"request_id":p.handle,"method":"can_use_tool","params":p.params,
+        json!(self.pending.iter().map(|p| json!({"request_id":p.handle,"method":p.params["subtype"],"params":p.params,
+            "attribution":if p.params["subtype"] == "elicitation" {"session_request_during_active_execution"} else {"stamped_tool_call"},
             "job_id":job["job_id"],"execution_instance_id":job["provider_options"]["native_execution_instance"],
-            "runtime_instance_id":runtime,"status":if p.answer.is_some(){"response_queued"}else if !self.anchored(p){"awaiting_tool_anchor"}
+            "runtime_instance_id":runtime,"status":if p.answer.is_some(){"response_queued"}else if !self.anchored(p){if p.params["subtype"] == "elicitation" {"awaiting_execution_anchor"} else {"awaiting_tool_anchor"}}
                 else if Self::needs_ui(p){"native_ui_required"}else{"awaiting_user"}})).collect::<Vec<_>>())
     }
     pub fn summaries(&self) -> Value {
-        json!(self.pending.iter().map(|p| json!({"request_id":p.handle,"method":"can_use_tool",
-            "status":if p.answer.is_some(){"response_queued"}else if !self.anchored(p){"awaiting_tool_anchor"}
+        json!(self.pending.iter().map(|p| json!({"request_id":p.handle,"method":p.params["subtype"],
+            "status":if p.answer.is_some(){"response_queued"}else if !self.anchored(p){if p.params["subtype"] == "elicitation" {"awaiting_execution_anchor"} else {"awaiting_tool_anchor"}}
                 else if Self::needs_ui(p){"native_ui_required"}else{"awaiting_user"}})).collect::<Vec<_>>())
     }
     pub fn validate(&self, handle: &str, result: &Value) -> Result<bool> {
@@ -172,7 +187,12 @@ impl Broker {
             .context("unknown or resolved Claude request")?;
         ensure!(
             self.anchored(p),
-            "Claude request has no matching current-task tool anchor"
+            "{}",
+            if p.params["subtype"] == "elicitation" {
+                "Claude elicitation has no replayed current execution anchor"
+            } else {
+                "Claude request has no matching current-task tool anchor"
+            }
         );
         ensure!(
             !Self::needs_ui(p),
@@ -228,6 +248,9 @@ fn text(value: &Value) -> Result<&str> {
         .context("invalid Claude request identity")
 }
 fn answer(params: &Value, result: &Value) -> Result<Value> {
+    if params["subtype"] == "elicitation" {
+        return crate::claude_elicitation::answer(params, result);
+    }
     let map = result
         .as_object()
         .context("Claude answer must be an object")?;

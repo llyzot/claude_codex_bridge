@@ -1,5 +1,24 @@
 # Native Herdr provider mount — 2026-10-11
 
+## Namespace retirement update — 2026-10-12
+
+`herdr-namespace` accepts `action: "retire"` with the original namespace request.
+It requires the daemon and Keeper to be stopped, excludes concurrent open/start
+operations, and verifies the stored plan plus live workspace/pane ownership.
+Foreign or untracked panes prevent closure. A missing namespace creates no state.
+
+One close permission is journaled before sending `workspace close`. Later calls
+observe the same operation: an absent workspace completes retirement, whereas
+an uncertain close with a still-present workspace remains `retiring` without
+resending. A reappeared retired ID is rejected. This closes only the recorded
+workspace; the server and unrelated workspaces are preserved. Namespace records
+and provider histories remain available for lifecycle recovery.
+
+This is the low-level close operation. Public `ccb kill` orchestration and
+reopening a deliberately retired namespace with verified session continuity
+remain to be connected. Ordinary preparation refuses retired records instead of
+silently creating fresh sessions. The material below records earlier checkpoints.
+
 Rust now has an internal `herdr-agents` controller for launching original Pi,
 Codex and Claude terminal programs into a previously prepared native namespace.
 It is a prerequisite for native `herdr open`, not a completed replacement for

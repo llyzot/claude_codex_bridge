@@ -53,7 +53,7 @@ fn validate_record(record: &Value, plan: &Value, signature: &str) -> Result<()> 
     );
     ensure!(
         record["workspace_tagged"].is_boolean()
-            && ["preparing", "uncertain", "prepared"]
+            && ["preparing", "uncertain", "prepared", "retiring", "retired"]
                 .contains(&record["status"].as_str().unwrap_or("")),
         "invalid namespace ledger state"
     );
@@ -111,13 +111,24 @@ fn validate_record(record: &Value, plan: &Value, signature: &str) -> Result<()> 
             );
         }
     }
-    if record["status"] == "prepared" {
+    if ["prepared", "retiring", "retired"].contains(&record["status"].as_str().unwrap_or("")) {
         ensure!(
             pending.is_null()
                 && record["workspace_tagged"] == true
                 && bindings.len() == plan["slots"].as_object().unwrap().len()
                 && bindings.values().all(|b| b["tagged"] == true),
             "incomplete prepared namespace"
+        );
+    }
+    if ["retiring", "retired"].contains(&record["status"].as_str().unwrap_or("")) {
+        let retirement = &record["retirement"];
+        ensure!(
+            retirement["schema_version"] == 1
+                && retirement["owner_id"] == record["owner_id"]
+                && retirement["workspace_id"] == record["workspace_id"]
+                && retirement["close_sent"].is_boolean()
+                && uuid::Uuid::parse_str(text(retirement, "operation_id")?).is_ok(),
+            "invalid namespace retirement identity"
         );
     }
     Ok(())
@@ -479,6 +490,58 @@ impl Controller<'_> {
             );
         }
         Ok(())
+    }
+    fn retire(&mut self) -> Result<Value> {
+        ensure!(
+            ["prepared", "retiring", "retired"]
+                .contains(&self.record["status"].as_str().unwrap_or("")),
+            "incomplete namespace requires explicit repair before retirement"
+        );
+        let present = self
+            .workspaces()?
+            .iter()
+            .any(|w| w["workspace_id"] == self.record["workspace_id"]);
+        if present {
+            ensure!(
+                self.record["status"] != "retired",
+                "retired workspace identity reappeared; refusing another close"
+            );
+            self.validate_bound()?;
+            let panes = self.panes()?;
+            let bindings = self.record["bindings"].as_object().unwrap();
+            ensure!(
+                panes.len() == bindings.len()
+                    && panes.iter().all(|p| bindings
+                        .iter()
+                        .any(|(slot, b)| p["pane_id"] == b["pane_id"] && self.owns(p, Some(slot)))),
+                "namespace contains untracked or foreign panes"
+            );
+        }
+        if self.record["retirement"].is_null() {
+            self.record["retirement"] = json!({"schema_version":1,"operation_id":uuid::Uuid::new_v4().to_string(),
+                "owner_id":self.record["owner_id"],"workspace_id":self.record["workspace_id"],"close_sent":present});
+            self.record["status"] = json!(if present { "retiring" } else { "retired" });
+            // The committed permission precedes IO. An uncertain send is only
+            // observed on later calls, never replayed against a reused ID.
+            self.save()?;
+            if present {
+                let _ = self.rpc(vec![
+                    "workspace".into(),
+                    "close".into(),
+                    text(&self.record, "workspace_id")?.into(),
+                ]);
+            }
+        }
+        if self.record["status"] != "retired"
+            && !self
+                .workspaces()?
+                .iter()
+                .any(|w| w["workspace_id"] == self.record["workspace_id"])
+        {
+            self.record["status"] = json!("retired");
+            self.save()?;
+        }
+        Ok(json!({"namespace":self.record,"provider_commands_sent":false}))
     }
     fn begin(&mut self, kind: &str, slot: Option<&str>, baseline: Value) -> Result<()> {
         self.record["pending"] = json!({"operation_id":uuid::Uuid::new_v4().to_string(),"kind":kind,"slot":slot,"baseline":baseline,"sent":false});
@@ -844,7 +907,7 @@ pub fn execute(request: &Value) -> Result<Value> {
         return Ok(json!({"plan":plan,"plan_hash":signature,"mutations":false}));
     }
     ensure!(
-        ["prepare", "inspect", "confirm"].contains(&action),
+        ["prepare", "inspect", "confirm", "retire"].contains(&action),
         "unsupported namespace action"
     );
     let root = Path::new(text(&plan, "project_root")?);
@@ -853,6 +916,56 @@ pub fn execute(request: &Value) -> Result<Value> {
     let state = runtime.join("herdr");
     unlinked(&state)?;
     unlinked(&state.join(RECORD))?;
+    if action == "retire" {
+        if !state.join(RECORD).exists() {
+            return Ok(json!({"status":"not_found","mutations":false}));
+        }
+        crate::daemon::verify_owner(&runtime)?;
+        ensure!(
+            crate::keeper::status(&runtime)?["alive"] == false,
+            "stop the native Keeper before namespace retirement"
+        );
+        unlinked(&runtime.join("kernel"))?;
+        std::fs::create_dir_all(runtime.join("kernel"))?;
+        // Serialize against both launchers and the background opener before
+        // acquiring the stopped authority's writer lock and namespace journal.
+        let mut launch_locks = Vec::new();
+        for path in [
+            state.join("native-open-launch.lock"),
+            state.join("native-open.lock"),
+            runtime.join("kernel/native-keeper-launch.lock"),
+            runtime.join("kernel/native-launch.lock"),
+        ] {
+            unlinked(&path)?;
+            let file = std::fs::OpenOptions::new()
+                .create(true)
+                .truncate(false)
+                .read(true)
+                .write(true)
+                .open(path)?;
+            file.try_lock().context("Herdr open is still in progress")?;
+            launch_locks.push(file);
+        }
+        crate::daemon::verify_owner(&runtime)?;
+        ensure!(
+            crate::keeper::status(&runtime)?["alive"] == false,
+            "stop the native Keeper before namespace retirement"
+        );
+        let _authority = Store::open(&runtime)?;
+        crate::daemon::verify_owner(&runtime)?;
+        let store = Store::open(&state)?;
+        let record = store
+            .json(RECORD)?
+            .context("namespace disappeared during retirement")?;
+        validate_record(&record, &plan, &signature)?;
+        return Controller {
+            store,
+            request,
+            plan,
+            record,
+        }
+        .retire();
+    }
     if action == "inspect" {
         let record = match std::fs::File::open(state.join(RECORD)) {
             Ok(file) => {
@@ -886,6 +999,10 @@ pub fn execute(request: &Value) -> Result<Value> {
     let mut store = Store::open(&state)?;
     let record = if let Some(record) = store.json(RECORD)? {
         validate_record(&record, &plan, &signature)?;
+        ensure!(
+            !["retiring", "retired"].contains(&record["status"].as_str().unwrap_or("")),
+            "namespace is retiring or retired; explicit lifecycle recovery is required"
+        );
         record
     } else {
         ensure!(action == "prepare", "no namespace operation to confirm");

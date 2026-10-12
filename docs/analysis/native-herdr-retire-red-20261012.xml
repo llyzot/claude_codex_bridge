@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="5" skipped="0" tests="7" time="17.819" timestamp="2026-10-12T12:59:35.147624+08:00" hostname="HOST"><testcase classname="test.test_native_herdr_retire" name="test_retirement_is_scoped_and_uncertain_close_is_never_replayed[None]" time="2.805"><failure message="AssertionError: ccb-native: unsupported namespace action&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: unsupported namespace action\n').returncode">test\test_native_herdr_retire.py:14: in test_retirement_is_scoped_and_uncertain_close_is_never_replayed
+    retired=run({**request,'action':'retire'})['namespace']
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_herdr_namespace.py:43: in run
+    result=call(request);assert result.returncode==0,result.stderr
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ccb-native: unsupported namespace action
+E
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: unsupported namespace action\n').returncode</failure></testcase><testcase classname="test.test_native_herdr_retire" name="test_retirement_is_scoped_and_uncertain_close_is_never_replayed[after-error]" time="2.910"><failure message="AssertionError: ccb-native: unsupported namespace action&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: unsupported namespace action\n').returncode">test\test_native_herdr_retire.py:14: in test_retirement_is_scoped_and_uncertain_close_is_never_replayed
+    retired=run({**request,'action':'retire'})['namespace']
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_herdr_namespace.py:43: in run
+    result=call(request);assert result.returncode==0,result.stderr
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ccb-native: unsupported namespace action
+E
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: unsupported namespace action\n').returncode</failure></testcase><testcase classname="test.test_native_herdr_retire" name="test_retirement_is_scoped_and_uncertain_close_is_never_replayed[before-error]" time="2.752"><failure message="AssertionError: ccb-native: unsupported namespace action&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: unsupported namespace action\n').returncode">test\test_native_herdr_retire.py:14: in test_retirement_is_scoped_and_uncertain_close_is_never_replayed
+    retired=run({**request,'action':'retire'})['namespace']
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_herdr_namespace.py:43: in run
+    result=call(request);assert result.returncode==0,result.stderr
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ccb-native: unsupported namespace action
+E
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: unsupported namespace action\n').returncode</failure></testcase><testcase classname="test.test_native_herdr_retire" name="test_foreign_or_untracked_namespace_contents_block_retirement[foreign-owner]" time="3.101" /><testcase classname="test.test_native_herdr_retire" name="test_foreign_or_untracked_namespace_contents_block_retirement[extra-pane]" time="2.905" /><testcase classname="test.test_native_herdr_retire" name="test_live_daemon_fences_namespace_retirement" time="2.936"><failure message="AssertionError: assert (1 != 0 and 'ownership is live' in 'ccb-native: unsupported namespace action\n')&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: unsupported namespace action\n').returncode&#10; +  and   'ccb-native: unsupported namespace action\n' = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: unsupported namespace action\n').stderr">test\test_native_herdr_retire.py:45: in test_live_daemon_fences_namespace_retirement
+    assert result.returncode!=0 and 'ownership is live' in result.stderr
+E   AssertionError: assert (1 != 0 and 'ownership is live' in 'ccb-native: unsupported namespace action\n')
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: unsupported namespace action\n').returncode
+E    +  and   'ccb-native: unsupported namespace action\n' = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: unsupported namespace action\n').stderr</failure></testcase><testcase classname="test.test_native_herdr_retire" name="test_missing_namespace_retirement_does_not_create_state" time="0.032"><failure message="AssertionError: ccb-native: unsupported namespace action&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: unsupported namespace action\n').returncode">test\test_native_herdr_retire.py:51: in test_missing_namespace_retirement_does_not_create_state
+    result=run({**request,'action':'retire'})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_herdr_namespace.py:43: in run
+    result=call(request);assert result.returncode==0,result.stderr
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ccb-native: unsupported namespace action
+E
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\release\\ccb-native.exe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: unsupported namespace action\n').returncode</failure></testcase></testsuite></testsuites>

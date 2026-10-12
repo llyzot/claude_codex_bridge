@@ -1,0 +1,67 @@
+{
+  "source_base_commit": "07b83725",
+  "operation": "herdr-namespace action=retire",
+  "source_sha256": "f0496ffc5a7100229be8fc9d97d1a984edc78f8f352054434499125824838466",
+  "native_sha256": "e4e50ae24bb947280886c833423f22e54ab7d8f148ff9a46fe18fd86ce0cbbd0",
+  "runs": {
+    "native-herdr-retire-red-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "5",
+      "skipped": "0",
+      "tests": "7",
+      "time": "17.819",
+      "timestamp": "2026-10-12T12:59:35.147624+08:00",
+      "hostname": "HOST"
+    },
+    "native-herdr-retire-debug-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "7",
+      "time": "23.102",
+      "timestamp": "2026-10-12T13:01:20.138434+08:00",
+      "hostname": "HOST"
+    },
+    "native-herdr-retire-release-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "60",
+      "time": "194.177",
+      "timestamp": "2026-10-12T13:03:17.003450+08:00",
+      "hostname": "HOST"
+    },
+    "native-herdr-retire-locks-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "4",
+      "time": "12.610",
+      "timestamp": "2026-10-12T13:06:36.551914+08:00",
+      "hostname": "HOST"
+    }
+  },
+  "contracts": [
+    "Only a prepared, matching namespace plan can be retired",
+    "Confirmed stopped daemon/Keeper plus opener and native launch locks precede closure",
+    "Workspace label/tokens, all existing bindings and exact pane inventory must match",
+    "One permission is committed before close; uncertainty is observed without resending",
+    "Retired workspace ID reuse is rejected; unrelated workspace/pane data preserved",
+    "Namespace absence creates no state; retired namespace cannot silently prepare again"
+  ],
+  "format": "passed",
+  "clippy": "all-targets -D warnings passed",
+  "installed_candidate_changed": false,
+  "production_changed": false,
+  "outside_Herdr_migration_approval": "still_pending",
+  "limits": [
+    "Public ccb kill orchestration and verified-session reopening of deliberately retired namespaces remain incomplete.",
+    "Before-send crashes/transport ambiguity can leave retirement pending; no speculative retry is introduced.",
+    "Namespace closure does not independently prove every detached provider descendant exited.",
+    "Tested against offline Herdr fixtures; no live Herdr controls were performed."
+  ]
+}

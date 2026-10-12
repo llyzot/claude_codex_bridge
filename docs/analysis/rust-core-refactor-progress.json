@@ -248,7 +248,8 @@
     "Scoped real Herdr 0.9.3/Windows Terminal Pi Lead plus native Codex host completed automatic result delivery. Fixed terminal adapter sampling before later extension transforms by reading the anchored settled session branch; stable content-versioned .mjs loader fixes stale implementation reload. Live revision change and restoration preserve Pi PID/session. All test resources stopped; final release rebuild awaits frozen regression completion.",
     "Read-only worktree startup preflight rejects missing or unconfirmed checkouts before publishing a new daemon lifetime, preserving prior startup identity and retaining locked materialization checks",
     "Native takeover checks legacy Python Keeper liveness before daemon ownership or journal recovery; missing/unmounted daemon lease and stale stopped Keeper state do not authorize takeover",
-    "Ordinary native Herdr open discovers provider executables, defaults Codex to authenticated hosted input, expands Windows topology before discovery, selects activated Herdr standalone release before stale PATH, and exposes these selections in read-only preview"
+    "Ordinary native Herdr open discovers provider executables, defaults Codex to authenticated hosted input, expands Windows topology before discovery, selects activated Herdr standalone release before stale PATH, and exposes these selections in read-only preview",
+    "Native namespace retirement journals one scoped close intent, rejects live authority/foreign panes/concurrent launch/retired ID reuse, and observes uncertain outcomes without resend; public kill/reopen integration remains pending"
   ],
   "remaining": [
     "Broaden native Keeper real-model/Herdr foreground acceptance, legacy/cross-platform coexistence and unavailable-observation/storage recovery; evaluate optional OS-level restart of the Keeper itself and production/default rollout",
@@ -668,7 +669,8 @@
     "native_pi_canonical_release": "19 final-release Pi bridge cases passed, including real installed Pi no-model loading and session clear. Source e4dba8a6 release installed into stopped ccb-rust candidate, all three aliases verified Rust; old image retained for rollback. Real Herdr callback/hot reload debug evidence remains separately scoped.",
     "native_workspace_preflight": "53 affected release startup/worktree/Keeper cases passed; original release failed both actionable-error regressions, debug fix passed both. Existing native-start bytes and user workspace contents preserved on rejection. fmt/Clippy passed. Candidate installed at source 570093dc; default unchanged. Evidence native-workspace-preflight-20261012.json.",
     "native_legacy_keeper": "Old release incorrectly admitted all eight live/invalid legacy Keeper fixtures. Debug passed all nine; 41 final release daemon/Keeper/Herdr-recovery and handoff cases passed. Candidate installed from 79e17170, fmt and Clippy passed. Production daemon observed alive, legacy Keeper PID absent; no production controls. See native-legacy-keeper-20261012.json.",
-    "native_herdr_defaults": "63 final-release ordinary-default/Herdr-open/startup/Windows-layout cases passed. New fixture transport integration uses installed Codex no-model initialization without supplying compiled options; reconnect does not duplicate pane launch. Real production config dry-run selected Herdr 0.9.3 and hosted Codex without writes. Candidate installed from 142a1bb4. See native-herdr-defaults-20261012.json."
+    "native_herdr_defaults": "63 final-release ordinary-default/Herdr-open/startup/Windows-layout cases passed. New fixture transport integration uses installed Codex no-model initialization without supplying compiled options; reconnect does not duplicate pane launch. Real production config dry-run selected Herdr 0.9.3 and hosted Codex without writes. Candidate installed from 142a1bb4. See native-herdr-defaults-20261012.json.",
+    "native_herdr_retire": "Original release: 5 failed and 2 existing refusal cases passed. Debug primitive: 7 passed. Final release namespace/mount/retirement selection: 60 passed; added four real Windows launch-lock interference cases all passed. fmt/Clippy passed. Existing Rust candidate held at 142a1bb4 pending production migration approval. Evidence native-herdr-retire-20261012.json."
   },
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2",
@@ -681,7 +683,8 @@
       "script": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_\\start-test.ps1",
       "authorization": "granted",
       "status": "executed; callback and hot reload passed after source fix"
-    }
+    },
+    "independent_work_while_approval_pending": "Integrate durable namespace retirement into public project kill and implement deliberate-retirement reopening with verified native session continuity; do not treat kill as a stop alias."
   },
   "installed_candidate": {
     "prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",

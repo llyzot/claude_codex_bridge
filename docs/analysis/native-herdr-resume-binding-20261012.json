@@ -53,5 +53,63 @@
     "Hosted Codex uses the pre-existing thread/resume returned-thread-ID check; terminal Pi/Codex/Claude are covered by this new binding check.",
     "The latest paid model-backed acceptance remains the preceding bb5a0f6a build; this guard is validated by release fixtures and installed Codex no-model tests.",
     "No production/default controls or account changes."
-  ]
+  ],
+  "source_commit": "2e829bb83f5e1489f8f9e79aed3c341ca282669c",
+  "candidate_install": {
+    "plan": {
+      "active_use_check": "performed_on_apply",
+      "backup": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-252d4673-4675-4779-9264-47a1cb309d62.backup",
+      "from": {
+        "binary_sha256": "8b8c75e52f122d9b332e3613b645f32111ef2545f5ac4ca7c0d8b12003650e34",
+        "manifest_sha256": "c316ac23b2dce2cecfb5ba631991cb20cf51ee2ea1b5280891ab0da754c17b1c",
+        "version": "8.7.10"
+      },
+      "operation_id": "252d4673-4675-4779-9264-47a1cb309d62",
+      "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+      "requires_stopped_native_commands": true,
+      "runtime_state_changed": false,
+      "stage": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-252d4673-4675-4779-9264-47a1cb309d62.stage",
+      "status": "planned",
+      "to_binary_sha256": "fb61b268f97c956a1c9054790397e7d7cab7493437cc36ac720284f42a3bb3d8",
+      "to_version": "8.7.10"
+    },
+    "result": {
+      "backup": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-252d4673-4675-4779-9264-47a1cb309d62.backup",
+      "path_modified": false,
+      "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+      "provider_settings_modified": false,
+      "runtime_state_changed": false,
+      "stage": "\\\\?\\C:\\Users\\user\\Desktop\\work\\.ccb-rust.ccb-native-upgrade-252d4673-4675-4779-9264-47a1cb309d62.stage",
+      "state_compatibility": "not_checked",
+      "status": "upgraded",
+      "upgrade": {
+        "finished_at": "2026-10-12T06:27:25.067260200Z",
+        "from": {
+          "binary_sha256": "8b8c75e52f122d9b332e3613b645f32111ef2545f5ac4ca7c0d8b12003650e34",
+          "manifest_sha256": "c316ac23b2dce2cecfb5ba631991cb20cf51ee2ea1b5280891ab0da754c17b1c",
+          "version": "8.7.10"
+        },
+        "operation_id": "252d4673-4675-4779-9264-47a1cb309d62",
+        "phase": "committed",
+        "prefix_name": "ccb-rust",
+        "record_type": "ccb_native_upgrade",
+        "runtime_state_changed": false,
+        "schema_version": 1,
+        "started_at": "2026-10-12T06:27:24.915826100Z",
+        "to": {
+          "binary_sha256": "fb61b268f97c956a1c9054790397e7d7cab7493437cc36ac720284f42a3bb3d8",
+          "manifest_sha256": "3223084894a17d067b5b753070cca44daf2625c410e4b322d58f5ed62a13b1ac",
+          "version": "8.7.10"
+        }
+      }
+    },
+    "verify": {
+      "binary_sha256": "fb61b268f97c956a1c9054790397e7d7cab7493437cc36ac720284f42a3bb3d8",
+      "prefix": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust",
+      "runtime": "rust",
+      "status": "verified",
+      "version": "8.7.10"
+    },
+    "account_path_changed": false
+  }
 }

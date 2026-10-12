@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "base_commit": "fa9f7a44",
+  "recorded_at": "2026-10-12T00:38:24.096672+00:00",
+  "real_models": true,
+  "credential_copy_performed": false,
+  "production_install_changed": false,
+  "foreground_ui_opened": false,
+  "acceptances": [
+    {
+      "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-keeper-live-z3652isg",
+      "status": "passed",
+      "lead_provider": "pi",
+      "binary_sha256": "76ba9098d7a17feedb17a2e1b3cd1606391d1e7c524e68a8dcce7ca79ff2f31b",
+      "first_session_ids": {
+        "lead": "01a12d89-59a0-741f-a15f-8877f751d893",
+        "worker": "01a12d89-5934-73d2-871c-25f4bd9fafa5"
+      },
+      "restored_session_ids": {
+        "lead": "01a12d89-59a0-741f-a15f-8877f751d893",
+        "worker": "01a12d89-5934-73d2-871c-25f4bd9fafa5"
+      },
+      "first_reply": "REVIEW_ONE_be14056b",
+      "second_reply": "REVIEW_TWO_be14056b PREVIOUS=REVIEW_ONE_be14056b",
+      "worker_recall": "WORKER_MEMORY_be14056b",
+      "initial_daemon": 14956,
+      "restored_daemon": 59608,
+      "keeper_instance_id": "a91d62ae-4b4c-4480-b664-be24c8f669ac",
+      "models": {
+        "lead": [
+          "gpt-6-astra"
+        ],
+        "worker": "gpt-6.1-sol"
+      },
+      "lead_tool_calls": [
+        {
+          "name": "powershell",
+          "command": "& 'C:/Users/user/Desktop/work/4.user/2.github/claude_codex_bridge/rust/target/release/ccb-native.exe' '--state-root' 'C:/Users/user/Desktop/work/ccb-native-keeper-live-z3652isg/project/.ccb/ccbd' 'ask' '--chain' '--from' 'lead' 'worker' '--' 'Compute 73*79 without tools. Explain two independent calculations, and finish with WORKER_MEMORY_be14056b. Do not edit files.'"
+        },
+        {
+          "name": "powershell",
+          "command": "& 'C:/Users/user/Desktop/work/4.user/2.github/claude_codex_bridge/rust/target/release/ccb-native.exe' '--state-root' 'C:/Users/user/Desktop/work/ccb-native-keeper-live-z3652isg/project/.ccb/ccbd' 'ask' '--chain' '--from' 'lead' 'worker' '--' 'Compute 97*89 without tools and explain two independent calculations. Do not edit files.'"
+        }
+      ],
+      "lead_wait_poll_tool_calls": 0,
+      "callback_edges": [
+        {
+          "parent_job_id": "job_3e3ab73db4f5",
+          "child_job_id": "job_51f01cced79d",
+          "continuation_job_id": "job_0ec5b4154317",
+          "edge_state": "done",
+          "lead_released_before_worker_seconds": 3.338725
+        },
+        {
+          "parent_job_id": "job_566cf8838774",
+          "child_job_id": "job_e0e27abfa915",
+          "continuation_job_id": "job_8d55a4bf6e67",
+          "edge_state": "done",
+          "lead_released_before_worker_seconds": 0.329327
+        }
+      ],
+      "owned_jobs": 7,
+      "maximum_running_attempts_per_job": 1,
+      "launch_source_removed_before_recovery": true,
+      "lead_history_sha256": "a331011c185f1feebdd258edb4a0bddc1a21bccec0505f6f921ab01c245b4f92",
+      "final_keeper_alive": false,
+      "final_keeper_phase": "stopped",
+      "keeper_restart_count": 1
+    },
+    {
+      "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-keeper-live-8rx9jonw",
+      "status": "passed",
+      "lead_provider": "claude",
+      "binary_sha256": "76ba9098d7a17feedb17a2e1b3cd1606391d1e7c524e68a8dcce7ca79ff2f31b",
+      "first_session_ids": {
+        "lead": "c52445dd-b025-4c5b-826e-a36053abca34",
+        "worker": "01a12d8a-88ba-7780-bf53-bd84a34ce758"
+      },
+      "restored_session_ids": {
+        "lead": "c52445dd-b025-4c5b-826e-a36053abca34",
+        "worker": "01a12d8a-88ba-7780-bf53-bd84a34ce758"
+      },
+      "first_reply": "REVIEW_ONE_43cebec2",
+      "second_reply": "REVIEW_TWO_43cebec2 PREVIOUS=REVIEW_ONE_43cebec2",
+      "worker_recall": "WORKER_MEMORY_43cebec2",
+      "initial_daemon": 61992,
+      "restored_daemon": 28388,
+      "keeper_instance_id": "1e5e5ec2-5c72-498e-b6a9-ebf963815773",
+      "models": {
+        "lead": [
+          "claude-opus-5-5"
+        ],
+        "worker": "gpt-6.1-sol"
+      },
+      "lead_tool_calls": [
+        {
+          "name": "Bash",
+          "command": "'C:/Users/user/Desktop/work/4.user/2.github/claude_codex_bridge/rust/target/release/ccb-native.exe' '--state-root' 'C:/Users/user/Desktop/work/ccb-native-keeper-live-8rx9jonw/project/.ccb/ccbd' 'ask' '--chain' '--from' 'lead' 'worker' '--' 'Compute 73*79 without using any tools. Explain two independent calculation methods that each arrive at the result, then finish your reply with the exact line: WORKER_MEMORY_43cebec2'"
+        },
+        {
+          "name": "Bash",
+          "command": "'C:/Users/user/Desktop/work/4.user/2.github/claude_codex_bridge/rust/target/release/ccb-native.exe' '--state-root' 'C:/Users/user/Desktop/work/ccb-native-keeper-live-8rx9jonw/project/.ccb/ccbd' 'ask' '--chain' '--from' 'lead' 'worker' '--' 'Compute 97*89 without using any tools. Explain two independent calculation methods that each arrive at the result.'"
+        }
+      ],
+      "lead_wait_poll_tool_calls": 0,
+      "callback_edges": [
+        {
+          "parent_job_id": "job_695dd4e9a83e",
+          "child_job_id": "job_ce367ae39c85",
+          "continuation_job_id": "job_7c119fe424ad",
+          "edge_state": "done",
+          "lead_released_before_worker_seconds": 5.308627
+        },
+        {
+          "parent_job_id": "job_a12495188ebc",
+          "child_job_id": "job_41d287c5bea2",
+          "continuation_job_id": "job_3251fd14077a",
+          "edge_state": "done",
+          "lead_released_before_worker_seconds": 3.126248
+        }
+      ],
+      "owned_jobs": 7,
+      "maximum_running_attempts_per_job": 1,
+      "launch_source_removed_before_recovery": true,
+      "lead_history_sha256": "1f7c69f33c672385be0bcd90d39e19a76aa9855456d17a29f8daad4fffc092bf",
+      "final_keeper_alive": false,
+      "final_keeper_phase": "stopped",
+      "keeper_restart_count": 1
+    }
+  ],
+  "earlier_failures": [
+    {
+      "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-keeper-live-ejp469_9",
+      "reason": "Harness specified unsupported hosted Codex extra argv; rejected before service launch."
+    },
+    {
+      "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-keeper-live-6hejl5kx",
+      "reason": "Harness quoted MCP key inside Codex dotted override, causing invalid transport; corrected to validated bare name and added readiness guard. Owned Keeper stopped."
+    },
+    {
+      "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-native-keeper-live-djd1q5vm",
+      "reason": "Claude PowerShell-only tool selection produced textual Bash invocation rather than delegation. Switched to actual Bash tool. Owned Keeper stopped."
+    }
+  ],
+  "verification": {
+    "real_runs": "Pi and Claude completed two chains each across forced daemon death; Codex context recall and both stable session identities verified.",
+    "harness_final_refinement": "After real runs, termination changed from PID signal to held Windows handle plus creation-time comparison. Separate disposable Python process confirmed mismatched identity refusal and matched termination. Partial-start cleanup now checks matching Keeper ownership.",
+    "full_suite_rerun": false,
+    "rust_source_changed": false
+  },
+  "limits": [
+    "These are two real-model acceptance runs, not a guarantee of compliance by every model.",
+    "Forced death occurred between chains with all queues idle; in-flight crash/no-replay/FIFO covered by earlier deterministic Keeper tests.",
+    "No Herdr or foreground UI acceptance in these runs.",
+    "Pi delegated via PowerShell; this Claude CLI delegated via Git Bash. No WezTerm was used.",
+    "Existing authentication homes reused; providers write their ordinary session/account metadata. Harness did not alter credentials or user configuration.",
+    "Production/default rollout, broader legacy and cross-platform validation remain pending."
+  ]
+}

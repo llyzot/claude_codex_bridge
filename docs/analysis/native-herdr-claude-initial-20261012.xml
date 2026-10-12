@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="5" failures="0" skipped="0" tests="5" time="2.432" timestamp="2026-10-12T09:00:08.328175+08:00" hostname="HOST"><testcase classname="test.test_native_herdr_claude" name="test_bound_claude_result_waits_for_idle_then_wakes_same_pi_lead" time="0.526"><error message="failed on setup with &quot;AssertionError: ccb-native: layout provider does not match compiled agent&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...xe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: layout provider does not match compiled agent\n').returncode&quot;">test\test_native_herdr_claude.py:20: in runtime
+    namespace_run(request);request['action']='mount';mount=run(request)['mount']
+    ^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_herdr_namespace.py:43: in run
+    result=call(request);assert result.returncode==0,result.stderr
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ccb-native: layout provider does not match compiled agent
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...xe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: layout provider does not match compiled agent\n').returncode</error></testcase><testcase classname="test.test_native_herdr_claude" name="test_first_claude_prompt_creates_transcript_and_cache_serves_second" time="0.233"><error message="failed on setup with &quot;AssertionError: ccb-native: layout provider does not match compiled agent&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...xe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: layout provider does not match compiled agent\n').returncode&quot;">test\test_native_herdr_claude.py:20: in runtime
+    namespace_run(request);request['action']='mount';mount=run(request)['mount']
+    ^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_herdr_namespace.py:43: in run
+    result=call(request);assert result.returncode==0,result.stderr
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ccb-native: layout provider does not match compiled agent
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...xe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: layout provider does not match compiled agent\n').returncode</error></testcase><testcase classname="test.test_native_herdr_claude" name="test_claude_transcript_recovery_never_replays_permitted_prompt[False]" time="0.167"><error message="failed on setup with &quot;AssertionError: ccb-native: layout provider does not match compiled agent&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...xe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: layout provider does not match compiled agent\n').returncode&quot;">test\test_native_herdr_claude.py:20: in runtime
+    namespace_run(request);request['action']='mount';mount=run(request)['mount']
+    ^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_herdr_namespace.py:43: in run
+    result=call(request);assert result.returncode==0,result.stderr
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ccb-native: layout provider does not match compiled agent
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...xe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: layout provider does not match compiled agent\n').returncode</error></testcase><testcase classname="test.test_native_herdr_claude" name="test_claude_transcript_recovery_never_replays_permitted_prompt[True]" time="0.142"><error message="failed on setup with &quot;AssertionError: ccb-native: layout provider does not match compiled agent&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...xe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: layout provider does not match compiled agent\n').returncode&quot;">test\test_native_herdr_claude.py:20: in runtime
+    namespace_run(request);request['action']='mount';mount=run(request)['mount']
+    ^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_herdr_namespace.py:43: in run
+    result=call(request);assert result.returncode==0,result.stderr
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ccb-native: layout provider does not match compiled agent
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...xe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: layout provider does not match compiled agent\n').returncode</error></testcase><testcase classname="test.test_native_herdr_claude" name="test_claude_native_session_change_before_idle_is_not_completion" time="0.149"><error message="failed on setup with &quot;AssertionError: ccb-native: layout provider does not match compiled agent&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...xe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: layout provider does not match compiled agent\n').returncode&quot;">test\test_native_herdr_claude.py:20: in runtime
+    namespace_run(request);request['action']='mount';mount=run(request)['mount']
+    ^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_herdr_namespace.py:43: in run
+    result=call(request);assert result.returncode==0,result.stderr
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ccb-native: layout provider does not match compiled agent
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...xe', 'herdr-namespace'], returncode=1, stdout='', stderr='ccb-native: layout provider does not match compiled agent\n').returncode</error></testcase></testsuite></testsuites>

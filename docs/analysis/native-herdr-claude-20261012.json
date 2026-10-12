@@ -1,0 +1,121 @@
+{
+  "status": "implemented_with_offline_acceptance",
+  "base_commit": "5172cdd7",
+  "broad_regression_binary_sha256": {
+    "ccb-kernel.exe": "6344691a52151afc3e400fbb55ccc006361e46ca96dee901b736a09e5eb77893",
+    "ccb-native.exe": "adabf1a3c0bf80a88bde51c914a608cec1e31929b2dd69fbfb77e0de8e8df883"
+  },
+  "recovery_recheck_binary_sha256": {
+    "ccb-kernel.exe": "5cb943295977a35ec48b105a13adcff4e1ee229f3411e4c4011a7aec251a6dc1",
+    "ccb-native.exe": "1867dc1533e4381205b333aa57d05ec99d2baaf3721c963b58a111cc6606087a"
+  },
+  "recorded_at": "2026-10-12T01:28:05.099187+00:00",
+  "implemented": [
+    "Native herdr open accepts original Claude terminals and composes model/effort arguments without stream-json launch switches.",
+    "Claude history root honors configured CLAUDE_CONFIG_DIR and explicit roots; initial prompts can precede transcript publication, with bounded discovery and durable provider-specific cache.",
+    "Append-only transcript reader binds exact request activation, session/workspace, file identity and connected message UUIDs. Queued prompts, sidechains, unrelated parents, duplicate UUID mutation, partial records and replaced/rewritten files cannot complete a request.",
+    "Assistant end_turn or exactly attributed turn_duration is a candidate; live Herdr identity and idle readiness plus a second transcript read are required before completion.",
+    "Hook feedback and tool results invalidate old completion candidates and prior assistant boundary identity.",
+    "Native single pasted_content envelope normalization preserves exact ID and rejects nested/sibling/mismatched envelopes; quoted requests are not activated.",
+    "Claude can act as Lead or Worker through the existing durable callback chain; cold recovery observes the existing execution without replay.",
+    "Stopped-server recovery retains Claude transcript bytes and resumes the same UUID with --resume.",
+    "Recovery completion is written before running becomes visible in the public open record."
+  ],
+  "validation": {
+    "reports": {
+      "native-herdr-claude-initial-20261012.xml": {
+        "cases": 5,
+        "passed": 0,
+        "failed": [
+          "test_bound_claude_result_waits_for_idle_then_wakes_same_pi_lead",
+          "test_first_claude_prompt_creates_transcript_and_cache_serves_second",
+          "test_claude_transcript_recovery_never_replays_permitted_prompt[False]",
+          "test_claude_transcript_recovery_never_replays_permitted_prompt[True]",
+          "test_claude_native_session_change_before_idle_is_not_completion"
+        ]
+      },
+      "native-herdr-claude-recheck-20261012.xml": {
+        "cases": 7,
+        "passed": 3,
+        "failed": [
+          "test_first_claude_prompt_creates_transcript_and_cache_serves_second",
+          "test_claude_transcript_recovery_never_replays_permitted_prompt[True]",
+          "test_public_open_mounts_original_claude_and_reconnects_without_relaunch[False]",
+          "test_public_open_mounts_original_claude_and_reconnects_without_relaunch[True]"
+        ]
+      },
+      "native-herdr-claude-regression-20261012.xml": {
+        "cases": 69,
+        "passed": 68,
+        "failed": [
+          "test_stopped_native_host_resumes_exact_thread_and_new_owned_process"
+        ]
+      },
+      "native-herdr-claude-stopped-recovery-20261012.xml": {
+        "cases": 9,
+        "passed": 9,
+        "failed": []
+      },
+      "native-herdr-claude-final-20261012.xml": {
+        "cases": 21,
+        "passed": 21,
+        "failed": []
+      },
+      "native-herdr-claude-paste-final-20261012.xml": {
+        "cases": 2,
+        "passed": 2,
+        "failed": []
+      }
+    },
+    "effective_unique_integration_cases_after_rechecks": 80,
+    "all_effective_cases_passed": true,
+    "rust_full_unit_before_final_paste_normalization": {
+      "passed": 41,
+      "parent_invoked_subprocess_worker_entries": 2
+    },
+    "rust_final_claude_history_selection": {
+      "passed": 7,
+      "includes_new_paste_case": true
+    },
+    "red_findings": [
+      "Deferred Claude tasks were blocked by the Store allow-list still restricting herdr-history.json to Codex; fixed and retested.",
+      "Broad 69-case run exposed running/reset publication race in stopped native Codex recovery. The final 21-case recheck passed after ordering repair.",
+      "A new deterministic unit test reproduced stale turn_duration resurrecting a hook-invalidated answer; cleared prior assistant identity on new input.",
+      "Native pasted_content wrapper was not recognized before normalization; positive/negative unit cases and both bound/deferred integration variants now pass."
+    ],
+    "fixture_repairs": [
+      "Initial five errors were a fixture layout still declaring worker:codex after changing the compiled provider to Claude; setup finalizer added for dummy-process cleanup.",
+      "Two public-open test failures omitted .ccb/ccb.config required by project discovery; fixture now creates it."
+    ],
+    "format_clippy_diff": "passed",
+    "full_repository_suite": false
+  },
+  "sanitized_real_transcript": {
+    "path": "test/fixtures/claude_transcript_parent_chain.json",
+    "source_version": "Claude Code 2.1.296",
+    "mode": "prior authenticated stream-json run, not an original TUI capture",
+    "records": 19,
+    "content_redacted": true,
+    "replayed_through_offline_Herdr": true
+  },
+  "actual_herdr_acceptance": {
+    "performed": false,
+    "HERDR_ENV_present": false,
+    "skill": "C:/Users/user/.agents/skills/herdr/SKILL.md",
+    "instruction": "If the check fails, say that you are not running inside Herdr and stop. Do not inspect or control the focused Herdr session from outside Herdr."
+  },
+  "binary_sha256": {
+    "ccb-kernel.exe": "41ac74f3df1c89ec2400e155f111a2bcebf50422b807f1d0519016f0e11440d5",
+    "ccb-native.exe": "5e622269e6681134dded7f2fd8b6ac6ae3c605eb51be91808bdb13adb481de54"
+  },
+  "production_install_changed": false,
+  "real_model_inference_performed_this_patch": false,
+  "existing_agents_controlled": false,
+  "limits": [
+    "Herdr control-plane behavior in these tests is a fixture; some existing Codex host regression cases use the actual installed Codex CLI without model inference.",
+    "Original Claude terminal rendering, real Herdr detection, actual permission dialogs, manual context changes and cancellation still require frontend acceptance.",
+    "Unexpected transcript formats, changed identities and uncertain sends remain faults/unknown outcomes, never permission to replay.",
+    "Discovery and transcript processing are bounded; large-history latency and broader platform/legacy coexistence remain rollout gates.",
+    "The full Rust migration and production/default promotion are not complete."
+  ]
+}

@@ -29,7 +29,10 @@ impl Daemon {
                         "discovered history execution mismatch"
                     );
                     self.kernel.store.save(
-                        &format!("providers/codex/{agent}/herdr-history.json"),
+                        &format!(
+                            "providers/{}/{agent}/herdr-history.json",
+                            job["provider"].as_str().unwrap()
+                        ),
                         &binding,
                     )?;
                     self.kernel.store.commit()?;
@@ -110,7 +113,10 @@ impl Daemon {
             spec["_herdr_history_cache"] = self
                 .kernel
                 .store
-                .json(&format!("providers/codex/{agent}/herdr-history.json"))?
+                .json(&format!(
+                    "providers/{}/{agent}/herdr-history.json",
+                    spec["provider"].as_str().unwrap()
+                ))?
                 .unwrap_or(Value::Null);
         }
         let job = if let Some(id) = active.as_str() {

@@ -3,7 +3,7 @@
 use crate::{
     herdr_agents,
     herdr_worker::Event,
-    terminal_history::{self, Binding, Reader},
+    terminal_history::{self, Binding, ProviderReader},
 };
 use anyhow::{ensure, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -48,7 +48,7 @@ fn millis() -> u64 {
         .unwrap_or_default()
         .as_millis() as u64
 }
-fn candidates(d: &Discovery, since: u64) -> Result<Vec<Binding>> {
+fn candidates(d: &Discovery, since: u64, provider: &str) -> Result<Vec<Binding>> {
     if !d.root.exists() {
         return Ok(vec![]);
     }
@@ -85,6 +85,35 @@ fn candidates(d: &Discovery, since: u64) -> Result<Vec<Binding>> {
                 continue;
             }
             crate::herdr_namespace::unlinked(&item.path())?;
+            if provider == "claude" {
+                let path = item.path();
+                let Some(id) = path
+                    .file_stem()
+                    .and_then(|v| v.to_str())
+                    .filter(|v| uuid::Uuid::parse_str(v).is_ok())
+                else {
+                    continue;
+                };
+                if d.session_id.as_ref().is_some_and(|expected| expected != id) {
+                    continue;
+                }
+                let binding = Binding {
+                    root: d.root.clone(),
+                    path: path.clone(),
+                    cwd: d.cwd.clone(),
+                    session_id: id.into(),
+                };
+                // A newly created Claude transcript can contain only queued metadata.
+                // It is not a candidate until it proves the session and workspace.
+                if crate::claude_history::baseline(&binding, true).is_ok() {
+                    found.push(binding);
+                }
+                ensure!(
+                    found.len() <= 32,
+                    "ambiguous recent Claude histories exceed candidate limit"
+                );
+                continue;
+            }
             let mut first = Vec::new();
             BufReader::new(fs::File::open(item.path())?)
                 .take(4 * 1024 * 1024 + 1)
@@ -157,6 +186,7 @@ pub(crate) fn run(
     permitted: &mut bool,
 ) -> Result<()> {
     let d: Discovery = serde_json::from_value(spec["herdr_discovery"].clone())?;
+    let provider = crate::records::string(spec, "provider")?;
     validate(&spec["herdr_discovery"], &spec["workspace_path"])?;
     let anchor = format!("{task}:{execution}");
     let input = format!("CCB_REQ_ID: {anchor}\n{prompt}");
@@ -203,7 +233,9 @@ pub(crate) fn run(
                         && live["agent_session"]["value"] == binding.session_id)
             {
                 proof["history"] = json!(binding);
-                proof["baseline"] = json!(terminal_history::baseline(&binding)?);
+                proof["baseline"] = json!(terminal_history::provider_baseline(
+                    provider, &binding, false
+                )?);
                 proof["fixed_history"] = json!(!live["agent_session"].is_null());
             }
         }
@@ -253,7 +285,7 @@ pub(crate) fn run(
     let since = proof["not_before_ms"]
         .as_u64()
         .context("missing discovery time boundary")?;
-    let mut readers: BTreeMap<PathBuf, (Binding, Reader)> = BTreeMap::new();
+    let mut readers: BTreeMap<PathBuf, (Binding, ProviderReader)> = BTreeMap::new();
     let fixed = proof["fixed_history"] == true;
     if proof["history"].is_object() {
         let binding: Binding = serde_json::from_value(proof["history"].clone())?;
@@ -261,7 +293,8 @@ pub(crate) fn run(
             binding.root == d.root && binding.cwd == d.cwd,
             "saved history scope changed"
         );
-        let reader = Reader::new(
+        let reader = ProviderReader::new(
+            provider,
             binding.clone(),
             serde_json::from_value(proof["baseline"].clone())?,
             anchor.clone(),
@@ -274,10 +307,16 @@ pub(crate) fn run(
     while alive.load(Ordering::Acquire) {
         if !completed {
             if !fixed && scan.elapsed() >= Duration::from_secs(1) {
-                for binding in candidates(&d, since)? {
+                for binding in candidates(&d, since, provider)? {
                     if !readers.contains_key(&binding.path) {
-                        let baseline = terminal_history::from_header(&binding)?;
-                        let reader = Reader::new(binding.clone(), baseline, anchor.clone())?;
+                        let baseline =
+                            terminal_history::provider_baseline(provider, &binding, true)?;
+                        let reader = ProviderReader::new(
+                            provider,
+                            binding.clone(),
+                            baseline,
+                            anchor.clone(),
+                        )?;
                         readers.insert(binding.path.clone(), (binding, reader));
                     }
                 }
@@ -300,6 +339,28 @@ pub(crate) fn run(
                 "request anchor appears in multiple Codex histories"
             );
             if let Some((binding, mut decision)) = result {
+                if provider == "claude" {
+                    let live = observed(request, agent, Some(&proof["identity"]))?;
+                    ensure!(
+                        live["agent_session"].is_null()
+                            || (live["agent_session"]["agent"] == provider
+                                && live["agent_session"]["kind"] == "id"
+                                && live["agent_session"]["value"] == binding.session_id),
+                        "Claude discovered session differs from live native session"
+                    );
+                    if live["interactive_ready"] != true {
+                        ensure!(
+                            start.elapsed() < deadline,
+                            "Claude transcript candidate is not idle"
+                        );
+                        std::thread::sleep(Duration::from_millis(100));
+                        continue;
+                    }
+                    let Some(latest) = readers.get_mut(&binding.path).unwrap().1.poll()? else {
+                        continue;
+                    };
+                    decision = latest;
+                }
                 decision["diagnostics"]["binding_authority"] =
                     json!("mounted_process_and_execution_anchor");
                 decision["diagnostics"]["native_execution_instance"] = json!(execution);

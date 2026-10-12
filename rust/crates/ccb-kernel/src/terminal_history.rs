@@ -13,6 +13,51 @@ use std::{
 const MAX_LINE: usize = 4 * 1024 * 1024;
 const BOUNDARY_BYTES: u64 = 64 * 1024;
 
+pub(crate) fn provider_baseline(
+    provider: &str,
+    binding: &Binding,
+    from_start: bool,
+) -> Result<Baseline> {
+    match provider {
+        "claude" => crate::claude_history::baseline(binding, from_start),
+        "codex" if from_start => from_header(binding),
+        "codex" | "pi" => baseline(binding),
+        _ => anyhow::bail!("unsupported terminal history provider"),
+    }
+}
+pub(crate) enum ProviderReader {
+    Native(Box<Reader>),
+    Claude(Box<crate::claude_history::Reader>),
+}
+impl ProviderReader {
+    pub(crate) fn new(
+        provider: &str,
+        binding: Binding,
+        baseline: Baseline,
+        request: String,
+    ) -> Result<Self> {
+        Ok(match provider {
+            "claude" => Self::Claude(Box::new(crate::claude_history::Reader::new(
+                binding, baseline, request,
+            )?)),
+            "pi" | "codex" => Self::Native(Box::new(Reader::new(binding, baseline, request)?)),
+            _ => anyhow::bail!("unsupported terminal history provider"),
+        })
+    }
+    pub(crate) fn anchored(&self) -> bool {
+        match self {
+            Self::Native(r) => r.anchored(),
+            Self::Claude(r) => r.anchored(),
+        }
+    }
+    pub(crate) fn poll(&mut self) -> Result<Option<Value>> {
+        match self {
+            Self::Native(r) => r.poll(),
+            Self::Claude(r) => r.poll(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Binding {
@@ -79,7 +124,7 @@ pub(crate) struct Baseline {
     pub producer: Option<Value>,
 }
 #[cfg(windows)]
-fn identity(file: &File) -> Result<Value> {
+pub(crate) fn identity(file: &File) -> Result<Value> {
     use std::os::windows::io::AsRawHandle;
     use windows_sys::Win32::Storage::FileSystem::{
         GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION,
@@ -97,17 +142,17 @@ fn identity(file: &File) -> Result<Value> {
     ]))
 }
 #[cfg(unix)]
-fn identity(file: &File) -> Result<Value> {
+pub(crate) fn identity(file: &File) -> Result<Value> {
     use std::os::unix::fs::MetadataExt;
     let m = file.metadata()?;
     Ok(json!([m.dev(), m.ino()]))
 }
 #[cfg(not(any(windows, unix)))]
-fn identity(_: &File) -> Result<Value> {
+pub(crate) fn identity(_: &File) -> Result<Value> {
     anyhow::bail!("unsupported history file identity")
 }
 
-fn line(reader: &mut impl BufRead) -> Result<Option<Vec<u8>>> {
+pub(crate) fn line(reader: &mut impl BufRead) -> Result<Option<Vec<u8>>> {
     let mut bytes = Vec::new();
     reader
         .take(MAX_LINE as u64 + 1)
@@ -122,7 +167,7 @@ fn line(reader: &mut impl BufRead) -> Result<Option<Vec<u8>>> {
         None
     })
 }
-fn boundary_digest(file: &mut File, size: u64) -> Result<String> {
+pub(crate) fn boundary_digest(file: &mut File, size: u64) -> Result<String> {
     ensure!(
         file.metadata()?.len() >= size,
         "history shrank below the observation baseline"

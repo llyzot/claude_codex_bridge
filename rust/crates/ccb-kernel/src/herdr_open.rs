@@ -171,8 +171,8 @@ fn prepare_request(
     for (name, spec) in base["agents"].as_object_mut().context("missing agents")? {
         let provider = crate::records::string(spec, "provider")?.to_owned();
         ensure!(
-            ["pi", "codex"].contains(&provider.as_str()),
-            "native herdr open currently supports Pi/Codex terminal adapters"
+            ["pi", "codex", "claude"].contains(&provider.as_str()),
+            "native herdr open supports Pi/Codex/Claude terminal adapters"
         );
         ensure!(
             hosted(spec) || spec["thread_options"].is_null() && spec["turn_options"].is_null(),
@@ -189,6 +189,8 @@ fn prepare_request(
         if let Some(thinking) = spec["thinking"].as_str().filter(|_| !hosted(spec)) {
             if provider == "pi" {
                 args.extend(["--thinking".into(), thinking.into()]);
+            } else if provider == "claude" {
+                args.extend(["--effort".into(), thinking.into()]);
             } else {
                 args.extend([
                     "-c".into(),
@@ -268,6 +270,15 @@ fn codex_root(spec: &Value, options: &Value, agent: &str) -> Result<PathBuf> {
     if let Some(root) = options["history_roots"][agent].as_str() {
         return Ok(root.into());
     }
+    if spec["provider"] == "claude" {
+        let home = spec["env"]["CLAUDE_CONFIG_DIR"]
+            .as_str()
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("CLAUDE_CONFIG_DIR").map(PathBuf::from))
+            .or_else(|| std::env::var_os("USERPROFILE").map(|p| PathBuf::from(p).join(".claude")))
+            .context("Claude home is unknown; configure history_roots")?;
+        return Ok(home.join("projects"));
+    }
     let home = spec["env"]["CODEX_HOME"]
         .as_str()
         .map(PathBuf::from)
@@ -276,7 +287,7 @@ fn codex_root(spec: &Value, options: &Value, agent: &str) -> Result<PathBuf> {
         .context("Codex home is unknown; configure history_roots")?;
     Ok(home.join("sessions"))
 }
-fn find_codex(root: &Path, id: &str, cwd: &Path) -> Result<Option<Value>> {
+fn find_history(provider: &str, root: &Path, id: &str, cwd: &Path) -> Result<Option<Value>> {
     ensure!(root.is_absolute(), "Codex history root must be absolute");
     if !root.exists() {
         return Ok(None);
@@ -312,7 +323,12 @@ fn find_codex(root: &Path, id: &str, cwd: &Path) -> Result<Option<Value>> {
                     session_id: id.into(),
                     cwd: cwd.into(),
                 };
-                let baseline = crate::terminal_history::baseline(&binding)?;
+                if provider == "claude" && crate::claude_history::baseline(&binding, false).is_err()
+                {
+                    continue;
+                }
+                let baseline =
+                    crate::terminal_history::provider_baseline(provider, &binding, false)?;
                 ensure!(
                     baseline.producer.is_none(),
                     "Codex discovery found another provider's history"
@@ -413,8 +429,9 @@ fn binding(
         ));
     }
     let native = &live["agent_session"];
+    let provider = crate::records::string(spec, "provider")?;
     let cwd = Path::new(crate::records::string(spec, "workspace_path")?);
-    if native["agent"] != "codex" || native["kind"] != "id" {
+    if native["agent"] != provider || native["kind"] != "id" {
         ensure!(
             native.is_null(),
             "unexpected Codex native session reference"
@@ -440,15 +457,17 @@ fn binding(
             binding.session_id == id && binding.cwd == cwd,
             "explicit Codex history does not match live session/workspace"
         );
-        crate::terminal_history::baseline(&binding)?;
+        crate::terminal_history::provider_baseline(provider, &binding, false)?;
         return Ok(Some(json!({"history":binding})));
     }
     let root = codex_root(spec, options, agent)?;
-    Ok(Some(if let Some(history) = find_codex(&root, id, cwd)? {
-        json!({"history":history})
-    } else {
-        json!({"discovery":{"root":root,"cwd":cwd,"session_id":id}})
-    }))
+    Ok(Some(
+        if let Some(history) = find_history(provider, &root, id, cwd)? {
+            json!({"history":history})
+        } else {
+            json!({"discovery":{"root":root,"cwd":cwd,"session_id":id}})
+        },
+    ))
 }
 fn restart_stopped_backend(
     request: &Value,
@@ -592,8 +611,8 @@ pub(crate) fn open(
             "Herdr Codex attachment requires a persistent native thread"
         );
         ensure!(
-            ["pi", "codex"].contains(&spec["provider"].as_str().unwrap_or("")),
-            "native herdr open currently supports Pi/Codex terminal adapters"
+            ["pi", "codex", "claude"].contains(&spec["provider"].as_str().unwrap_or("")),
+            "native herdr open supports Pi/Codex/Claude terminal adapters"
         );
         ensure!(
             hosted(spec) || spec["thread_options"].is_null() && spec["turn_options"].is_null(),
@@ -762,7 +781,8 @@ pub(crate) fn open(
                             } else if saved["discovery"].is_object() {
                                 ensure!(
                                     live["agent_session"].is_null()
-                                        || live["agent_session"]["agent"] == "codex"
+                                        || live["agent_session"]["agent"]
+                                            == request["config"]["agents"][name]["provider"]
                                             && live["agent_session"]["kind"] == "id"
                                             && (saved["discovery"]["session_id"].is_null()
                                                 || live["agent_session"]["value"]
@@ -771,7 +791,8 @@ pub(crate) fn open(
                                 );
                             } else {
                                 ensure!(
-                                    live["agent_session"]["agent"] == "codex"
+                                    live["agent_session"]["agent"]
+                                        == request["config"]["agents"][name]["provider"]
                                         && live["agent_session"]["kind"] == "id"
                                         && live["agent_session"]["value"]
                                             == saved["history"]["session_id"],
@@ -811,10 +832,12 @@ pub(crate) fn open(
                 }
             }
         }
-        save(&root, &record)?;
         if record["phase"] == "running" {
+            // Publish recovery completion before observers can see running.
+            // finish writes the recovery record before the matching open record.
             recovery::finish(&root, &record)?;
         }
+        save(&root, &record)?;
         if record["phase"] == "running"
             || record["phase"] == "namespace_uncertain"
             || Instant::now() >= deadline

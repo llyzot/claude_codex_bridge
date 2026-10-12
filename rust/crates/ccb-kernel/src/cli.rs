@@ -113,7 +113,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             "version":crate::installation::version(),"core_version":env!("CARGO_PKG_VERSION"),
             "codex_tui_host":{"experimental":true,"supported":cfg!(windows),"input":"authenticated_websocket","herdr_open_integrated":true,"stopped_server_recovery":true,"dead_display_reattachment":true},
             "native_keeper":{"supported":cfg!(windows),"default_native_start":cfg!(windows),"restart_limit":3},
-            "public_api_version":2,"herdr_open":{"experimental":true,"supported":cfg!(windows),"terminal_providers":["pi","codex"],"background_startup":true,"quiescent_stopped_recovery":true},"native_prefix_installation":{"schema_version":1,
+            "public_api_version":2,"herdr_open":{"experimental":true,"supported":cfg!(windows),"terminal_providers":["pi","codex","claude"],"background_startup":true,"quiescent_stopped_recovery":true},"native_prefix_installation":{"schema_version":1,
                 "supported":cfg!(all(windows,target_arch="x86_64")),"commands":["ccb","ask","ccb-native"],
                 "modifies_account_settings":false,"in_place_upgrade":true,"upgrade_requires_stopped_commands":true,
                 "upgrade_recovery":true,"program_file_rollback":true,"runtime_state_rollback":false,"prefix_removal":true,"removal_recovery":true}})

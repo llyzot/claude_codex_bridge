@@ -1,0 +1,175 @@
+{
+  "source": "Sanitized Claude Code 2.1.296 stream-json transcript structure; not a foreground TUI capture",
+  "records": [
+    {
+      "type": "user",
+      "isSidechain": false,
+      "uuid": "record-1",
+      "sessionId": "00000000-0000-4000-8000-000000000001",
+      "cwd": "REPLACED_BY_TEST",
+      "message": {
+        "role": "user",
+        "content": "CCB_REQ_ID: REPLACED_BY_TEST\nTask"
+      }
+    },
+    {
+      "type": "attachment",
+      "isSidechain": false,
+      "uuid": "record-2",
+      "parentUuid": "record-1",
+      "sessionId": "00000000-0000-4000-8000-000000000001",
+      "cwd": "REPLACED_BY_TEST"
+    },
+    {
+      "type": "attachment",
+      "isSidechain": false,
+      "uuid": "record-3",
+      "parentUuid": "record-2",
+      "sessionId": "00000000-0000-4000-8000-000000000001",
+      "cwd": "REPLACED_BY_TEST"
+    },
+    {
+      "type": "attachment",
+      "isSidechain": false,
+      "uuid": "record-4",
+      "parentUuid": "record-3",
+      "sessionId": "00000000-0000-4000-8000-000000000001",
+      "cwd": "REPLACED_BY_TEST"
+    },
+    {
+      "type": "atis-latch",
+      "sessionId": "00000000-0000-4000-8000-000000000001"
+    },
+    {
+      "type": "attachment",
+      "isSidechain": false,
+      "uuid": "record-5",
+      "parentUuid": "record-4",
+      "sessionId": "00000000-0000-4000-8000-000000000001",
+      "cwd": "REPLACED_BY_TEST"
+    },
+    {
+      "type": "attachment",
+      "isSidechain": false,
+      "uuid": "record-6",
+      "parentUuid": "record-5",
+      "sessionId": "00000000-0000-4000-8000-000000000001",
+      "cwd": "REPLACED_BY_TEST"
+    },
+    {
+      "type": "attachment",
+      "isSidechain": false,
+      "uuid": "record-7",
+      "parentUuid": "record-6",
+      "sessionId": "00000000-0000-4000-8000-000000000001",
+      "cwd": "REPLACED_BY_TEST"
+    },
+    {
+      "type": "attachment",
+      "isSidechain": false,
+      "uuid": "record-8",
+      "parentUuid": "record-7",
+      "sessionId": "00000000-0000-4000-8000-000000000001",
+      "cwd": "REPLACED_BY_TEST"
+    },
+    {
+      "type": "attachment",
+      "isSidechain": false,
+      "uuid": "record-9",
+      "parentUuid": "record-8",
+      "sessionId": "00000000-0000-4000-8000-000000000001",
+      "cwd": "REPLACED_BY_TEST"
+    },
+    {
+      "type": "assistant",
+      "isSidechain": false,
+      "uuid": "record-10",
+      "parentUuid": "record-9",
+      "sessionId": "00000000-0000-4000-8000-000000000001",
+      "cwd": "REPLACED_BY_TEST",
+      "message": {
+        "role": "assistant",
+        "stop_reason": "tool_use",
+        "id": "message-1",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "tool-call",
+            "name": "Bash",
+            "input": {}
+          }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "isSidechain": false,
+      "uuid": "record-11",
+      "parentUuid": "record-10",
+      "sessionId": "00000000-0000-4000-8000-000000000001",
+      "cwd": "REPLACED_BY_TEST",
+      "toolUseResult": {},
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "tool-call",
+            "content": "tool result"
+          }
+        ]
+      }
+    },
+    {
+      "type": "attachment",
+      "isSidechain": false,
+      "uuid": "record-12",
+      "parentUuid": "record-11",
+      "sessionId": "00000000-0000-4000-8000-000000000001",
+      "cwd": "REPLACED_BY_TEST"
+    },
+    {
+      "type": "attachment",
+      "isSidechain": false,
+      "uuid": "record-13",
+      "parentUuid": "record-12",
+      "sessionId": "00000000-0000-4000-8000-000000000001",
+      "cwd": "REPLACED_BY_TEST"
+    },
+    {
+      "type": "last-prompt",
+      "sessionId": "00000000-0000-4000-8000-000000000001"
+    },
+    {
+      "type": "atis-latch",
+      "sessionId": "00000000-0000-4000-8000-000000000001"
+    },
+    {
+      "type": "assistant",
+      "isSidechain": false,
+      "uuid": "record-14",
+      "parentUuid": "record-13",
+      "sessionId": "00000000-0000-4000-8000-000000000001",
+      "cwd": "REPLACED_BY_TEST",
+      "message": {
+        "role": "assistant",
+        "stop_reason": "end_turn",
+        "id": "message-2",
+        "content": [
+          {
+            "type": "text",
+            "text": "final text"
+          }
+        ]
+      }
+    },
+    {
+      "type": "queue-operation",
+      "sessionId": "00000000-0000-4000-8000-000000000001"
+    },
+    {
+      "type": "queue-operation",
+      "sessionId": "00000000-0000-4000-8000-000000000001"
+    }
+  ]
+}

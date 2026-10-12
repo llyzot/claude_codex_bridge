@@ -80,6 +80,15 @@ fn resumes(
         let native = spec["startup_args"].as_array().cloned().unwrap_or_default();
         let selectors = if spec["provider"] == "pi" {
             vec!["--session", "--continue", "--resume", "-c", "-r"]
+        } else if spec["provider"] == "claude" {
+            vec![
+                "--session-id",
+                "--continue",
+                "--resume",
+                "--fork-session",
+                "-c",
+                "-r",
+            ]
         } else {
             vec!["resume", "fork"]
         };
@@ -129,9 +138,10 @@ fn resumes(
         } else if super::hosted(spec) {
             result[name] = native_host_session(runtime, spec, name, agents)?;
         } else {
+            let provider = crate::records::string(spec, "provider")?;
             let cache = read(
                 runtime,
-                &format!("providers/codex/{name}/herdr-history.json"),
+                &format!("providers/{provider}/{name}/herdr-history.json"),
             )?
             .unwrap_or(Value::Null);
             let history = if cache.is_object() {
@@ -148,7 +158,7 @@ fn resumes(
                     rows.as_array().unwrap().is_empty(),
                     "Codex has task history but no verified native session binding"
                 );
-                result[name] = json!({"provider":"codex","fresh":true,"args":[]});
+                result[name] = json!({"provider":provider,"fresh":true,"args":[]});
             } else {
                 let binding: crate::terminal_history::Binding = serde_json::from_value(history)?;
                 ensure!(
@@ -158,9 +168,9 @@ fn resumes(
                     ),
                     "Codex recovery workspace changed"
                 );
-                crate::terminal_history::from_header(&binding)?;
+                crate::terminal_history::provider_baseline(provider, &binding, true)?;
                 uuid::Uuid::parse_str(&binding.session_id)?;
-                result[name] = json!({"provider":"codex","session_id":binding.session_id,"path":binding.path,"args":["resume",binding.session_id]});
+                result[name] = json!({"provider":provider,"session_id":binding.session_id,"path":binding.path,"args":[if provider=="claude"{"--resume"}else{"resume"},binding.session_id]});
             }
         }
     }

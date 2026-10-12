@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="4" skipped="0" tests="7" time="89.556" timestamp="2026-10-12T09:00:39.159214+08:00" hostname="HOST"><testcase classname="test.test_native_herdr_claude" name="test_bound_claude_result_waits_for_idle_then_wakes_same_pi_lead" time="10.341" /><testcase classname="test.test_native_herdr_claude" name="test_first_claude_prompt_creates_transcript_and_cache_serves_second" time="19.590"><failure message="Failed: expected fixture state not observed">test\test_native_herdr_claude.py:73: in test_first_claude_prompt_creates_transcript_and_cache_serves_second
+    r=runtime;r['defer']();s=r['start']();first=r['submit'](s);prompt=wait_for(lambda:r['prompts']())[-1]
+                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_herdr_worker.py:24: in wait_for
+    pytest.fail('expected fixture state not observed')
+E   Failed: expected fixture state not observed</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_claude_transcript_recovery_never_replays_permitted_prompt[False]" time="11.978" /><testcase classname="test.test_native_herdr_claude" name="test_claude_transcript_recovery_never_replays_permitted_prompt[True]" time="26.482"><failure message="Failed: expected fixture state not observed">test\test_native_herdr_claude.py:86: in test_claude_transcript_recovery_never_replays_permitted_prompt
+    s=r['start']();task=r['submit'](s);prompt=wait_for(lambda:r['prompts']())[-1]
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_herdr_worker.py:24: in wait_for
+    pytest.fail('expected fixture state not observed')
+E   Failed: expected fixture state not observed</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_claude_native_session_change_before_idle_is_not_completion" time="19.837" /><testcase classname="test.test_native_herdr_claude" name="test_public_open_mounts_original_claude_and_reconnects_without_relaunch[False]" time="0.210"><failure message="AssertionError: ccb-native: no .ccb/ccb.config found above current directory&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...imeout-ms', '15000'], returncode=1, stdout='', stderr='ccb-native: no .ccb/ccb.config found above current directory\n').returncode">test\test_native_herdr_claude.py:120: in test_public_open_mounts_original_claude_and_reconnects_without_relaunch
+    history=project/'claude-history';history.mkdir();session=str(uuid.uuid4())
+        ^^^^^^^^
+test\test_native_herdr_claude.py:118: in opened
+    request['config']['agents']={'worker':worker};request['config']['source_config']={'layout':'worker:claude'}
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ccb-native: no .ccb/ccb.config found above current directory
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...imeout-ms', '15000'], returncode=1, stdout='', stderr='ccb-native: no .ccb/ccb.config found above current directory\n').returncode</failure></testcase><testcase classname="test.test_native_herdr_claude" name="test_public_open_mounts_original_claude_and_reconnects_without_relaunch[True]" time="0.211"><failure message="AssertionError: ccb-native: no .ccb/ccb.config found above current directory&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...imeout-ms', '15000'], returncode=1, stdout='', stderr='ccb-native: no .ccb/ccb.config found above current directory\n').returncode">test\test_native_herdr_claude.py:120: in test_public_open_mounts_original_claude_and_reconnects_without_relaunch
+    history=project/'claude-history';history.mkdir();session=str(uuid.uuid4())
+        ^^^^^^^^
+test\test_native_herdr_claude.py:118: in opened
+    request['config']['agents']={'worker':worker};request['config']['source_config']={'layout':'worker:claude'}
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AssertionError: ccb-native: no .ccb/ccb.config found above current directory
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\rel...imeout-ms', '15000'], returncode=1, stdout='', stderr='ccb-native: no .ccb/ccb.config found above current directory\n').returncode</failure></testcase></testsuite></testsuites>

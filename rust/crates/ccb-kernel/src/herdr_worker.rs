@@ -2,7 +2,7 @@
 //! Only the actor grants sending, after it commits the exact observation baseline.
 use crate::{
     herdr_agents,
-    terminal_history::{self, Baseline, Binding, Reader},
+    terminal_history::{self, Baseline, Binding, ProviderReader},
 };
 use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
@@ -40,9 +40,9 @@ pub(crate) fn validate(config: &Value, name: &str, spec: &Value) -> Result<()> {
         "Herdr terminal workers currently require Windows"
     );
     ensure!(
-        ["codex", "pi"].contains(&spec["provider"].as_str().unwrap_or(""))
+        ["codex", "pi", "claude"].contains(&spec["provider"].as_str().unwrap_or(""))
             && spec["command"].is_null(),
-        "Herdr terminal driver requires Codex or Pi, with no owned command"
+        "Herdr terminal driver requires Codex, Pi or Claude, with no owned command"
     );
     let request = &config["herdr"];
     ensure!(
@@ -57,8 +57,9 @@ pub(crate) fn validate(config: &Value, name: &str, spec: &Value) -> Result<()> {
     );
     if spec["herdr_discovery"].is_object() {
         ensure!(
-            spec["provider"] == "codex" && spec["herdr_history"].is_null(),
-            "deferred history is only supported for unbound Codex"
+            (spec["provider"] == "codex" || spec["provider"] == "claude")
+                && spec["herdr_history"].is_null(),
+            "deferred history requires unbound Codex or Claude"
         );
         crate::herdr_discovery::validate(&spec["herdr_discovery"], &spec["workspace_path"])?;
         ensure!(
@@ -267,7 +268,7 @@ fn run(
             );
             std::thread::sleep(Duration::from_millis(100));
         };
-        let baseline = terminal_history::baseline(&observed_binding)?;
+        let baseline = terminal_history::provider_baseline(provider, &observed_binding, false)?;
         ensure!(
             baseline.producer == producer,
             "history producer differs from mounted provider"
@@ -359,7 +360,7 @@ fn run(
             "Pi bridge owner changed"
         );
     }
-    let mut history = Reader::new(observed_binding.clone(), baseline, anchor)?;
+    let mut history = ProviderReader::new(provider, observed_binding.clone(), baseline, anchor)?;
     let started = Instant::now();
     let timeout = spec["timeout_s"].as_f64().unwrap_or(3600.0);
     let mut completed = false;
@@ -368,6 +369,28 @@ fn run(
         // remains deliverable, but no next input is allowed without live readiness.
         if !completed {
             if let Some(mut decision) = history.poll()? {
+                if provider == "claude" {
+                    let live = observe(
+                        request,
+                        agent,
+                        &observed_binding,
+                        provider,
+                        None,
+                        Some(&proof["identity"]),
+                    )?;
+                    if live["interactive_ready"] != true {
+                        ensure!(
+                            started.elapsed().as_secs_f64() < timeout,
+                            "Claude transcript candidate is not idle"
+                        );
+                        std::thread::sleep(Duration::from_millis(100));
+                        continue;
+                    }
+                    let Some(latest) = history.poll()? else {
+                        continue;
+                    };
+                    decision = latest;
+                }
                 decision["diagnostics"]["native_execution_instance"] = json!(execution);
                 events.send(Event::Completed(decision))?;
                 completed = true;

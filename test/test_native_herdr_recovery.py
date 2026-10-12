@@ -10,15 +10,18 @@ from test_native_herdr_worker import wait_for
 pytestmark=pytest.mark.skipif(os.name!='nt',reason='Windows process lifetime proof')
 
 @pytest.fixture
-def stopped(setup):
-    project,backend,request=setup;(project/'.ccb').mkdir();(project/'.ccb/ccb.config').write_text('worker:codex')
-    request['config']['agents'].pop('lead');request['config']['source_config']={'layout':'worker:codex'}
+def stopped(setup,request):
+    provider=getattr(request,'param','codex')
+    project,backend,request=setup;(project/'.ccb').mkdir();(project/'.ccb/ccb.config').write_text(f'worker:{provider}')
+    request['config']['agents'].pop('lead');request['config']['agents']['worker']['provider']=provider
+    request['config']['source_config']={'layout':f'worker:{provider}'}
     runtime=project/'.ccb/ccbd';state=runtime/'herdr';processes=[]
     def helper():
         p=subprocess.Popen([sys.executable,'-I','-c','import time;time.sleep(300)'],creationflags=0x08000000);processes.append(p);return p
-    first=helper();session=str(uuid.uuid4());history=project/'history';history.mkdir();log=history/f'rollout-{session}.jsonl'
-    log.write_text(json.dumps({'type':'session_meta','payload':{'id':session,'cwd':str(project)}})+'\n',encoding='utf-8')
-    s=server(backend);s.update(server_running=False,shell_pid=os.getpid(),provider_pids=[first.pid],agent_sessions={'codex':{'agent':'codex','kind':'id','value':session,'source':'fixture'}})
+    first=helper();session=str(uuid.uuid4());history=project/'history';history.mkdir();log=history/(f'{session}.jsonl' if provider=='claude' else f'rollout-{session}.jsonl')
+    header={'type':'user','uuid':'historical','sessionId':session,'cwd':str(project),'message':{'role':'user','content':'history'}} if provider=='claude' else {'type':'session_meta','payload':{'id':session,'cwd':str(project)}}
+    log.write_text(json.dumps(header)+'\n',encoding='utf-8')
+    s=server(backend);s.update(server_running=False,shell_pid=os.getpid(),provider_pids=[first.pid],agent_sessions={provider:{'agent':provider,'kind':'id','value':session,'source':'fixture'}})
     (backend/'server.json').write_text(json.dumps(s),encoding='utf-8')
     options=project/'open.json';options.write_text(json.dumps(dict(config=request['config'],command=request['command'],session=request['session'],history_roots={'worker':str(history)},transport_timeout_ms=1000)),encoding='utf-8')
     def open(recover=False,ms=10000):return cli('--project',project,'herdr','open','--options',options,'--no-attach','--timeout-ms',ms,*(['--recover-stopped'] if recover else []))
@@ -33,7 +36,7 @@ def stopped(setup):
     try:
         started=open();assert started.returncode==0,started.stderr
         wait_for(lambda:cli('--state-root',runtime,'ping').returncode==0)
-        yield dict(project=project,backend=backend,runtime=runtime,state=state,open=open,stop=stop,helper=helper,session=session,log=log,first=first)
+        yield dict(project=project,backend=backend,runtime=runtime,state=state,open=open,stop=stop,helper=helper,session=session,log=log,first=first,provider=provider)
     finally:
         start=state/'herdr-open-start.json'
         if start.exists():owned_stop(json.loads(start.read_text(encoding='utf-8')).get('process'))
@@ -44,7 +47,8 @@ def stopped(setup):
             if p.poll() is None:p.kill()
             p.wait(timeout=5)
 
-def test_recover_quiet_server_archives_epoch_and_resumes_exact_codex_history(stopped):
+@pytest.mark.parametrize('stopped',['codex','claude'],indirect=True)
+def test_recover_quiet_server_archives_epoch_and_resumes_exact_history(stopped):
     p=stopped;old=json.loads((p['state']/'namespace.json').read_text(encoding='utf-8'));bytes_before=p['log'].read_bytes();p['stop']()
     next_process=p['helper']();change(p['backend'],lambda s:s.update(provider_pids=[next_process.pid]))
     result=p['open'](True);assert result.returncode==0,result.stderr
@@ -52,7 +56,7 @@ def test_recover_quiet_server_archives_epoch_and_resumes_exact_codex_history(sto
     new=json.loads((p['state']/'namespace.json').read_text(encoding='utf-8'));assert new['owner_id']!=old['owner_id'] and new['workspace_id']!=old['workspace_id']
     assert p['log'].read_bytes()==bytes_before
     rows=[json.loads(r) for r in (p['backend']/'calls.jsonl').read_text(encoding='utf-8').splitlines()]
-    launches=[r for r in rows if r[:2]==['agent','start']];assert len(launches)==2 and launches[-1][-3:]==['--','resume',p['session']]
+    launches=[r for r in rows if r[:2]==['agent','start']];assert len(launches)==2 and launches[-1][-3:]==['--','--resume' if p['provider']=='claude' else 'resume',p['session']]
     assert mutate_count(p['backend'],['workspace','close'])==1
     assert len((p['state']/'herdr-recoveries.jsonl').read_text(encoding='utf-8').splitlines())==1
     assert p['open'](True).returncode==0 and p['open']().returncode==0

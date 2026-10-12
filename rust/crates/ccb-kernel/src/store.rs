@@ -131,7 +131,7 @@ impl Store {
             && parts[0] == "providers"
             && ["pi", "codex", "claude"].contains(&parts[1])
             && (["session.json", "fault.json"].contains(&parts[3])
-                || parts[1] == "codex" && parts[3] == "herdr-history.json"
+                || ["codex", "claude"].contains(&parts[1]) && parts[3] == "herdr-history.json"
                 || parts[1] == "pi"
                     && [
                         "role-plan.json",

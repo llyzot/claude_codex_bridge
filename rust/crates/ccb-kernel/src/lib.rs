@@ -46,6 +46,7 @@ mod lifecycle;
 mod live_directory;
 pub mod models;
 mod owned_process;
+mod permission_policy;
 mod pi_context;
 mod pi_rpc;
 mod pi_skills;

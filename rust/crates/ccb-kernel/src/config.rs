@@ -473,6 +473,7 @@ pub fn compile(root: &Path, document: Value, executables: &Value) -> Result<Valu
             _ => anyhow::bail!("native provider adapter is not implemented: {provider}"),
         }
         spec["command"] = json!(argv);
+        crate::permission_policy::validate(&spec, Some(root))?;
         agents.insert(name.clone(), spec);
     }
     ensure!(!agents.is_empty(), "config has no agents");

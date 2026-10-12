@@ -139,7 +139,7 @@ fn find(root: &Path, identity: &str) -> Result<Option<PathBuf>> {
     }
     Ok(None)
 }
-fn installed(identity: &str, project: Option<&Path>) -> Result<(PathBuf, Value)> {
+fn installed_optional(identity: &str, project: Option<&Path>) -> Result<Option<(PathBuf, Value)>> {
     let identity = normalize(identity)?;
     let mut found = None;
     if let Some(project) = project {
@@ -156,7 +156,10 @@ fn installed(identity: &str, project: Option<&Path>) -> Result<(PathBuf, Value)>
     let root = match found {
         Some(root) => root,
         None => {
-            find(&user_store()?, &identity)?.context(format!("role {identity} is not installed"))?
+            let Some(root) = find(&user_store()?, &identity)? else {
+                return Ok(None);
+            };
+            root
         }
     };
     let manifest = toml(&root.join("role.toml"))?;
@@ -164,7 +167,57 @@ fn installed(identity: &str, project: Option<&Path>) -> Result<(PathBuf, Value)>
         normalize(manifest["id"].as_str().context("role manifest has no id")?)? == identity,
         "role manifest id mismatch"
     );
-    Ok((root, manifest))
+    Ok(Some((root, manifest)))
+}
+fn installed(identity: &str, project: Option<&Path>) -> Result<(PathBuf, Value)> {
+    installed_optional(identity, project)?.context(format!("role {identity} is not installed"))
+}
+/// Required command surfaces must never silently become advisory native prompts.
+/// Native execution adapters have not yet implemented that hard tool boundary.
+pub(crate) fn validate_command_surface(spec: &Value, project: Option<&Path>) -> Result<()> {
+    let Some(identity) = normalized(&spec["role"])? else {
+        return Ok(());
+    };
+    let loaded = match installed_optional(&identity, project) {
+        Ok(loaded) => loaded,
+        // Manual launch retains task-local live-resource failure semantics:
+        // prompt() still requires a valid installed manifest before any input.
+        Err(_) if spec["permission"] != "auto" => return Ok(()),
+        Err(_) => anyhow::bail!("cannot establish role policy before enabling auto permission"),
+    };
+    let Some((root, manifest)) = loaded else {
+        ensure!(
+            spec["permission"] != "auto",
+            "cannot establish role policy before enabling auto permission"
+        );
+        return Ok(());
+    };
+    let declared = &manifest["adapters"]["ccb"]["command_surface"];
+    let relative = if declared.is_null() {
+        "adapters/ccb/command-surface.toml"
+    } else {
+        declared
+            .as_str()
+            .context("role command surface must be a path")?
+    };
+    let relative = Path::new(relative);
+    ensure!(
+        !relative.as_os_str().is_empty()
+            && relative
+                .components()
+                .all(|c| matches!(c, std::path::Component::Normal(_))),
+        "role command surface must stay inside role root"
+    );
+    let path = root.join(relative);
+    if !path.exists() {
+        return Ok(());
+    }
+    ensure!(
+        path.is_file() && path.canonicalize()?.starts_with(&root),
+        "role command surface escapes role root"
+    );
+    let _surface = toml(&path).map_err(|_| anyhow::anyhow!("invalid role command surface"))?;
+    anyhow::bail!("role {identity} declares a required command surface; native hard enforcement is not implemented (fail_mount)")
 }
 pub fn default_agent(identity: &str, project: Option<&Path>) -> Result<String> {
     let identity = normalize(identity)?;
@@ -213,6 +266,7 @@ pub struct Prepared {
     pub skill_roots: Option<Vec<PathBuf>>,
 }
 pub fn prompt(spec: &Value, project: Option<&Path>, body: &str) -> Result<Prepared> {
+    validate_command_surface(spec, project)?;
     use serde_json::json;
     use sha2::{Digest, Sha256};
     let Some(identity) = normalized(&spec["role"])? else {

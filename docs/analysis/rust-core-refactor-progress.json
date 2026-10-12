@@ -237,7 +237,8 @@
     "Windows native start now includes a Rust Keeper: singleton lifetime fencing, bounded crash recovery from protected committed configuration, durable stop intent and passive status; controlled FIFO/Pi callback recovery, Keeper loss and PID-reuse boundaries verified",
     "Confirmed pre-initialization Pi/Codex/Claude process exits persist startup faults, terminate unsent requests and return failure through existing Lead callback chains without automatic respawn",
     "Windows original Claude Herdr terminal composition, bound/deferred transcript observation, Lead/Worker callbacks and same-session stopped-server recovery implemented with offline acceptance; native paste envelopes and hook invalidation covered",
-    "Shared Pi/Codex/Claude launch shortcut normalization and conflict validation; Claude protocol effort forwarding and Codex turn-option preservation verified"
+    "Shared Pi/Codex/Claude launch shortcut normalization and conflict validation; Claude protocol effort forwarding and Codex turn-option preservation verified",
+    "Explicit native manual/auto task-permission mapping, conflict checks, transient launch derivation and required-role fail_mount guards implemented; no production or real-agent permission changes"
   ],
   "remaining": [
     "Broaden native Keeper real-model/Herdr foreground acceptance, legacy/cross-platform coexistence and unavailable-observation/storage recovery; evaluate optional OS-level restart of the Keeper itself and production/default rollout",
@@ -265,7 +266,7 @@
     "Validate the implemented original Claude TUI adapter against actual Herdr/Claude interaction; finish TUI context-switch/approval/interactive-input coordination and cancellation/error scenarios beyond structured transcript plus idle completion. Native Codex uses authenticated WebSocket input; legacy terminal migration and production rollout remain pending.",
     "Broaden real-model native Codex followup acceptance beyond the verified direct and Pi-callback happy paths; evaluate other-provider steering/legacy socket adoption and implement outbox retention; uncertain sends remain intentionally non-replayed",
     "Broaden transport acceptance to inherited open pipes/blocked writers/silent hangs and legacy idle fault lifetime repair and cross-Windows-session recovery; observed output EOF and first-write input failures now have three-provider coverage",
-    "Migrate the currently unconsumed top-level permission setting to native provider launch policy, including role restrictions and caller authorization, across protocol and original-terminal paths before default promotion"
+    "Implement native hard role command enforcement/managed role capabilities and caller authorization; verify restored-session defaults, hook trust/project acceptance and interactive permission parity. Explicit manual/auto launch mapping now exists; required role surfaces currently fail_mount."
   ],
   "verification": {
     "native_role_addressing": "20 final-release cases passed: compact canonical/legacy role expansion against the existing parser, project/user/current-directory precedence, adapter and source-home naming, managed-HOME avoidance, hybrid/rich binding, invalid IDs/manifests/names, duplicate default names, unambiguous/ambiguous/disabled targeting, agents listing, and actual native project startup plus role-addressed fixture work",
@@ -630,6 +631,16 @@
     "native_herdr_claude_evidence": "docs/analysis/native-herdr-claude-20261012.json",
     "native_herdr_claude_validation": "Broad 69-case run: 68 passed, one recovery publication race. Separate stopped-recovery selection: 9 passed. Final 21-case recheck passed after hook-boundary/publication repairs; final two paste-path cases passed after native envelope normalization. Effective 80 unique integration cases passed across runs/rechecks. Rust full unit suite 41 passed plus two parent-invoked helpers before final paste normalization; final seven Claude history unit cases passed. Formatting/Clippy/diff/build/bin hashes passed. Actual Herdr UI not exercised because HERDR_ENV is absent and the Herdr skill forbids outside-pane controls; no model call/default rollout in this patch.",
     "native_launch_options_evidence": "docs/analysis/native-launch-options-20261012.json",
-    "native_launch_options_validation": "56 launch-options/config/startup/Claude Herdr composition cases passed. New red case reproduced missing normalization. All existing thinking levels, legacy prefix deduplication, option preservation, conflicts, type validation and no-mutation Herdr preflight covered. Formatting/Clippy/build/hash/diff passed. Top-level permission remains unconsumed by native runtime and is an explicit rollout blocker; no policy/default installation/model call changed."
+    "native_launch_options_validation": "56 launch-options/config/startup/Claude Herdr composition cases passed. New red case reproduced missing normalization. All existing thinking levels, legacy prefix deduplication, option preservation, conflicts, type validation and no-mutation Herdr preflight covered. Formatting/Clippy/build/hash/diff passed. Top-level permission remains unconsumed by native runtime and is an explicit rollout blocker; no policy/default installation/model call changed.",
+    "native_permission_evidence": "docs/analysis/native-permission-policy-20261012.json",
+    "native_permission_validation": "Initial selection: 112 passed, 1 manual malformed-role isolation regression. Fixed task-local error handling and sanitized auto-policy failure. Final permission/live-role selection: 41 passed. Added direct/attached Codex argv conflict guards; final permission selection: 24 passed. Formatting/Clippy/build/hash/diff verified; no full-suite or real-provider auto launch. Actual user Windows-layout config was read-only compiled and rejected for missing expanded agents, defining the next concrete rollout gate."
+  },
+  "next_rollout_action": {
+    "project": "C:/Users/user/Desktop/work/1.code/1.renesas/sample-project-2",
+    "observed_config": "version=2; [windows] main=\"pi_lead:pi, codex_worker:codex\"; [runtime.mux] backend=\"herdr\"",
+    "read_only_native_compile_exit": 1,
+    "error": "config agents must be a table",
+    "current_installation": "C:/Users/user/AppData/Local/ccb-pi-local/bin/ccb.cmd invokes its .venv/Scripts/python.exe",
+    "next_action": "Translate the existing Windows layout configuration through the native compiler before state migration and installation cutover."
   }
 }

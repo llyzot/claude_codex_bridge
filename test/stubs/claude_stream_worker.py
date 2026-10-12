@@ -9,6 +9,8 @@ import threading
 import re
 
 mode=sys.argv[1]
+if os.environ.get('CCB_FIXTURE_ARGV_TRACE'):
+    with open(os.environ['CCB_FIXTURE_ARGV_TRACE'],'a',encoding='utf-8') as output:output.write(json.dumps(sys.argv)+'\n')
 flag='--resume' if '--resume' in sys.argv else '--session-id'
 session=sys.argv[sys.argv.index(flag)+1]
 previous=None

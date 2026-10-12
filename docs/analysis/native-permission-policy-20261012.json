@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "base_commit": "6b836156",
+  "recorded_at": "2026-10-12T01:54:45.985431+00:00",
+  "implemented": [
+    "Explicit manual/auto validation across compile, daemon startup/reload and Herdr launch binding.",
+    "Manual leaves provider defaults and explicit provider arguments/options in control. Auto maps Codex task approvals/sandbox and Claude permission mode at process/session launch.",
+    "Generated permission options remain outside persisted declarative configuration; reload to manual has no generated argv residue. Codex manual reload test supplies explicit on-request/read-only options.",
+    "Conflicting command-line/config/protocol permission overrides are rejected; Herdr auto declarations require matching actual launch arguments.",
+    "Required role command surfaces cannot silently run as advisory prompts: unsupported native enforcement follows fail_mount. The same check runs before regular task input and on reload.",
+    "Malformed ordinary live-role resources retain task-local failure/recovery semantics under manual mode; auto requires readable role metadata and does not echo invalid manifest contents."
+  ],
+  "verification": {
+    "reports": {
+      "native-permission-policy-20261012.xml": {
+        "cases": 113,
+        "passed": 112,
+        "failed": [
+          "test_bad_live_memory_fails_only_task_and_can_be_fixed_without_restart[bad-manifest]"
+        ]
+      },
+      "native-permission-policy-final-20261012.xml": {
+        "cases": 41,
+        "passed": 41,
+        "failed": []
+      },
+      "native-permission-policy-guards-20261012.xml": {
+        "cases": 24,
+        "passed": 24,
+        "failed": []
+      }
+    },
+    "red": "Prior build accepted Pi permission=auto despite unsupported provider capability.",
+    "initial_regression": "112 passed, 1 failed because eager role-manifest validation blocked the entire service for a malformed manual role resource.",
+    "repair": "Manual resource errors remain isolated to the affected task; auto policy ambiguity remains a sanitized preflight error. Final 41 permission/live-role cases passed.",
+    "last_guard_recheck": "24 permission cases passed after adding direct and attached Codex argv conflict detection.",
+    "format_clippy_diff": "passed",
+    "rust_full_unit_rerun": false,
+    "full_repository_suite": false
+  },
+  "production_install_changed": false,
+  "existing_agent_permissions_changed": false,
+  "real_provider_auto_mode_launched": false,
+  "real_model_inference_performed": false,
+  "binary_sha256": {
+    "ccb-kernel.exe": "bf0b3ca9fde5e0896dc0659a3e64dd7a20e6b6d7d390c11e3f427d7ba3144ab0",
+    "ccb-native.exe": "53767fccbab6aa8d5de96a4235364e1de46bfd7f969047065e93caf2c4975f67"
+  },
+  "limits": [
+    "Native hard enforcement of role command allowlists and managed role tools is still unimplemented; required policies fail mount rather than being weakened.",
+    "Pi has no supported native auto-permission switch and is rejected for that explicit mode.",
+    "Manual means no CCB-generated automatic override; it does not revoke explicit user provider settings or independently prove the effective policy of every restored provider session.",
+    "Legacy bypass-hook-trust/project acceptance behavior, inherited permissions, provider dialogs and finer caller authorization still require parity/acceptance work.",
+    "All new permission execution tests use disposable protocol fixtures; no real unrestricted provider or existing workspace was launched."
+  ],
+  "next_rollout_gate": {
+    "project": "C:/Users/user/Desktop/work/1.code/1.renesas/sample-project-2",
+    "observed_config": "version=2; [windows] main=\"pi_lead:pi, codex_worker:codex\"; [runtime.mux] backend=\"herdr\"",
+    "read_only_native_compile_exit": 1,
+    "error": "config agents must be a table",
+    "current_installation": "C:/Users/user/AppData/Local/ccb-pi-local/bin/ccb.cmd invokes its .venv/Scripts/python.exe",
+    "next_action": "Translate the existing Windows layout configuration through the native compiler before state migration and installation cutover."
+  }
+}

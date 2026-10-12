@@ -91,6 +91,7 @@ fn plan(request: &Value) -> Result<Value> {
     );
     let mut agents = json!({});
     for (name, spec) in request["config"]["agents"].as_object().unwrap() {
+        crate::permission_policy::validate_terminal_binding(request, name, spec)?;
         ensure!(
             ["pi", "codex", "claude"].contains(&spec["provider"].as_str().unwrap_or("")),
             "unsupported Windows native Herdr provider"

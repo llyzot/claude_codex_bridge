@@ -184,7 +184,7 @@ fn prepare_request(
                 .map(|v| v.iter().map(|s| s.as_str().unwrap().to_owned()).collect())
                 .unwrap_or_default()
         } else {
-            crate::launch_options::terminal_args(spec)?
+            crate::permission_policy::terminal(spec, crate::launch_options::terminal_args(spec)?)?
         };
         if provider == "pi" {
             let bridge = crate::pi_terminal::execute(
@@ -573,6 +573,7 @@ pub(crate) fn open(
         .values_mut()
     {
         *spec = crate::launch_options::normalize(spec)?;
+        crate::permission_policy::validate(spec, Some(project))?;
         if spec["driver_kind"] == "codex_app_server" && !hosted(spec) {
             if spec["thread_options"]
                 .as_object()

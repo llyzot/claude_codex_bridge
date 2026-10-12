@@ -45,6 +45,7 @@ pub(crate) fn validate(config: &Value, name: &str, spec: &Value) -> Result<()> {
         "Herdr terminal driver requires Codex, Pi or Claude, with no owned command"
     );
     let request = &config["herdr"];
+    crate::permission_policy::validate_terminal_binding(request, name, spec)?;
     ensure!(
         request["config"]["project_id"] == config["project_id"]
             && request["config"]["project_root"] == config["project_root"],

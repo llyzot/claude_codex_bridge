@@ -66,6 +66,8 @@ impl Session {
         saved: &Value,
         surface: Option<crate::skill_surface::Surface>,
     ) -> Result<Self> {
+        let effective = crate::permission_policy::protocol(spec)?;
+        let spec = &effective;
         let argv = spec["command"]
             .as_array()
             .context("Claude requires stream-json argv")?;

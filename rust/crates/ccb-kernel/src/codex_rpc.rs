@@ -82,6 +82,8 @@ impl Session {
         saved: &Value,
         session_record: &std::path::Path,
     ) -> Result<Self> {
+        let effective = crate::permission_policy::protocol(spec)?;
+        let spec = &effective;
         let argv = spec["command"]
             .as_array()
             .context("Codex requires app-server argv")?;

@@ -129,6 +129,12 @@ impl Daemon {
         let agents = config["agents"]
             .as_object()
             .context("daemon agents must be an object")?;
+        for spec in agents.values() {
+            crate::permission_policy::validate(
+                spec,
+                config["project_root"].as_str().map(std::path::Path::new),
+            )?;
+        }
         ensure!(
             !agents.is_empty() && agents.len() <= 32,
             "daemon requires 1 to 32 agents"

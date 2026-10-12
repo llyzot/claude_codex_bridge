@@ -54,6 +54,7 @@ pub fn now() -> String {
         .to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 pub fn verify_owner(root: &std::path::Path) -> Result<()> {
+    verify_legacy_keeper(root)?;
     let raw = match std::fs::read(root.join("lease.json")) {
         Ok(v) => v,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
@@ -61,6 +62,35 @@ pub fn verify_owner(root: &std::path::Path) -> Result<()> {
     };
     let lease: Value = serde_json::from_slice(&raw)?;
     verify_lease_owner(&lease)
+}
+fn verify_legacy_keeper(root: &std::path::Path) -> Result<()> {
+    let path = root.join("keeper.json");
+    crate::startup::unlinked(&path)?;
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    let mut bytes = Vec::new();
+    file.take(65537).read_to_end(&mut bytes)?;
+    ensure!(bytes.len() <= 65536, "legacy Keeper record exceeds limit");
+    let keeper: Value = serde_json::from_slice(&bytes)?;
+    let pid = keeper["keeper_pid"].as_u64().unwrap_or(0);
+    ensure!(
+        keeper["schema_version"] == 2
+            && keeper["record_type"] == "ccbd_keeper"
+            && pid > 0
+            && pid <= u32::MAX as u64,
+        "invalid legacy Keeper identity"
+    );
+    // The legacy record has no process-creation identity. Its persisted state
+    // (even 'stopped') cannot prove that the process can no longer restart CCB.
+    // PID reuse and access-denied observations require explicit migration.
+    ensure!(
+        owner_stopped(pid as u32),
+        "legacy Keeper ownership is live or cannot be proven stopped; stop the legacy supervisor before migration"
+    );
+    Ok(())
 }
 fn verify_lease_owner(lease: &Value) -> Result<()> {
     if lease.is_null() {

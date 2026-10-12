@@ -1,0 +1,53 @@
+{
+  "source_base_commit": "6dbb3a6d",
+  "change": "Native daemon ownership checks now require proof that the legacy Python Keeper process has exited, even if the daemon lease is absent/unmounted or Keeper record says stopped. No legacy process is killed or legacy metadata rewritten.",
+  "native_sha256": "349a33776ed5e6e1ac8b10b844d9d2c20c9691c6e45bfc6739710a7f67adc66a",
+  "runs": {
+    "native-legacy-keeper-red-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "8",
+      "skipped": "0",
+      "tests": "9",
+      "time": "3.558",
+      "timestamp": "2026-10-12T12:38:57.865350+08:00",
+      "hostname": "HOST"
+    },
+    "native-legacy-keeper-debug-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "9",
+      "time": "1.747",
+      "timestamp": "2026-10-12T12:39:40.093570+08:00",
+      "hostname": "HOST"
+    },
+    "native-legacy-keeper-release-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "41",
+      "time": "184.102",
+      "timestamp": "2026-10-12T12:41:18.835175+08:00",
+      "hostname": "HOST"
+    }
+  },
+  "format": "passed",
+  "clippy": "all-targets -D warnings passed",
+  "current_production_observation": {
+    "daemon_pid": 52968,
+    "daemon_image": "C:/Users/user/scoop/apps/python/3.14.6/python.exe",
+    "daemon_creation_local": "2026-10-10T23:04:18.148062+08:00",
+    "recorded_keeper_pid": 48016,
+    "keeper_pid_observed_absent": true,
+    "default_entrypoint": "Python ccb-pi-local/bin/ccb.cmd",
+    "read_only": true
+  },
+  "limits": [
+    "PID-only legacy records cannot distinguish reuse. A live reused PID or access-denied observation remains fenced and requires explicit migration/retirement of legacy metadata.",
+    "The check does not stop an unmodified external writer from editing files or racing a new launch; production cutover still requires confirmed legacy shutdown.",
+    "No production Herdr controls or account PATH changes. No claim of a new full regression."
+  ]
+}

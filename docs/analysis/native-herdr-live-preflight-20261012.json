@@ -1,0 +1,57 @@
+{
+  "recorded_at": "2026-10-12T03:16:19.027136+00:00",
+  "base_commit": "8c9cb186",
+  "review": {
+    "project": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_",
+    "session": "ccb-rust-ui-gjjd92m_",
+    "herdr_executable": "C:\\Users\\user\\.herdr\\packages\\standalone\\releases\\0.9.3-x86_64-pc-windows-msvc\\herdr.exe",
+    "native_executable": "C:\\Users\\user\\Desktop\\work\\ccb-rust\\bin\\ccb.exe",
+    "config": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_\\.ccb\\ccb.config",
+    "options": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_\\herdr-options.json",
+    "script": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_\\start-test.ps1",
+    "preflight": {
+      "agents": [
+        {
+          "name": "codex_worker",
+          "provider": "codex",
+          "workspace_path": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_"
+        },
+        {
+          "name": "pi_lead",
+          "provider": "pi",
+          "workspace_path": "\\\\?\\C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_"
+        }
+      ],
+      "mutations": false,
+      "project_id": "a062d7e3d6fe0969d4431b3595ef7192a02f40e23292c51b8f947d00807c9280",
+      "status": "planned"
+    },
+    "launch_executed": false,
+    "existing_sessions_inspected": false,
+    "scope": [
+      "Start and inspect only the explicit test session; use returned workspace/pane identities",
+      "Test Pi Lead and Codex Worker result callback through native Herdr integration",
+      "Show the test session in Windows Terminal if needed",
+      "Stop only resources whose identity is recorded by this test; preserve the existing default session and account PATH"
+    ]
+  },
+  "hashes": {
+    ".ccb/ccb.config": "026d0ffb37b7d120b080cdba0703c91c78684241e6e722b6e89bc0d4d53f0ed4",
+    "herdr-options.json": "b8307363af94ac713abd5afb66bb17686fecd969e30750fc69263146d32c82a1",
+    "start-test.ps1": "006d966690af82f0fdfbed1d242616ec9dee7a35100a4938d5dc496941bb8079"
+  },
+  "current_environment": {
+    "HERDR_ENV_present": false,
+    "PATH_herdr_version_directory": "0.9.0-x86_64-pc-windows-msvc",
+    "explicit_test_herdr_version_directory": "0.9.3-x86_64-pc-windows-msvc",
+    "global_PATH_changed": false
+  },
+  "authorization": {
+    "status": "pending",
+    "reason": "Herdr skill requires HERDR_ENV=1 before control commands; request explicit user exception limited to prepared named test session",
+    "skill": "C:/Users/user/.agents/skills/herdr/SKILL.md"
+  },
+  "runtime_started": false,
+  "existing_Herdr_sessions_inspected": false,
+  "runtime_directory_created": false
+}

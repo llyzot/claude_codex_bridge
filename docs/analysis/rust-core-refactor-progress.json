@@ -655,13 +655,21 @@
     "native_claude_elicitation_evidence": "docs/analysis/native-claude-elicitation-20261012.json",
     "native_claude_elicitation_validation": "83-case interaction regression: 82 passed, one incorrect no-echo cancellation expectation; corrected case passed separately without weakening runtime completion. Real authenticated Claude/local-MCP form round trip passed after removing test safe-mode that disabled MCP; one call/answer and exact final reply, owned Keeper stopped. No account config/credential copy/default change. Clippy, formatting, build and bin hashes verified.",
     "native_installed_refresh_evidence": "docs/analysis/native-installed-refresh-20261012.json",
-    "native_installed_refresh_validation": "Installed image matches release. Pi/Codex and Claude/Codex real chains plus Keeper recovery passed; Lead initial turns ended before Worker completion. Old native test state resumed under the new image with stable IDs and correct recall. Actual dangerFullAccess/never defaults, without permission overrides, produced successful WriteAllText/ReadAllText records and verified marker. All test Keepers stopped. Legacy read transient was rechecked: same PID 52968 healthy, project config unchanged. Five IO gate tests passed. No default cutover or Herdr UI acceptance."
+    "native_installed_refresh_validation": "Installed image matches release. Pi/Codex and Claude/Codex real chains plus Keeper recovery passed; Lead initial turns ended before Worker completion. Old native test state resumed under the new image with stable IDs and correct recall. Actual dangerFullAccess/never defaults, without permission overrides, produced successful WriteAllText/ReadAllText records and verified marker. All test Keepers stopped. Legacy read transient was rechecked: same PID 52968 healthy, project config unchanged. Five IO gate tests passed. No default cutover or Herdr UI acceptance.",
+    "native_herdr_live_preflight_evidence": "docs/analysis/native-herdr-live-preflight-20261012.json",
+    "native_herdr_live_preflight_validation": "Prepared separate Git test project, Pi/Codex config with explicit authenticated native Codex TUI host, executable manifest, named Herdr 0.9.3 session and guarded PowerShell launcher. Installed candidate config compilation and herdr open --dry-run passed. No Herdr status/control command or runtime startup performed outside the skill boundary. Pending explicit user exception for this test session only."
   },
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\1.renesas\\sample-project-2",
     "candidate_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "next_action": "Account-default IO is now authorized and verified separately. Proceed toward actual scoped Herdr foreground acceptance and state-preserving legacy-to-native cutover; restricted sandbox setup remains an external limitation, not a passed gate.",
-    "latest_evidence": "docs/analysis/native-installed-refresh-20261012.json"
+    "next_action": "Await user decision on the explicitly scoped outside-Herdr test. On approval, launch only prepared session and observe the same operation without replacement on timeout; then validate terminal callback and cleanup. No default cutover yet.",
+    "latest_evidence": "docs/analysis/native-installed-refresh-20261012.json",
+    "herdr_preflight": {
+      "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_",
+      "session": "ccb-rust-ui-gjjd92m_",
+      "script": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_\\start-test.ps1",
+      "authorization": "pending"
+    }
   },
   "installed_candidate": {
     "prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",

@@ -1,0 +1,54 @@
+{
+  "source_base_commit": "64ce29d9",
+  "change": "Read-only workspace preflight before publishing a new daemon lifetime; existing live owners bypass this check, and materialization still rechecks under its own lock.",
+  "source_files": {
+    "rust/crates/ccb-kernel/src/startup.rs": "b18bdf9582194ef8ccae9132156e582280c2bd60124e7bd7b7e5e517d8958c76",
+    "rust/crates/ccb-kernel/src/workspaces.rs": "c74686e3de6530c785b2b447f7cc8c5349370dbae0b40ecd64009272bad1808b"
+  },
+  "native_sha256": "a036d9cc29866c8c83887dbe3a9209426279e291af2bd5acd2b89fd0e17b4e96",
+  "runs": {
+    "native-workspace-preflight-red-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "2",
+      "skipped": "0",
+      "tests": "2",
+      "time": "17.670",
+      "timestamp": "2026-10-12T12:30:41.588546+08:00",
+      "hostname": "HOST"
+    },
+    "native-workspace-preflight-debug-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "2",
+      "time": "7.852",
+      "timestamp": "2026-10-12T12:31:50.022644+08:00",
+      "hostname": "HOST"
+    },
+    "native-workspace-preflight-release-20261012.xml": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "53",
+      "time": "134.921",
+      "timestamp": "2026-10-12T12:32:56.260122+08:00",
+      "hostname": "HOST"
+    }
+  },
+  "regression_assertions": [
+    "Dirty prepared checkout returns its actionable worktree error",
+    "Missing registered checkout returns its actionable worktree error",
+    "Prior native-start.json remains byte-identical: no new daemon lifetime is created",
+    "Dirty content and registered worktree inventory are preserved"
+  ],
+  "format": "passed",
+  "clippy": "all-targets -D warnings passed",
+  "limits": [
+    "No production/default entrypoint migration in this change",
+    "Read-only preflight is an early error check, not a substitute for locked materialization",
+    "53 affected release cases, not a new full-suite run"
+  ]
+}

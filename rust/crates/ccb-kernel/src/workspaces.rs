@@ -714,6 +714,14 @@ pub fn validate(config: &Value) -> Result<()> {
     plans(config)?;
     Ok(())
 }
+/// Read-only launch check. Materialization repeats these checks under its lock;
+/// this observation cannot authorize adoption or replace that locked check.
+pub(crate) fn preflight(config: &Value) -> Result<()> {
+    for plan in plans(config)? {
+        plan.inspect(true)?;
+    }
+    Ok(())
+}
 pub fn materialize(config: &Value) -> Result<()> {
     let plans = plans(config)?;
     for plan in &plans {

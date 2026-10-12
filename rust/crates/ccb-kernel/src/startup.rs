@@ -212,6 +212,10 @@ pub(crate) fn start_daemon(root: &Path, mut config: Value, timeout: Duration) ->
         }
     }
     crate::daemon::verify_owner(&root)?;
+    // Reject known workspace damage before publishing a new process lifetime.
+    // Existing/live owners above remain observation-only, and the daemon still
+    // rechecks workspace ownership while holding the materialization lock.
+    crate::workspaces::preflight(&config)?;
     config["startup_id"] = json!(uuid::Uuid::new_v4().to_string());
     let mut bytes = serde_json::to_vec(&config)?;
     ensure!(

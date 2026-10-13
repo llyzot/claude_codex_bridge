@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "scope": "reported project initial startup; Codex pane and project shutdown",
+  "failure_fingerprint": "initial-open-budget-expired-before-pi-binding-codex-unsent-kill-missing-checkpoint",
+  "installed_sha256": "5d1ac6e9a8c8828daf151951d08deeebfbff859303913fb9a34972da4971c49d",
+  "evidence": {
+    "opener_created_local": "2026-10-13 15:44:43.840",
+    "open_record_last_write_local": "2026-10-13 15:45:44",
+    "pi_ready_record_last_write_local": "2026-10-13 15:45:53",
+    "opener_status": "finished",
+    "open_phase": "agents_starting",
+    "bound_providers": ["claude", "codex-native-host-placeholder"],
+    "missing_binding": "pi",
+    "codex_mount_status": "prepared",
+    "codex_launch_sent": false,
+    "claude_mount_status": "blocked",
+    "daemon_configuration_present": false,
+    "daemon_lease_present": false,
+    "daemon_start_intent_present": false,
+    "keeper_intent_present": false,
+    "source_worker_budget_seconds": 60,
+    "pane_evidence": "user screenshot: Codex pane contains PowerShell prompt; workspace subsequently closed so current pane capture unavailable",
+    "public_kill_reproduction": "isolated regression reproduced exact error: no committed restart configuration at this state root"
+  },
+  "findings": [
+    {
+      "confidence": "high",
+      "domain": "startup sequencing",
+      "finding": "Codex native host requires backend startup; backend startup waits for all provider bindings. Pi binding was missing when the opener ended, and Codex launch was never sent."
+    },
+    {
+      "confidence": "high",
+      "domain": "shutdown lifecycle",
+      "finding": "Installed project kill requires the committed daemon restart checkpoint, which is absent for an initial startup that never reached the backend."
+    },
+    {
+      "confidence": "high",
+      "domain": "status reporting",
+      "finding": "A completed opener can retain agents_starting with observation_expired rather than exposing a terminal initialization timeout."
+    }
+  ],
+  "unresolved": [
+    "Reason Pi took about seventy seconds to publish its ready record; no timing profile exists to identify a particular extension or initialization stage.",
+    "Reason Herdr reported Claude blocked; no current pane remains and screenshot alone does not establish a provider failure."
+  ],
+  "current_state": {
+    "reported_namespace": "retired",
+    "project_restarted_during_this_diagnosis": false,
+    "experimental_changes_installed": true,
+    "experimental_regression": "Historical intermediate runs are superseded by the final repair receipt.",
+    "issue_submitted": false
+  },
+  "additional_live_diagnosis": {
+    "authorization": "Human approved isolated Herdr startup tests and explicit outside-Herdr control for these tests.",
+    "installed_binary_used": true,
+    "model_tasks_submitted": 0,
+    "trust_prompts_confirmed": false,
+    "benchmarks_ms": {
+      "bundled_cli_without_extensions_offline": 478,
+      "bundled_cli_with_global_extensions_and_trellis_offline": 7627,
+      "bundled_cli_with_global_extensions_and_trellis_online": 3009,
+      "project_context_and_ccb_bridge_offline": 3672,
+      "ccb_bridge_session_start_callback": 99
+    },
+    "three_agent_test": {
+      "session": "ccb-startup-probe-20261013-1709",
+      "pi_process_created_after_opener_ms": 12192,
+      "pi_session_start_after_process_ms": 4318,
+      "pi_ready_after_opener_ms": 16921,
+      "opener_finished_after_ms": 60711,
+      "final_open_phase": "agents_starting",
+      "final_bindings": ["codex-native-host-placeholder", "pi"],
+      "claude_pane": "waiting_input",
+      "claude_wait_reason": "folder trust confirmation",
+      "codex_launch_sent": false,
+      "installed_kill_error": "no committed restart configuration at this state root",
+      "isolated_server_stopped": true
+    },
+    "pi_codex_control_test": {
+      "session": "ccb-pi-codex-probe-20261013",
+      "pi_ready_ms": 11425,
+      "pi_bound_ms": 13900,
+      "codex_attachment_sent_ms": 25499,
+      "backend_running_ms": 28367,
+      "codex_ping": "local_protocol_ready; healthy; idle; no active or queued jobs",
+      "codex_pane": "waiting_input",
+      "codex_wait_reason": "folder trust confirmation",
+      "installed_kill_result": "closed; daemon and Keeper stopped; namespace retired",
+      "isolated_server_stopped": true
+    },
+    "conclusions": [
+      "A different provider waiting for user input prevents initial Codex host startup. The Codex shell-only symptom reproduced even with Pi becoming ready in about seventeen seconds.",
+      "The incomplete-startup kill failure reproduced with the installed binary, while kill succeeded after the backend committed its configuration.",
+      "Backend healthy/running does not establish an interactive-ready Codex pane; the new test folder still displayed a trust confirmation.",
+      "Existing managed fd and rg binaries predated the incident. The measured warm startup did not download them or make fetch calls."
+    ],
+    "limits": [
+      "The original seventy-second Pi readiness delay did not reproduce. These measurements do not prove the original cause was a particular extension, network call, or cold cache.",
+      "The new test folder's Claude trust prompt does not establish what blocked Claude in the original project; its live pane was already closed before this test.",
+      "No model access, worker task execution or callback delivery was exercised in these startup-only tests."
+    ],
+    "formal_project_source_changes": false,
+    "installed_binary_changed": false
+  },
+  "repair_verification": {
+    "date_local": "2026-10-14",
+    "implementation": [
+      "Seal the original startup configuration before allocating a server or workspace; never reconstruct missing authority from current disk configuration.",
+      "Launch providers independently and start the native Codex host before all terminal bindings are ready. Add later ready agents using the existing daemon reload path, preserving the running host and its session.",
+      "Cancel the exact live opener generation before shutdown, then retire only its verified owned namespace. Preserve history on a later reopen.",
+      "Distinguish waiting_input, backend mounting and interactive readiness, and publish startup_timed_out when the background startup budget expires.",
+      "Retry only bounded Windows file sharing conflicts during atomic state publication; do not replay an agent launch or reconstruct missing authority."
+    ],
+    "default_background_budget_ms": 60000,
+    "live_acceptance": {
+      "session": "ccb-startup-fixed-e-20261013",
+      "before_kill": {
+        "phase": "waiting_input",
+        "opener": "opening",
+        "claude": "blocked",
+        "pi": "ready",
+        "codex": "ready",
+        "codex_protocol": "local_protocol_ready",
+        "active_job": null
+      },
+      "kill_result": "closed; daemon and Keeper stopped; namespace retired",
+      "retirement_id": "79213abc-cbf6-482f-b03a-5167e4fcc4a9",
+      "isolated_server_stopped": true,
+      "model_tasks_submitted": 0,
+      "trust_prompts_confirmed": false
+    },
+    "limits": [
+      "The original seventy-second Pi initialization delay did not reproduce; no claim is made about its original cause.",
+      "The live acceptance checks startup and shutdown only. Callback routing is covered by isolated protocol fixtures, not a paid model task.",
+      "The formal project remains closed and its application source was not modified."
+    ],
+    "final_receipt": "native-independent-startup-repair-20261014.json"
+  },
+  "repair_direction": [
+    "Persist initial startup ownership before allocating resources so shutdown can cancel an incomplete launch using its original authority.",
+    "Remove the unnecessary dependency of Codex host initialization on Pi interactive readiness.",
+    "Expose initialization progress and a terminal timeout distinctly from a foreground observation timeout."
+  ]
+}

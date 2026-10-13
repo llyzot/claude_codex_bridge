@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="38.475" timestamp="2026-10-13T19:16:29.978957+08:00" hostname="HOST"><testcase classname="test.test_native_herdr_open" name="test_host_starts_while_pi_waits_and_later_binding_keeps_same_host" time="37.131"><failure message="Failed: expected fixture state not observed">test\test_native_herdr_open.py:127: in test_host_starts_while_pi_waits_and_later_binding_keeps_same_host
+    wait_for(lambda:mutate_count(p['backend'],['pane','run'])==1,timeout=35)
+test\test_native_herdr_worker.py:24: in wait_for
+    pytest.fail('expected fixture state not observed')
+E   Failed: expected fixture state not observed</failure></testcase><testcase classname="test.test_native_herdr_open" name="test_kill_cancels_an_active_initial_open" time="0.830"><failure message="AssertionError: assert False&#10; +  where False = exists()&#10; +    where exists = (WindowsPath('C:/Users/user/AppData/Local/Temp/pytest-of-user/pytest-548/test_kill_cancels_an_active_in0/project/.ccb/ccbd') / 'herdr/open-configuration.json').exists">test\test_native_herdr_open.py:148: in test_kill_cancels_an_active_initial_open
+    assert (p['native']/'herdr/open-configuration.json').exists()
+E   AssertionError: assert False
+E    +  where False = exists()
+E    +    where exists = (WindowsPath('C:/Users/user/AppData/Local/Temp/pytest-of-user/pytest-548/test_kill_cancels_an_active_in0/project/.ccb/ccbd') / 'herdr/open-configuration.json').exists</failure></testcase></testsuite></testsuites>

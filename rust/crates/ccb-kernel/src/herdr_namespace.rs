@@ -491,7 +491,7 @@ impl Controller<'_> {
         }
         Ok(())
     }
-    fn retire(&mut self) -> Result<Value> {
+    fn retire(&mut self, pre_backend: bool) -> Result<Value> {
         ensure!(
             ["prepared", "retiring", "retired"]
                 .contains(&self.record["status"].as_str().unwrap_or("")),
@@ -520,6 +520,9 @@ impl Controller<'_> {
         if self.record["retirement"].is_null() {
             self.record["retirement"] = json!({"schema_version":1,"operation_id":uuid::Uuid::new_v4().to_string(),
                 "owner_id":self.record["owner_id"],"workspace_id":self.record["workspace_id"],"close_sent":present});
+            if pre_backend {
+                self.record["retirement"]["pre_backend"] = json!(true);
+            }
             self.record["status"] = json!(if present { "retiring" } else { "retired" });
             // The committed permission precedes IO. An uncertain send is only
             // observed on later calls, never replayed against a reused ID.
@@ -905,6 +908,182 @@ fn inspect_status(request: &Value, expected: &str) -> Result<Value> {
     );
     Ok(namespace)
 }
+fn pre_backend_authority(runtime: &Path, plan: &Value) -> Result<crate::Kernel> {
+    crate::daemon::verify_owner(runtime)?;
+    ensure!(
+        crate::keeper::status(runtime)?["alive"] == false,
+        "native Keeper is still active"
+    );
+    let mut kernel = crate::Kernel::open(runtime)?;
+    for path in [
+        "configuration.json",
+        "lease.json",
+        "kernel/native-start.json",
+        "kernel/native-keeper.json",
+    ] {
+        ensure!(
+            crate::startup::load(&runtime.join(path))?.is_none(),
+            "backend has prior ownership records; use committed recovery"
+        );
+    }
+    for name in plan["slots"]
+        .as_object()
+        .context("namespace slots missing")?
+        .keys()
+    {
+        ensure!(
+            crate::records::dispatch(
+                &mut kernel.store,
+                "latest",
+                &json!({"stream":"jobs","identity":"job_id","agent_name":name})
+            )?
+            .as_array()
+            .is_some_and(|rows| rows.is_empty()),
+            "pre-backend namespace has durable jobs; explicit recovery required"
+        );
+    }
+    ensure!(
+        crate::records::dispatch(
+            &mut kernel.store,
+            "latest",
+            &json!({"stream":"callbacks","identity":"edge_id"})
+        )?
+        .as_array()
+        .is_some_and(|rows| rows.is_empty()),
+        "pre-backend namespace has callback records"
+    );
+    Ok(kernel)
+}
+fn retire_layout(
+    request: &Value,
+    plan: Value,
+    signature: String,
+    pre_backend: bool,
+) -> Result<Value> {
+    let project = Path::new(text(&plan, "project_root")?);
+    let runtime = crate::config::state_root(project)?;
+    let state = runtime.join("herdr");
+    crate::daemon::verify_owner(&runtime)?;
+    ensure!(
+        crate::keeper::status(&runtime)?["alive"] == false,
+        "stop the native Keeper before namespace retirement"
+    );
+    std::fs::create_dir_all(runtime.join("kernel"))?;
+    let mut locks = Vec::new();
+    for path in [
+        state.join("native-open-launch.lock"),
+        state.join("native-open.lock"),
+        runtime.join("kernel/native-keeper-launch.lock"),
+        runtime.join("kernel/native-launch.lock"),
+    ] {
+        unlinked(&path)?;
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(path)?;
+        file.try_lock().context("Herdr open is still in progress")?;
+        locks.push(file);
+    }
+    crate::daemon::verify_owner(&runtime)?;
+    ensure!(
+        crate::keeper::status(&runtime)?["alive"] == false,
+        "native Keeper is still active"
+    );
+    let _initial = if pre_backend {
+        Some(pre_backend_authority(&runtime, &plan)?)
+    } else {
+        None
+    };
+    let _authority = if pre_backend {
+        None
+    } else {
+        Some(Store::open(&runtime)?)
+    };
+    crate::daemon::verify_owner(&runtime)?;
+    let store = Store::open(&state)?;
+    let record = store
+        .json(RECORD)?
+        .context("namespace disappeared during retirement")?;
+    validate_record(&record, &plan, &signature)?;
+    Controller {
+        store,
+        request,
+        plan,
+        record,
+    }
+    .retire(pre_backend)
+}
+pub(crate) fn retire_initial(request: &Value) -> Result<Value> {
+    let plan = plan(request)?;
+    retire_layout(request, plan.clone(), hash(&plan)?, true)
+}
+pub(crate) fn reopen_pre_backend(request: &Value) -> Result<bool> {
+    let plan = plan(request)?;
+    let signature = hash(&plan)?;
+    let root = Path::new(text(&plan, "project_root")?);
+    let runtime = crate::config::state_root(root)?;
+    let state = runtime.join("herdr");
+    let Some(record) = crate::startup::load(&state.join(RECORD))? else {
+        return Ok(false);
+    };
+    if record["status"] != "retired" || record["retirement"]["pre_backend"] != true {
+        return Ok(false);
+    }
+    let _authority = pre_backend_authority(&runtime, &plan)?;
+    let store = Store::open(&state)?;
+    let current = store
+        .json(RECORD)?
+        .context("retired namespace disappeared")?;
+    ensure!(current == record, "retired namespace changed");
+    validate_record(&record, &plan, &signature)?;
+    let controller = Controller {
+        store,
+        request,
+        plan: plan.clone(),
+        record: record.clone(),
+    };
+    ensure!(
+        !controller
+            .workspaces()?
+            .iter()
+            .any(|w| w["workspace_id"] == record["workspace_id"]),
+        "retired workspace identity reappeared"
+    );
+    let mut store = controller.store;
+    let owner = text(&record, "owner_id")?;
+    uuid::Uuid::parse_str(owner)?;
+    store.save(&format!("archived-partial/{owner}/namespace.json"), &record)?;
+    if let Some(agents) = store.json("herdr-agents.json")? {
+        ensure!(
+            agents["namespace_owner"] == record["owner_id"],
+            "partial agent ledger belongs to another namespace"
+        );
+        for row in agents["agents"]
+            .as_object()
+            .context("partial agent rows missing")?
+            .values()
+        {
+            for process in [
+                &row["binding"]["process"],
+                &row["host_launch"]["host_process"],
+                &row["host_launch"]["server_process"],
+            ] {
+                if !process.is_null() {
+                    ensure!(!crate::startup::owner_alive(&json!({"pid":process["pid"],"process":process}))?,
+                        "closed workspace provider is still live or unconfirmed; wait before reopening");
+                }
+            }
+        }
+        store.save(&format!("archived-partial/{owner}/agents.json"), &agents)?;
+        store.remove("herdr-agents.json")?;
+    }
+    store.remove(RECORD)?;
+    store.remove("open-configuration.json")?;
+    store.commit()?;
+    Ok(true)
+}
 pub fn execute(request: &Value) -> Result<Value> {
     let plan = plan(request)?;
     let signature = hash(&plan)?;
@@ -926,51 +1105,7 @@ pub fn execute(request: &Value) -> Result<Value> {
         if !state.join(RECORD).exists() {
             return Ok(json!({"status":"not_found","mutations":false}));
         }
-        crate::daemon::verify_owner(&runtime)?;
-        ensure!(
-            crate::keeper::status(&runtime)?["alive"] == false,
-            "stop the native Keeper before namespace retirement"
-        );
-        unlinked(&runtime.join("kernel"))?;
-        std::fs::create_dir_all(runtime.join("kernel"))?;
-        // Serialize against both launchers and the background opener before
-        // acquiring the stopped authority's writer lock and namespace journal.
-        let mut launch_locks = Vec::new();
-        for path in [
-            state.join("native-open-launch.lock"),
-            state.join("native-open.lock"),
-            runtime.join("kernel/native-keeper-launch.lock"),
-            runtime.join("kernel/native-launch.lock"),
-        ] {
-            unlinked(&path)?;
-            let file = std::fs::OpenOptions::new()
-                .create(true)
-                .truncate(false)
-                .read(true)
-                .write(true)
-                .open(path)?;
-            file.try_lock().context("Herdr open is still in progress")?;
-            launch_locks.push(file);
-        }
-        crate::daemon::verify_owner(&runtime)?;
-        ensure!(
-            crate::keeper::status(&runtime)?["alive"] == false,
-            "stop the native Keeper before namespace retirement"
-        );
-        let _authority = Store::open(&runtime)?;
-        crate::daemon::verify_owner(&runtime)?;
-        let store = Store::open(&state)?;
-        let record = store
-            .json(RECORD)?
-            .context("namespace disappeared during retirement")?;
-        validate_record(&record, &plan, &signature)?;
-        return Controller {
-            store,
-            request,
-            plan,
-            record,
-        }
-        .retire();
+        return retire_layout(request, plan, signature, false);
     }
     if action == "inspect" {
         let record = match std::fs::File::open(state.join(RECORD)) {
@@ -1003,6 +1138,9 @@ pub fn execute(request: &Value) -> Result<Value> {
         );
     }
     let mut store = Store::open(&state)?;
+    if action == "prepare" {
+        crate::herdr_open::record_preparation(&mut store, request)?;
+    }
     let record = if let Some(record) = store.json(RECORD)? {
         validate_record(&record, &plan, &signature)?;
         ensure!(

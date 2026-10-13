@@ -69,7 +69,20 @@ pub(crate) fn unlinked(path: &Path) -> Result<()> {
 }
 pub(crate) fn load(path: &Path) -> Result<Option<Value>> {
     unlinked(path)?;
-    match fs::read(path) {
+    let deadline = Instant::now() + Duration::from_millis(200);
+    let bytes = loop {
+        match fs::read(path) {
+            Err(error)
+                if cfg!(windows)
+                    && matches!(error.raw_os_error(), Some(5 | 32 | 33))
+                    && Instant::now() < deadline =>
+            {
+                std::thread::sleep(Duration::from_millis(5))
+            }
+            result => break result,
+        }
+    };
+    match bytes {
         Ok(bytes) => Ok(Some(serde_json::from_slice(&bytes)?)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(e.into()),
@@ -84,7 +97,8 @@ pub(crate) fn save(path: &Path, value: &Value) -> Result<()> {
         .open(&temporary)?;
     file.write_all(&serde_json::to_vec(value)?)?;
     file.sync_all()?;
-    fs::rename(temporary, path)?;
+    drop(file);
+    crate::store::replace_file(&temporary, path)?;
     Ok(())
 }
 pub(crate) fn ping(root: &Path, project: &Value, fingerprint: &str) -> Result<Option<Value>> {

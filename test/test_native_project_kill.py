@@ -1,11 +1,14 @@
 """Public project shutdown preserves state and retires only owned Herdr topology."""
 import json
 import os
+import subprocess
+import sys
 import pytest
 from test_native_cli_security import cli
 from test_native_keeper import start,stop,status,wait_for
 from test_native_herdr_open import project
 from test_native_herdr_namespace import setup,server,mutate_count,fault
+from test_native_herdr_namespace import run as namespace_run
 
 pytestmark=pytest.mark.skipif(os.name!='nt',reason='Windows native project lifecycle')
 
@@ -106,3 +109,37 @@ def test_another_project_runtime_is_rejected_before_stop(tmp_path):
         assert status(root)['alive'] and cli('--state-root',root,'ping').returncode==0
         assert not (root/'kernel/native-keeper-stop.json').exists()
     finally:stop(root)
+
+def test_kill_pre_backend_namespace_closes_once_and_preserves_other_workspaces(setup):
+    project,backend,request=setup
+    ns=namespace_run(request)['namespace'];before=server(backend)
+    result=cli('kill',cwd=project,timeout=25)
+    assert result.returncode==0,result.stderr
+    assert json.loads(result.stdout)['status']=='closed'
+    assert not (project/'.ccb/ccbd/configuration.json').exists()
+    assert server(backend)['workspaces']=={'external':before['workspaces']['external']}
+    assert cli('kill',cwd=project,timeout=25).returncode==0
+    assert mutate_count(backend,['workspace','close'])==1
+    assert ns['workspace_id'] not in server(backend)['workspaces']
+
+@pytest.mark.parametrize('change',['extra-pane','foreign-owner'])
+def test_pre_backend_kill_refuses_unowned_live_contents(setup,change):
+    project,backend,request=setup;ns=namespace_run(request)['namespace'];state=server(backend)
+    if change=='extra-pane':state['panes']['foreign']={'pane_id':'foreign','workspace_id':ns['workspace_id'],'tokens':{}}
+    else:state['workspaces'][ns['workspace_id']]['tokens']['ccb_native_owner']='foreign'
+    (backend/'server.json').write_text(json.dumps(state))
+    result=cli('kill',cwd=project,timeout=25)
+    assert result.returncode!=0 and mutate_count(backend,['workspace','close'])==0
+
+def test_closed_pre_backend_namespace_reopens_only_via_public_open_intent(setup):
+    project,backend,request=setup;ns=namespace_run(request)['namespace']
+    result=cli('kill',cwd=project,timeout=25);assert result.returncode==0,result.stderr
+    assert namespace_run({**request,'action':'inspect'})['namespace']['status']=='retired'
+
+def test_missing_initial_authority_is_not_reconstructed(setup):
+    project,backend,request=setup
+    namespace_run(request)
+    (project/'.ccb/ccbd/herdr/open-configuration.json').unlink()
+    result=cli('kill',cwd=project,timeout=25)
+    assert result.returncode!=0 and 'refusing to reconstruct' in result.stderr
+    assert mutate_count(backend,['workspace','close'])==0

@@ -148,6 +148,17 @@ impl Store {
         if provider_state {
             crate::models::validate_agent(parts[2])?;
         }
+        let partial_archive = parts.len() == 3
+            && parts[0] == "archived-partial"
+            && ["namespace.json", "agents.json"].contains(&parts[2]);
+        if partial_archive {
+            uuid::Uuid::parse_str(parts[1])?;
+        }
+        let launch_receipt =
+            parts.len() == 2 && parts[0] == "launches" && parts[1].ends_with(".json");
+        if launch_receipt {
+            uuid::Uuid::parse_str(parts[1].strip_suffix(".json").unwrap())?;
+        }
         ensure!(
             relative.starts_with("mailboxes/")
                 || relative.starts_with("leases/")
@@ -156,6 +167,8 @@ impl Store {
                 || stream
                 || artifact
                 || provider_state
+                || partial_archive
+                || launch_receipt
                 || [
                     "lease.json",
                     "lifecycle.json",
@@ -165,6 +178,7 @@ impl Store {
                     "herdr-agents.json",
                     "herdr-open.json",
                     "herdr-open-start.json",
+                    "open-configuration.json",
                     "herdr-recovery.json",
                     "herdr-recoveries.jsonl",
                     "herdr-attachments.jsonl",
@@ -547,6 +561,22 @@ impl Store {
         }
     }
 }
+pub(crate) fn replace_file(temp: &Path, path: &Path) -> Result<()> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
+    loop {
+        match fs::rename(temp, path) {
+            Ok(()) => return Ok(()),
+            Err(error)
+                if cfg!(windows)
+                    && matches!(error.raw_os_error(), Some(5 | 32 | 33))
+                    && std::time::Instant::now() < deadline =>
+            {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+}
 fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     fs::create_dir_all(path.parent().unwrap())?;
     let temp = path.with_extension("kernel-tmp");
@@ -560,7 +590,7 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     file.write_all(bytes)?;
     file.sync_all()?;
     drop(file);
-    fs::rename(&temp, path)?;
+    replace_file(&temp, path)?;
     sync_parent(path)
 }
 fn reject_link(path: &Path) -> Result<()> {
@@ -592,6 +622,26 @@ fn sync_parent(path: &Path) -> Result<()> {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[cfg(windows)]
+    #[test]
+    fn atomic_replacement_waits_for_a_reader_without_delete_sharing() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("state.json");
+        atomic_write(&path, b"old").unwrap();
+        let reader = OpenOptions::new()
+            .read(true)
+            .share_mode(3)
+            .open(&path)
+            .unwrap();
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            drop(reader);
+        });
+        atomic_write(&path, b"new").unwrap();
+        release.join().unwrap();
+        assert_eq!(fs::read(path).unwrap(), b"new");
+    }
     #[test]
     fn followup_history_replacement_recovers_before_and_after_publication() {
         for applied in [false, true] {

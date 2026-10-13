@@ -161,6 +161,21 @@ pub fn execute(request: &Value) -> Result<Value> {
         request["expect_json"].is_boolean(),
         "Herdr expect_json must be boolean"
     );
+    if !request["cancel_control"].is_null() {
+        let path =
+            std::path::Path::new(crate::records::string(&request["cancel_control"], "path")?);
+        ensure!(
+            path.is_absolute()
+                && path
+                    .file_name()
+                    .is_some_and(|name| name == "open-cancel.json"),
+            "invalid startup cancellation path"
+        );
+        uuid::Uuid::parse_str(crate::records::string(
+            &request["cancel_control"],
+            "instance",
+        )?)?;
+    }
     let mut process = Command::new(&command[0]);
     process
         .args(&command[1..])
@@ -211,6 +226,21 @@ pub fn execute(request: &Value) -> Result<Value> {
         }
         if failure.is_some() {
             break;
+        }
+        if let Some(path) = request["cancel_control"]["path"].as_str() {
+            let path = std::path::Path::new(path);
+            ensure!(
+                path.is_absolute(),
+                "startup cancellation path must be absolute"
+            );
+            if let Some(receipt) = crate::startup::load(path)? {
+                if !request["cancel_control"]["instance"].is_null()
+                    && receipt["instance"] == request["cancel_control"]["instance"]
+                {
+                    failure = Some("startup_cancelled");
+                    break;
+                }
+            }
         }
         if exit.is_none() {
             exit = child.try_wait()?;

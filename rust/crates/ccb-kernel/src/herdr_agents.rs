@@ -37,6 +37,13 @@ fn contract(name: &str, value: &Value) -> Result<()> {
 fn hash(value: &Value) -> Result<String> {
     Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(value)?)))
 }
+fn launch_acknowledged(result: &Result<Value>, row: &Value) -> bool {
+    result.as_ref().is_ok_and(|a| {
+        a["agent"]["name"] == row["herdr_name"]
+            && a["agent"]["pane_id"] == row["pane_id"]
+            && a["agent"]["terminal_id"] == row["terminal_id"]
+    })
+}
 fn pi_hook_ready(agent: &Value) -> bool {
     agent["agent"] == "pi"
         && agent["interactive_ready"].is_null()
@@ -116,7 +123,7 @@ fn plan(request: &Value) -> Result<Value> {
 pub(crate) fn rpc(request: &Value, arguments: Vec<String>) -> Result<Value> {
     let response = herdr_transport::execute(
         &json!({"schema_version":1,"operation":"agent_mount","command":request["command"],
-        "session":request["session"],"args":arguments,"expect_json":true,"timeout_ms":request["timeout_ms"].as_u64().unwrap_or(10000)}),
+        "session":request["session"],"args":arguments,"cancel_control":request["cancel_control"],"expect_json":true,"timeout_ms":request["timeout_ms"].as_u64().unwrap_or(10000)}),
     )?;
     ensure!(
         response["ok"] == true,
@@ -299,7 +306,11 @@ impl Manager<'_> {
                 row["binding"].is_null(),
                 "bound Herdr agent lost its detected identity"
             );
-            return Ok(json!({"status":"starting"}));
+            return Ok(if agent["agent_status"] == "blocked" {
+                json!({"status":"blocked","observed_lifecycle":"blocked","interactive_ready":false})
+            } else {
+                json!({"status":"starting"})
+            });
         }
         ensure!(
             agent["agent"] == self.plan["agents"][name]["provider"],
@@ -598,6 +609,7 @@ impl Manager<'_> {
                 "plan":self.plan,"plan_hash":hash(&self.plan)?,"protocol":snapshot["protocol"],"agents":rows});
             self.save()?;
         }
+        let mut launches = Vec::new();
         for name in &names {
             if mount && self.sync_host_display(name)? {
                 continue;
@@ -703,21 +715,61 @@ impl Manager<'_> {
                     arguments.extend(native);
                 }
                 let mut request = self.request.clone();
-                if native_pi {
-                    request["timeout_ms"] = json!(timeout + 1000);
+                if native_pi || self.request["cancel_control"].is_object() {
+                    request["timeout_ms"] = json!((timeout + 1000).min(60000));
                 }
-                let acknowledgement = rpc(&request, arguments);
-                let acknowledged = acknowledgement.as_ref().is_ok_and(|a| {
-                    a["agent"]["name"] == row["herdr_name"]
-                        && a["agent"]["pane_id"] == row["pane_id"]
-                        && a["agent"]["terminal_id"] == row["terminal_id"]
+                if self.request["cancel_control"].is_object() {
+                    launches.push((name.clone(), request, arguments));
+                } else {
+                    let acknowledgement = rpc(&request, arguments);
+                    let acknowledged =
+                        launch_acknowledged(&acknowledgement, &self.record["agents"][name]);
+                    self.record["agents"][name]["launch_acknowledged"] = json!(acknowledged);
+                    self.save()?;
+                    self.refresh(name, true)?;
+                }
+            }
+        }
+        if mount && self.request["cancel_control"].is_object() {
+            // The opener remains alive to observe these one-shot operations.
+            // Persisted sent intents prevent replay if the opener later exits.
+            for (name, request, arguments) in launches {
+                let row = self.record["agents"][&name].clone();
+                let path = self
+                    .store
+                    .as_ref()
+                    .context("startup launch requires its namespace writer")?
+                    .owned_path(&format!("launches/{}.json", text(&row, "operation_id")?))?;
+                herdr_namespace::unlinked(path.parent().unwrap())?;
+                std::fs::create_dir_all(path.parent().unwrap())?;
+                std::thread::spawn(move || {
+                    let result = rpc(&request, arguments);
+                    let receipt = json!({"schema_version":1,"operation_id":row["operation_id"],"acknowledged":launch_acknowledged(&result, &row)});
+                    let _ = (|| -> Result<()> {
+                        herdr_namespace::unlinked(&path)?;
+                        let mut file = tempfile::NamedTempFile::new_in(path.parent().unwrap())?;
+                        serde_json::to_writer(&mut file, &receipt)?;
+                        file.as_file().sync_all()?;
+                        file.persist(path)?;
+                        Ok(())
+                    })();
                 });
-                self.record["agents"][name]["launch_acknowledged"] = json!(acknowledged);
-                self.save()?;
-                // A timeout/error can mean Herdr already started the provider.
-                // Only a fresh unique-name and process-identity observation can
-                // bind it. Absence never authorizes a second launch request.
-                self.refresh(name, true)?;
+            }
+            for name in &names {
+                let row = &self.record["agents"][name];
+                let path = self
+                    .store
+                    .as_ref()
+                    .context("startup observation requires its namespace writer")?
+                    .owned_path(&format!("launches/{}.json", text(row, "operation_id")?))?;
+                if let Some(receipt) = crate::startup::load(&path)? {
+                    ensure!(
+                        receipt["operation_id"] == row["operation_id"],
+                        "agent launch observation identity changed"
+                    );
+                    self.record["agents"][name]["launch_acknowledged"] =
+                        receipt["acknowledged"].clone();
+                }
             }
         }
         let rows = self.record["agents"].as_object().unwrap();

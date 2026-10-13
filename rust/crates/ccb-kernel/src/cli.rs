@@ -160,7 +160,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         println!("ccb-native [--project <directory>] trace <submission|message|attempt|reply|job ID> [--limit <1..1000>] [--offset <n>]");
         println!("ccb-native codex-tui-attach <host-directory> (experimental native Codex TUI)");
         println!("ccb-native [--project <dir>] worktree inspect|merge|retire <agent> [--into <branch>] [--operation-id <uuid>] [--dry-run]\nccb-native [--project <dir>] worktree recover|status|restore|purge <operation-id> [--into <branch>] [--delete-branch] [--operation-id <uuid>] [--dry-run]\nMutations require a stopped native runtime and resolved jobs/replies. Retire preserves the entire checkout in an archive; purge refuses remaining user files.");
-        println!("ccb-native [--project <directory>] herdr open [--herdr-exe <path>] [--session <name>] [--options <json>] [--no-attach] [--timeout-ms <0..60000>] [--dry-run] [--recover-stopped]");
+        println!("ccb-native [--project <directory>] herdr open [--herdr-exe <path>] [--session <name>] [--options <json>] [--no-attach] [--timeout-ms <0..60000>] [--startup-timeout-ms <1000..600000>] [--dry-run] [--recover-stopped]\nForeground observation defaults to 10 seconds; the independent background startup budget defaults to 60 seconds.");
         println!("ccb-native --state-root <dir> clear|compact [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> context-status <operation-id>");
         println!("ccb-native --state-root <dir> restart [agent|role...|all] [--dry-run] [--operation-id <uuid>] [--wait --timeout-ms <ms>]\nccb-native --state-root <dir> restart-status [operation-id]");
         return Ok(());
@@ -575,6 +575,10 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
                 "--session" | "--herdr-session" => {
                     index += 1;
                     options["session"] = json!(arg(&args, index)?);
+                }
+                "--startup-timeout-ms" => {
+                    index += 1;
+                    options["startup_timeout_ms"] = json!(arg(&args, index)?.parse::<u64>()?);
                 }
                 "--timeout-ms" => {
                     index += 1;

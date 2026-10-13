@@ -9,8 +9,104 @@ use std::{
     time::{Duration, Instant},
 };
 const RECORD: &str = "herdr-open.json";
+const STARTUP_CONFIG: &str = "open-configuration.json";
+
+fn cancelled(root: &Path, instance: &Value) -> Result<bool> {
+    let intent = read(root, "open-cancel.json")?.unwrap_or(Value::Null);
+    Ok(!instance.is_null()
+        && intent["instance"] == *instance
+        && intent["process"]["pid"] == std::process::id())
+}
+
+pub(crate) fn cancel_start(runtime: &Path, project: Option<&Path>) -> Result<Option<Value>> {
+    let root = runtime.join("herdr");
+    if !root.exists() {
+        return Ok(None);
+    }
+    let path = root.join("native-open-launch.lock");
+    crate::herdr_namespace::unlinked(&path)?;
+    let lock = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(path)?;
+    lock.try_lock()
+        .context("another Herdr launch request is being recorded")?;
+    let Some(intent) = read(&root, "herdr-open-start.json")? else {
+        return Ok(None);
+    };
+    if intent["status"] != "opening" {
+        return Ok(None);
+    }
+    if let Some(project) = project {
+        ensure!(
+            intent["project_id"] == crate::config::project_id(project)?,
+            "Herdr opener belongs to another project or lacks startup ownership"
+        );
+    }
+    if !crate::startup::owner_alive(
+        &json!({"pid":intent["process"]["pid"],"process":intent["process"]}),
+    )? {
+        return Ok(None);
+    }
+    // The namespace controller holds its writer across bounded Herdr RPCs.
+    // A cancellation request must reach it without acquiring that writer.
+    let path = root.join("open-cancel.json");
+    crate::herdr_namespace::unlinked(&path)?;
+    let mut file = tempfile::NamedTempFile::new_in(&root)?;
+    serde_json::to_writer(
+        &mut file,
+        &json!({"schema_version":1,"project_id":intent["project_id"],"instance":intent["instance"],"process":intent["process"]}),
+    )?;
+    file.as_file().sync_all()?;
+    file.persist(path)?;
+    Ok(Some(intent["process"].clone()))
+}
+
+pub(crate) fn prepared_configuration(runtime: &Path) -> Result<Option<Value>> {
+    read(&runtime.join("herdr"), STARTUP_CONFIG)?
+        .map(|record| crate::restart_config::restore(&record))
+        .transpose()
+}
+pub(crate) fn record_preparation(store: &mut crate::store::Store, request: &Value) -> Result<()> {
+    if !cfg!(windows) {
+        return Ok(());
+    }
+    let mut config = request["config"].clone();
+    let mut mounted = request.clone();
+    mounted["action"] = json!("mount");
+    config["herdr"] = mounted;
+    let fingerprint = crate::config::fingerprint(&config)?;
+    if let Some(prior) = store.json(STARTUP_CONFIG)? {
+        if prior["config_fingerprint"] == fingerprint {
+            return Ok(());
+        }
+        ensure!(
+            store
+                .json("namespace.json")?
+                .is_none_or(|n| n["status"] == "retired"),
+            "startup ownership configuration changed while its namespace exists"
+        );
+    }
+    store.save(
+        STARTUP_CONFIG,
+        &json!({"schema_version":1,"record_type":"native_configuration",
+        "project_id":config["project_id"],"config_fingerprint":fingerprint,
+        "restart_checkpoint":crate::restart_config::seal(&config)?}),
+    )?;
+    store.commit()
+}
 fn hosted(spec: &Value) -> bool {
     spec["provider"] == "codex" && !spec["tui_host_root"].is_null()
+}
+fn readiness(config: &Value, record: &Value) -> Value {
+    config["agents"].as_object().unwrap().iter().map(|(name, spec)| {
+        let row = &record["agents"][name];
+        let mounted = record["daemon_agents"].as_array().is_some_and(|agents| agents.contains(&json!(name)));
+        let interface = if row["observed_lifecycle"] == "blocked" { "waiting_input" } else if row["interactive_ready"] == true { "ready" } else if row["sent"] != true { "not_started" } else { "starting" };
+        (name.clone(),json!({"provider":spec["provider"],"startup_state":row["status"],"backend_mounted":mounted,"interface_state":interface,"interactive_ready":row["interactive_ready"]==true}))
+    }).collect::<serde_json::Map<String,Value>>().into()
 }
 #[path = "herdr_recovery.rs"]
 mod recovery;
@@ -516,6 +612,7 @@ fn restart_stopped_backend(
     let specs = request["config"]["agents"].as_object().unwrap();
     if !specs.values().any(hosted)
         || record["daemon"].is_null()
+        || record["daemon"]["status"] != "running"
         || !record["daemon_fingerprint"].is_string()
         || record["bindings"].as_object().unwrap().len() != specs.len()
     {
@@ -528,6 +625,9 @@ fn restart_stopped_backend(
     let Some(lease) = read(&runtime, "lease.json")? else {
         return Ok(());
     };
+    if record["daemon"]["pid"] != lease["ccbd_pid"] {
+        return Ok(());
+    }
     let pid = lease["ccbd_pid"]
         .as_u64()
         .filter(|p| *p > 0 && *p <= u32::MAX as u64)
@@ -584,6 +684,10 @@ fn restart_stopped_backend(
 fn daemon_configuration(request: &Value, record: &Value) -> Value {
     let mut daemon = request["config"].clone();
     daemon["herdr"] = request.clone();
+    daemon["agents"]
+        .as_object_mut()
+        .unwrap()
+        .retain(|name, spec| hosted(spec) || !record["bindings"][name].is_null());
     for (name, spec) in daemon["agents"].as_object_mut().unwrap() {
         if hosted(spec) {
             continue;
@@ -601,11 +705,115 @@ fn daemon_configuration(request: &Value, record: &Value) -> Value {
     daemon
 }
 
+fn sync_daemon(request: &Value, root: &Path, record: &mut Value, wait: Duration) -> Result<bool> {
+    let daemon = daemon_configuration(request, record);
+    if record["daemon"].is_null()
+        && read(root, "herdr-recovery.json")?.is_some_and(|r| r["phase"] != "complete")
+    {
+        // Restore every previously mounted actor before transferring durable
+        // work. Agents which never mounted do not hold a restored host back.
+        let runtime =
+            crate::config::state_root(Path::new(crate::records::string(&daemon, "project_root")?))?;
+        let prior = crate::restart_config::load(&runtime)?;
+        if prior["agents"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .any(|name| daemon["agents"].get(name).is_none())
+        {
+            return Ok(false);
+        }
+    }
+    if daemon["agents"].as_object().unwrap().is_empty() {
+        return Ok(false);
+    }
+    let runtime =
+        crate::config::state_root(Path::new(crate::records::string(&daemon, "project_root")?))?;
+    let desired = json!(crate::config::fingerprint(&daemon)?);
+    if record["daemon"].is_null() {
+        record["daemon_agents"] = json!(daemon["agents"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .collect::<Vec<_>>());
+        record["daemon_fingerprint"] = desired.clone();
+        save(root, record)?;
+        recovery::authorize_start(&runtime, root, record, &daemon)?;
+        record["daemon"] =
+            crate::startup::start(&runtime, daemon, wait.min(Duration::from_millis(250)))?;
+        save(root, record)?;
+        return Ok(record["daemon"]["status"] == "running");
+    }
+    if record["daemon"]["status"] != "running" {
+        let mut pending = daemon.clone();
+        pending["agents"]
+            .as_object_mut()
+            .unwrap()
+            .retain(|name, _| {
+                record["daemon_agents"]
+                    .as_array()
+                    .is_some_and(|names| names.contains(&json!(name)))
+            });
+        record["daemon"] =
+            crate::startup::start(&runtime, pending, wait.min(Duration::from_millis(250)))?;
+        if record["daemon"]["status"] != "running" {
+            return Ok(false);
+        }
+    }
+    if record["daemon_fingerprint"] == desired {
+        record["daemon"] =
+            crate::startup::start(&runtime, daemon, wait.min(Duration::from_millis(250)))?;
+        return Ok(record["daemon"]["status"] == "running");
+    }
+    // Only add newly bound agents. Keep the existing host and its tasks intact.
+    if !record["binding_reload"].is_null() {
+        let state = crate::cli::request(&runtime, "reload-status", json!({}))?["reload"].clone();
+        ensure!(
+            state["operation_id"] == record["binding_reload"]["operation_id"],
+            "startup binding reload was superseded"
+        );
+        if state["status"] == "applied" {
+            record["daemon_fingerprint"] = state["desired_fingerprint"].clone();
+            record["daemon_agents"] = record["binding_reload"]["agent_names"].clone();
+            record["binding_reload"] = Value::Null;
+            save(root, record)?;
+        } else {
+            ensure!(
+                ["waiting_for_idle", "preparing", "retiring"]
+                    .contains(&state["status"].as_str().unwrap_or("")),
+                "startup binding reload failed: {}",
+                state["status"]
+            );
+            return Ok(false);
+        }
+    }
+    if record["daemon_fingerprint"] == desired {
+        return Ok(true);
+    }
+    let state = crate::cli::request(&runtime, "reload", json!({"config":daemon,"when_idle":true,"expected_fingerprint":record["daemon_fingerprint"]}))?["reload"].clone();
+    if state["status"] == "unchanged" {
+        record["daemon_fingerprint"] = desired;
+    } else {
+        record["binding_reload"] = state;
+        record["binding_reload"]["agent_names"] = json!(daemon_configuration(request, record)
+            ["agents"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .collect::<Vec<_>>());
+    }
+    save(root, record)?;
+    Ok(false)
+}
+
 fn retain_inherited_paths(runtime: &Path, source: &Value, request: &mut Value) -> Result<()> {
-    let Some(committed) = read(runtime, "configuration.json")? else {
+    let prior = if let Some(committed) = read(runtime, "configuration.json")? {
+        crate::restart_config::restore(&committed)?
+    } else if let Some(prepared) = prepared_configuration(runtime)? {
+        prepared
+    } else {
         return Ok(());
     };
-    let prior = crate::restart_config::restore(&committed)?;
     if prior["project_id"] != source["project_id"] || !prior["herdr"].is_object() {
         return Ok(());
     }
@@ -746,6 +954,20 @@ pub(crate) fn open(
             && record["request_hash"] == signature,
         "Herdr open configuration changed; explicit migration is required"
     );
+    if crate::herdr_namespace::reopen_pre_backend(&request)? {
+        record["bindings"] = json!({});
+        record["session_reports"] = Value::Null;
+        record["daemon"] = Value::Null;
+        record["daemon_fingerprint"] = Value::Null;
+        record["daemon_agents"] = Value::Null;
+        record["binding_reload"] = Value::Null;
+        record["phase"] = json!("opening");
+        save(&root, &record)?;
+    }
+    {
+        let mut store = crate::store::Store::open(&root)?;
+        record_preparation(&mut store, &request)?;
+    }
     if record["observer_instance"] != options["opener_instance"] {
         record["observer_instance"] = options["opener_instance"].clone();
         record["phase"] = json!("opening");
@@ -753,6 +975,11 @@ pub(crate) fn open(
     }
     let deadline = Instant::now() + wait;
     loop {
+        if cancelled(&root, &options["opener_instance"])? {
+            record["phase"] = json!("cancelled");
+            save(&root, &record)?;
+            break;
+        }
         if !recovery::step(
             project,
             &config,
@@ -772,6 +999,10 @@ pub(crate) fn open(
         if !server(&request, &root, &mut record)? {
             record["phase"] = json!("server_starting");
         } else {
+            {
+                let mut store = crate::store::Store::open(&root)?;
+                record_preparation(&mut store, &request)?;
+            }
             crate::workspaces::materialize(&request["config"])?;
             let mut prepare = request.clone();
             prepare["action"] = json!("prepare");
@@ -790,7 +1021,29 @@ pub(crate) fn open(
                     &mut record,
                     deadline.saturating_duration_since(Instant::now()),
                 )?;
-                let mounted = crate::herdr_agents::execute(&request)?["mount"].clone();
+                if cancelled(&root, &options["opener_instance"])? {
+                    continue;
+                }
+                // Hosted providers can initialize before any terminal needs a
+                // trust decision or publishes its session identity.
+                for (name, spec) in request["config"]["agents"].as_object().unwrap() {
+                    if hosted(spec) {
+                        record["bindings"][name] = json!({"native_host":true});
+                    }
+                }
+                sync_daemon(
+                    &request,
+                    &root,
+                    &mut record,
+                    deadline.saturating_duration_since(Instant::now()),
+                )?;
+                if cancelled(&root, &options["opener_instance"])? {
+                    continue;
+                }
+                let mut mount = request.clone();
+                mount["cancel_control"] = json!({"path":root.join("open-cancel.json"),"instance":options["opener_instance"]});
+                let mounted = crate::herdr_agents::execute(&mount)?["mount"].clone();
+                record["agents"] = mounted["agents"].clone();
                 record["phase"] = json!(if mounted["status"] == "ready" {
                     "binding_sessions"
                 } else {
@@ -890,19 +1143,16 @@ pub(crate) fn open(
                             }
                         }
                     }
-                    if record["bindings"].as_object().unwrap().len()
-                        == request["config"]["agents"].as_object().unwrap().len()
-                    {
-                        let daemon = daemon_configuration(&request, &record);
-                        record["daemon_fingerprint"] = json!(crate::config::fingerprint(&daemon)?);
-                        save(&root, &record)?;
-                        recovery::authorize_start(&runtime, &root, &record, &daemon)?;
-                        let started = crate::startup::start(
-                            &runtime,
-                            daemon,
+                    if !cancelled(&root, &options["opener_instance"])? {
+                        let started = sync_daemon(
+                            &request,
+                            &root,
+                            &mut record,
                             deadline.saturating_duration_since(Instant::now()),
                         )?;
-                        record["phase"] = json!(if started["status"] == "running"
+                        record["phase"] = json!(if started
+                            && record["bindings"].as_object().unwrap().len()
+                                == request["config"]["agents"].as_object().unwrap().len()
                             && (!has_host
                                 || request["config"]["agents"]
                                     .as_object()
@@ -912,12 +1162,17 @@ pub(crate) fn open(
                                         || mounted["agents"][name]["status"] == "ready"))
                         {
                             "running"
-                        } else if started["status"] == "running" {
+                        } else if mounted["status"] == "blocked" {
+                            "waiting_input"
+                        } else if started {
                             "native_hosts_starting"
+                        } else if record["daemon"].is_null() && mounted["status"] == "ready" {
+                            "binding_sessions"
+                        } else if record["daemon"].is_null() {
+                            "agents_starting"
                         } else {
                             "daemon_starting"
                         });
-                        record["daemon"] = started;
                     }
                 }
             }
@@ -936,8 +1191,16 @@ pub(crate) fn open(
         }
         std::thread::sleep(Duration::from_millis(250));
     }
+    if record["phase"] != "running"
+        && record["phase"] != "cancelled"
+        && record["phase"] != "namespace_uncertain"
+    {
+        record["last_startup_phase"] = record["phase"].clone();
+        record["phase"] = json!("startup_timed_out");
+        save(&root, &record)?;
+    }
     Ok(
-        json!({"status":record["phase"],"project_id":record["project_id"],"session":record["session"],"workspace_id":record["workspace_id"],"state_root":runtime,"daemon":record["daemon"],"observation_expired":record["phase"]!="running"}),
+        json!({"status":record["phase"],"last_startup_phase":record["last_startup_phase"],"agents":readiness(&config,&record),"project_id":record["project_id"],"session":record["session"],"workspace_id":record["workspace_id"],"state_root":runtime,"daemon":record["daemon"],"observation_expired":record["phase"]!="running"}),
     )
 }
 pub(crate) fn launch(
@@ -951,6 +1214,7 @@ pub(crate) fn launch(
     for (key, valid) in [
         ("dry_run", options["dry_run"].is_boolean()),
         ("recover_stopped", options["recover_stopped"].is_boolean()),
+        ("startup_timeout_ms", options["startup_timeout_ms"].is_u64()),
         ("session", options["session"].is_string()),
         (
             "transport_timeout_ms",
@@ -965,6 +1229,13 @@ pub(crate) fn launch(
             "invalid Herdr option type: {key}"
         );
     }
+    ensure!(
+        options["startup_timeout_ms"].is_null()
+            || options["startup_timeout_ms"]
+                .as_u64()
+                .is_some_and(|ms| (1000..=600000).contains(&ms)),
+        "Herdr background startup budget must be 1000..600000 ms"
+    );
     if options["dry_run"] == true {
         return open(project, config, options, Duration::ZERO);
     }
@@ -988,6 +1259,12 @@ pub(crate) fn launch(
     );
     let request_hash = hash(&json!([project, config, options]))?;
     let prior = read(&root, "herdr-open-start.json")?.unwrap_or(Value::Null);
+    let cancellation = read(&root, "open-cancel.json")?.unwrap_or(Value::Null);
+    let shutdown_requested = prior["cancel_requested"] == true
+        || !prior["instance"].is_null() && cancellation["instance"] == prior["instance"];
+    if shutdown_requested {
+        ensure!(read(&root, "namespace.json")?.is_none_or(|n| n["status"] == "retired"), "Herdr startup cancellation is still closing its namespace; finish ccb kill before reopening");
+    }
     let process = prior["process"].clone();
     let live = process["pid"]
         .as_u64()
@@ -1010,6 +1287,10 @@ pub(crate) fn launch(
         }
         None => false,
     };
+    ensure!(
+        !shutdown_requested || !reusable,
+        "Herdr startup cancellation is still in progress; finish ccb kill before reopening"
+    );
     let intent = if reusable {
         ensure!(
             prior["request_hash"] == request_hash,
@@ -1042,7 +1323,8 @@ pub(crate) fn launch(
         let mut child = child.spawn()?;
         #[cfg(windows)]
         drop(guard);
-        let intent = json!({"schema_version":1,"instance":instance,"request_hash":request_hash,"process":crate::owned_process::observe_external_process(child.id())?,"status":"opening"});
+        let intent = json!({"schema_version":1,"project_id":config["project_id"],"instance":instance,"request_hash":request_hash,"process":crate::owned_process::observe_external_process(child.id())?,"status":"opening",
+            "startup_timeout_ms":options["startup_timeout_ms"].as_u64().unwrap_or(60000)});
         let mut store = crate::store::Store::open(&root)?;
         store.save("herdr-open-start.json", &intent)?;
         store.commit()?;
@@ -1077,7 +1359,7 @@ pub(crate) fn launch(
                 .filter(|r| r["observer_instance"] == intent["instance"])
                 .unwrap_or(Value::Null);
             return Ok(
-                json!({"status":record["phase"].as_str().unwrap_or("opening"),"session":record["session"],"workspace_id":record["workspace_id"],"state_root":runtime,"opener":intent["process"],"observation_expired":true}),
+                json!({"status":record["phase"].as_str().unwrap_or("opening"),"agents":readiness(&config,&record),"daemon":record["daemon"],"session":record["session"],"workspace_id":record["workspace_id"],"state_root":runtime,"opener":intent["process"],"observation_expired":true}),
             );
         }
         if crate::daemon::owner_stopped(intent["process"]["pid"].as_u64().unwrap() as u32) {
@@ -1097,7 +1379,7 @@ pub(crate) fn worker(envelope: &Value) -> Result<()> {
         project,
         envelope["config"].clone(),
         &options,
-        Duration::from_secs(60),
+        Duration::from_millis(options["startup_timeout_ms"].as_u64().unwrap_or(60000)),
     );
     let mut store = crate::store::Store::open(&root)?;
     let mut state = store
@@ -1110,6 +1392,9 @@ pub(crate) fn worker(envelope: &Value) -> Result<()> {
     match outcome {
         Ok(result) => {
             state["status"] = json!("finished");
+            if result["status"] == "cancelled" {
+                state["cancel_requested"] = json!(true);
+            }
             state["result"] = result;
         }
         Err(error) => {

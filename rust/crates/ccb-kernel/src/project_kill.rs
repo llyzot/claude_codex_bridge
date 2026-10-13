@@ -35,6 +35,17 @@ pub(crate) fn execute(root: &Path, project: Option<&Path>, timeout: Duration) ->
         "native project kill currently requires Windows process identities"
     );
     crate::startup::unlinked(root)?;
+    let deadline = Instant::now() + timeout;
+    if let Some(process) = crate::herdr_open::cancel_start(root, project)? {
+        while crate::startup::owner_alive(&json!({"pid":process["pid"],"process":process}))? {
+            if Instant::now() >= deadline {
+                return Ok(
+                    json!({"status":"stopping","startup_cancel_requested":true,"observation_expired":true}),
+                );
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+    }
     if let Some(project) = project {
         let expected = crate::config::project_id(project)?;
         for record in [
@@ -64,7 +75,6 @@ pub(crate) fn execute(root: &Path, project: Option<&Path>, timeout: Duration) ->
     if (daemon_live || keeper_live) && crate::keeper::stop(root)?.is_none() && daemon_live {
         crate::cli::request(root, "shutdown", json!({}))?;
     }
-    let deadline = Instant::now() + timeout;
     loop {
         let daemon_live = live_daemon(root)?;
         let keeper_live = crate::keeper::status(root)?["alive"] == true;
@@ -86,7 +96,13 @@ pub(crate) fn execute(root: &Path, project: Option<&Path>, timeout: Duration) ->
     // Do not rebuild a request from edited/missing ccb.config or expose the
     // protected launch environment. The original committed request owns this
     // namespace; retirement rechecks its plan and all live ownership metadata.
-    let config = crate::restart_config::load(root)?;
+    let initial = !checkpoint;
+    let config = match crate::herdr_open::prepared_configuration(root)? {
+        Some(config) => Some(config),
+        None if checkpoint => Some(crate::restart_config::load(root)?),
+        None => None,
+    };
+    let config = config.context("initial startup ownership configuration is missing; refusing to reconstruct it from the current environment")?;
     let project = Path::new(crate::records::string(&config, "project_root")?);
     ensure!(
         crate::config::state_root(project)?.canonicalize()? == root.canonicalize()?,
@@ -98,7 +114,14 @@ pub(crate) fn execute(root: &Path, project: Option<&Path>, timeout: Duration) ->
         .context("namespace has no committed Herdr request; explicit recovery is required")?
         .clone();
     request["action"] = json!("retire");
-    let result = crate::herdr_namespace::execute(&request)?;
+    let result = if initial {
+        crate::herdr_namespace::retire_initial(&request)?
+    } else {
+        crate::herdr_namespace::execute(&request)?
+    };
+    closed_result(result)
+}
+fn closed_result(result: Value) -> Result<Value> {
     let retired = result["namespace"]["status"] == "retired";
     Ok(json!({"status":if retired {"closed"} else {"closing"},
         "daemon_stopped":true,"keeper_stopped":true,"namespace_status":result["namespace"]["status"],

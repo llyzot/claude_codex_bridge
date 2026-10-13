@@ -20,6 +20,13 @@ pytestmark=pytest.mark.skipif(os.name!='nt' or not NODE,reason='Windows original
 
 def cli(*args,timeout=20,**kwargs):
     return subprocess.run([str(BIN),*map(str,args)],capture_output=True,text=True,encoding='utf-8',timeout=timeout,**kwargs)
+
+def read(path):
+    for attempt in range(11):
+        try:return json.loads(path.read_text(encoding='utf-8'))
+        except (PermissionError,FileNotFoundError):
+            if attempt==10:raise
+            time.sleep(.02)
 def owned_stop(identity):
     if not identity:return
     observed=cli('process-identity',identity['pid'])
@@ -54,7 +61,7 @@ def project(setup):
     def command(**data):
         pi.stdin.write(json.dumps(data)+'\n');pi.stdin.flush();line=pi.stdout.readline();assert line,pi.stderr.read();return json.loads(line)
     def idle(name):
-        ledger=json.loads((native_root/'herdr/herdr-agents.json').read_text(encoding='utf-8'))
+        ledger=read(native_root/'herdr/herdr-agents.json')
         change(backend,lambda s:s['agents'][ledger['agents'][name]['herdr_name']].update(agent_status='idle',interactive_ready=True))
     yield dict(root=root,backend=backend,options=options,file=file,native=native_root,open=open,ready=ready,pi=pi,codex=codex,session=session,log=log,prompts=prompts,command=command,idle=idle)
     start=native_root/'herdr/herdr-open-start.json'
@@ -70,7 +77,7 @@ def test_cold_open_composes_server_agents_binding_daemon_and_same_pi_lead_review
     p=project;opened=p['open']();assert opened.returncode==0,opened.stderr
     wait_for(p['ready'],timeout=20)
     root=p['native'];first=p['ready']()
-    server_identity=json.loads((root/'herdr/herdr-open.json').read_text(encoding='utf-8'))['server_process']
+    server_identity=read(root/'herdr/herdr-open.json')['server_process']
     assert json.loads(cli('process-identity',server_identity['pid']).stdout)==server_identity
     assert mutate_count(p['backend'],['agent','start'])==2
     asked=cli('--state-root',root,'ask','lead','initial task');assert asked.returncode==0,asked.stderr
@@ -102,17 +109,60 @@ def test_open_mounts_pi_before_native_codex_host_then_attaches_without_prompt_in
     change(p['backend'],lambda s:s.update(shell_name='pwsh.exe'))
     if lost_ack:fault(p['backend'],['pane','run'],'after-error')
     result=p['open']();assert result.returncode==0,result.stderr
-    wait_for(lambda:json.loads((p['native']/'herdr/herdr-open.json').read_text(encoding='utf-8'))['phase']=='running',timeout=20)
+    wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=20)
     assert mutate_count(p['backend'],['agent','start'])==1
     assert mutate_count(p['backend'],['pane','run'])==1
 
     assert mutate_count(p['backend'],['agent','rename'])==1
     assert not p['prompts']()
-    session=json.loads((p['native']/'providers/codex/worker/session.json').read_text(encoding='utf-8'))
+    session=read(p['native']/'providers/codex/worker/session.json')
     assert session['state']['tui_host']['input_transport']=='authenticated_websocket'
     assert Path(session['state']['path']).is_file(), 'Empty native thread must be resumable without a model warm-up'
     assert p['open']().returncode==0
     assert mutate_count(p['backend'],['pane','run'])==1
+
+def test_host_starts_while_pi_waits_and_later_binding_keeps_same_host(project):
+    from test_native_codex_tui_host import CODEX
+    if not CODEX.exists():pytest.skip('Installed Codex required for no-model host initialization')
+    p=project;home=p['root']/'empty-codex-home';home.mkdir()
+    worker=p['options']['config']['agents']['worker']
+    worker.update(command=[str(CODEX),'app-server','--stdio'],driver_kind='codex_app_server',profile_family='protocol_turn',
+                  tui_host_root=str(p['root']/'native-hosts'),thread_options={},env={'CODEX_HOME':str(home)})
+    p['options']['startup_timeout_ms']=120000
+    p['file'].write_text(json.dumps(p['options']),encoding='utf-8')
+    change(p['backend'],lambda s:s.update(shell_name='pwsh.exe',start_status='blocked'))
+    result=p['open'](200);assert result.returncode==0,result.stderr
+    wait_for(lambda:mutate_count(p['backend'],['pane','run'])==1,timeout=35)
+    wait_for(lambda:(lambda rows:rows.get('worker',{}).get('status')=='ready' and rows.get('lead',{}).get('status')=='blocked')(read(p['native']/'herdr/herdr-open.json').get('agents',{})),timeout=15)
+    status=json.loads(cli('--state-root',p['native'],'ping','worker').stdout)
+    assert status['ok'] and status['diagnostics']['driver_kind']=='codex_app_server'
+    opened=read(p['native']/'herdr/herdr-open.json')
+    assert 'lead' not in opened['bindings']
+    assert opened['agents']['lead']['status']=='blocked'
+    initial=read(p['native']/'providers/codex/worker/session.json')
+    before=read(p['native']/'lease.json')['process']
+    p['idle']('lead')
+    wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=45)
+    after=read(p['native']/'providers/codex/worker/session.json')
+    assert after['runtime_instance_id']==initial['runtime_instance_id']
+    assert read(p['native']/'lease.json')['process']==before
+    assert mutate_count(p['backend'],['pane','run'])==1 and not p['prompts']()
+
+
+def test_kill_cancels_an_active_initial_open(project):
+    p=project
+    (p['native']/'pi-terminal-events/lead/current.json').unlink()
+    assert p['open'](0).returncode==0
+    wait_for(lambda:(p['native']/'herdr/namespace.json').exists(),timeout=10)
+    assert (p['native']/'herdr/open-configuration.json').exists()
+    result=cli('--project',p['root'],'kill','--timeout-ms','10000')
+    assert result.returncode==0,result.stderr
+    assert json.loads(result.stdout)['status']=='closed'
+    intent=read(p['native']/'herdr/herdr-open-start.json')
+    assert intent['cancel_requested'] and intent['result']['status']=='cancelled'
+    assert mutate_count(p['backend'],['workspace','close'])==1
+    assert 'external' in server(p['backend'])['workspaces']
+
 
 @pytest.mark.parametrize('root_value,ephemeral',[('relative-host',False),(None,True)])
 def test_invalid_native_host_open_is_rejected_before_mutation(setup,root_value,ephemeral):
@@ -137,8 +187,8 @@ def test_public_open_discovers_programs_and_hosts_codex_without_compiled_options
     p['file'].write_text(json.dumps(p['options']),encoding='utf-8')
     change(p['backend'],lambda s:s.update(shell_name='pwsh.exe'))
     result=p['open']();assert result.returncode==0,result.stderr
-    wait_for(lambda:json.loads((p['native']/'herdr/herdr-open.json').read_text(encoding='utf-8'))['phase']=='running',timeout=20)
-    session=json.loads((p['native']/'providers/codex/worker/session.json').read_text(encoding='utf-8'))
+    wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=20)
+    session=read(p['native']/'providers/codex/worker/session.json')
     assert session['state']['tui_host']['input_transport']=='authenticated_websocket'
     assert Path(session['state']['tui_host']['path']).parent.samefile(p['native']/'herdr/codex-hosts/worker')
     assert mutate_count(p['backend'],['agent','start'])==1
@@ -156,10 +206,60 @@ def test_short_observation_returns_without_restarting_live_opener(project):
     wait_for(p['ready'],timeout=20)
     assert mutate_count(p['backend'],['agent','start'])==2
 
+def test_background_budget_is_independent_from_foreground_observation(project):
+    p=project
+    result=p['open'](0);assert result.returncode==0,result.stderr
+    intent=read(p['native']/'herdr/herdr-open-start.json')
+    assert intent['startup_timeout_ms']==60000
+    wait_for(p['ready'],timeout=20)
+
+@pytest.mark.parametrize('budget',[0,999,600001])
+def test_invalid_background_budget_does_not_start_server_or_agents(project,budget):
+    p=project
+    result=cli('--project',p['root'],'herdr','open','--options',p['file'],
+        '--startup-timeout-ms',budget,'--no-attach')
+    assert result.returncode!=0 and 'budget' in result.stderr
+    assert mutate_count(p['backend'],['agent','start'])==0
+
+def test_partial_close_and_reopen_preserves_history_and_allocates_new_owned_namespace(project):
+    p=project;current=p['native']/'pi-terminal-events/lead/current.json'
+    change(p['backend'],lambda state:state.update(start_status='blocked'))
+    current.unlink();p['options']['startup_timeout_ms']=20000;p['file'].write_text(json.dumps(p['options']))
+    opened=p['open']();assert opened.returncode==0,opened.stderr
+    assert not (p['native']/'configuration.json').exists()
+    opener=read(p['native']/'herdr/herdr-open-start.json')['process']
+    wait_for(lambda:cli('process-identity',opener['pid']).returncode!=0,timeout=30)
+    old=read(p['native']/'herdr/namespace.json');history=p['log'].read_bytes()
+    ledger=read(p['native']/'herdr/herdr-agents.json')
+    assert all(row['binding'] for row in ledger['agents'].values()),'precondition: both original provider lifetimes were observed'
+    closed=cli('--project',p['root'],'kill');assert closed.returncode==0,closed.stderr
+    blocked=p['open']();assert blocked.returncode!=0 and 'still live' in blocked.stderr
+    opener=read(p['native']/'herdr/herdr-open-start.json')['process']
+    wait_for(lambda:cli('process-identity',opener['pid']).returncode!=0,timeout=30)
+    p['pi'].terminate();p['pi'].wait(timeout=5);p['codex'].terminate();p['codex'].wait(timeout=5)
+    replacement_pi=subprocess.Popen(p['pi'].args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+        text=True,encoding='utf-8',creationflags=0x08000000)
+    replacement_worker=subprocess.Popen(p['codex'].args,creationflags=0x08000000)
+    try:
+        assert json.loads(replacement_pi.stdout.readline())['ready']
+        change(p['backend'],lambda state:state.update(provider_pids=[replacement_pi.pid,replacement_worker.pid],start_status='idle'))
+        p['options']['startup_timeout_ms']=60000;p['file'].write_text(json.dumps(p['options']))
+        ready=p['open']();assert ready.returncode==0,ready.stderr
+        wait_for(p['ready'],timeout=20)
+        new=read(p['native']/'herdr/namespace.json')
+        assert new['owner_id']!=old['owner_id'] and new['workspace_id']!=old['workspace_id']
+        assert (p['native']/'herdr/archived-partial'/old['owner_id']/'namespace.json').exists()
+        assert p['log'].read_bytes()==history
+    finally:
+        cli('--state-root',p['native'],'stop')
+        for process in [replacement_pi,replacement_worker]:
+            if process.poll() is None:process.kill()
+            process.wait(timeout=5)
+
 def test_hook_authoritative_pi_recovers_its_initial_name_without_relaunch(project):
     p=project;change(p['backend'],lambda s:s.update(pi_hook_authority=True))
     result=p['open']();assert result.returncode==0,result.stderr
-    wait_for(p['ready'],timeout=8)
+    wait_for(p['ready'],timeout=30)
     assert mutate_count(p['backend'],['agent','start'])==2
     assert mutate_count(p['backend'],['agent','rename'])==1
     assert p['open']().returncode==0 and mutate_count(p['backend'],['agent','rename'])==1
@@ -167,14 +267,18 @@ def test_hook_authoritative_pi_recovers_its_initial_name_without_relaunch(projec
 def test_initial_pi_name_repair_recovers_lost_ack_without_repeating_rename(project):
     p=project;change(p['backend'],lambda s:s.update(pi_hook_authority=True))
     fault(p['backend'],['agent','rename'],'after-error')
-    result=p['open']();assert result.returncode==0,result.stderr;wait_for(p['ready'],timeout=8)
+    result=p['open']();assert result.returncode==0,result.stderr;wait_for(p['ready'],timeout=30)
     assert p['open']().returncode==0 and mutate_count(p['backend'],['agent','rename'])==1
 
 def test_initial_pi_name_repair_refuses_a_foreign_extension_owner(project):
     p=project;change(p['backend'],lambda s:s.update(pi_hook_authority=True))
     current=p['native']/'pi-terminal-events/lead/current.json';row=json.loads(current.read_text(encoding='utf-8'))
     row['owner']='00000000-0000-0000-0000-000000000000';current.write_text(json.dumps(row),encoding='utf-8')
-    result=p['open']();assert result.returncode!=0
+    result=p['open']()
+    if result.returncode==0:
+        wait_for(lambda:read(p['native']/'herdr/herdr-open-start.json')['status']=='failed',timeout=20)
+        result=p['open']()
+    assert result.returncode!=0
     assert mutate_count(p['backend'],['agent','rename'])==0 and p['pi'].poll() is None
 
 def test_delayed_native_session_binding_continues_in_background(project):
@@ -213,9 +317,10 @@ def test_uncertain_missing_pi_session_report_is_not_replayed(project):
     p=project;change(p['backend'],lambda s:s['agent_sessions'].pop('pi'))
     fault(p['backend'],['pane','report-agent-session'],'before-error')
     assert p['open'](0).returncode==0
-    wait_for(lambda:mutate_count(p['backend'],['pane','report-agent-session'])==1)
+    wait_for(lambda:mutate_count(p['backend'],['pane','report-agent-session'])==1,timeout=30)
     time.sleep(.3);assert p['open'](0).returncode==0
-    assert p['ready']() is None and mutate_count(p['backend'],['pane','report-agent-session'])==1
+    assert cli('--state-root',p['native'],'ping','lead').returncode!=0
+    assert mutate_count(p['backend'],['pane','report-agent-session'])==1
 
 def test_changed_request_does_not_replace_running_agents_or_daemon(project):
     p=project;assert p['open']().returncode==0;before=wait_for(p['ready'],timeout=20)
@@ -225,12 +330,12 @@ def test_changed_request_does_not_replace_running_agents_or_daemon(project):
 
 def test_reconnect_from_another_powershell_path_preserves_running_environment(project):
     p=project;assert p['open']().returncode==0;before=wait_for(p['ready'],timeout=20)
-    ledger=json.loads((p['native']/'herdr/herdr-open.json').read_text(encoding='utf-8'))
+    ledger=read(p['native']/'herdr/herdr-open.json')
     argv=cli('--project',p['root'],'herdr','open','--options',p['file'],'--no-attach','--timeout-ms','10000',
              env={**os.environ,'PATH':str(p['root']/'another-shell-bin')+os.pathsep+os.environ['PATH']})
     assert argv.returncode==0,argv.stderr
-    wait_for(lambda:json.loads((p['native']/'herdr/herdr-open.json').read_text(encoding='utf-8'))['phase']=='running',timeout=20)
-    after=json.loads((p['native']/'herdr/herdr-open.json').read_text(encoding='utf-8'))
+    wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=20)
+    after=read(p['native']/'herdr/herdr-open.json')
     assert after['request_hash']==ledger['request_hash'] and after['daemon_fingerprint']==ledger['daemon_fingerprint']
     assert p['ready']()['pid']==before['pid'] and mutate_count(p['backend'],['agent','start'])==2
 
@@ -246,7 +351,7 @@ def test_reconnect_does_not_accept_a_changed_explicit_agent_path(project):
 def test_opener_crash_after_launch_intent_resumes_without_duplicate_agent_start(project):
     p=project;fault(p['backend'],['agent','start'],'hang-after')
     initial=p['open'](0);assert initial.returncode==0,initial.stderr
-    intent=json.loads((p['native']/'herdr/herdr-open-start.json').read_text(encoding='utf-8'))
+    intent=read(p['native']/'herdr/herdr-open-start.json')
     wait_for(lambda:(p['backend']/'mutation-finished').exists())
     owned_stop(intent['process'])
     wait_for(lambda:cli('process-identity',intent['process']['pid']).returncode!=0)
@@ -266,12 +371,12 @@ def test_explicit_history_and_windows_path_override_are_preserved(project):
     p['options']['bindings']={'worker':dict(root=str(p['log'].parent),path=str(p['log']),session_id=p['session'],cwd=str(p['root']))}
     p['file'].write_text(json.dumps(p['options']),encoding='utf-8')
     result=p['open']();assert result.returncode==0,result.stderr;wait_for(p['ready'],timeout=20)
-    ledger=json.loads((p['native']/'herdr/herdr-open.json').read_text(encoding='utf-8'))
+    ledger=read(p['native']/'herdr/herdr-open.json')
     assert Path(ledger['bindings']['worker']['history']['path'])==p['log']
 
 def test_agent_shell_environment_routes_plain_native_ask_from_outside_project(project):
     p=project;assert p['open']().returncode==0;wait_for(p['ready'],timeout=20)
-    namespace=json.loads((p['native']/'herdr/namespace.json').read_text(encoding='utf-8'))
+    namespace=read(p['native']/'herdr/namespace.json')
     env=server(p['backend'])['panes'][namespace['bindings']['lead']['pane_id']]['env']
     assert env['CCB_AGENT_NAME']=='lead' and Path(env['CCB_NATIVE_STATE_ROOT'])==p['native']
     called=cli('ask','worker','automatic sender and root',env={**os.environ,**env},cwd=p['backend'])

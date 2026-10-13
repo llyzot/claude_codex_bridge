@@ -8,6 +8,14 @@ import uuid
 
 sys.stdout.reconfigure(encoding='utf-8');sys.stderr.reconfigure(encoding='utf-8')
 root=Path(sys.argv[1]);args=sys.argv[2:]
+state_lock=(root/'server.lock').open('a+b')
+if os.name=='nt':
+    import msvcrt
+    state_lock.seek(0);state_lock.write(b'0');state_lock.flush();state_lock.seek(0)
+    msvcrt.locking(state_lock.fileno(),msvcrt.LK_LOCK,1)
+else:
+    import fcntl
+    fcntl.flock(state_lock,fcntl.LOCK_EX)
 assert args[:2]==['--session','native-namespace-test'];args=args[2:]
 state_file=root/'server.json'
 state=json.loads(state_file.read_text(encoding='utf-8'))
@@ -22,11 +30,21 @@ def option(name):return args[args.index(name)+1]
 def environment():return dict(args[i+1].split('=',1) for i,value in enumerate(args) if value=='--env')
 def save():
     temporary=state_file.with_suffix('.tmp');temporary.write_text(json.dumps(state),encoding='utf-8');temporary.replace(state_file)
+
+def take_provider(pane):
+    if state.get('pid_map_workspace')!=pane['workspace_id']:
+        slots=sorted(p['tokens']['ccb_slot'] for p in state['panes'].values() if p['workspace_id']==pane['workspace_id'] and p.get('tokens',{}).get('ccb_slot') not in (None,'cmd'))
+        state['pid_map']=dict(zip(slots,state['provider_pids']));state['pid_map_workspace']=pane['workspace_id']
+    pid=state['pid_map'].get(pane.get('tokens',{}).get('ccb_slot'))
+    if pid not in state['provider_pids']:pid=state['provider_pids'][0]
+    state['provider_pids'].remove(pid)
+    return pid
 if args==['server']:
     if state.get('restore_without_tokens'):
         for row in state['workspaces'].values():row.pop('tokens',None)
         for row in state['panes'].values():row.pop('tokens',None);row['terminal_id']=str(uuid.uuid4())
     state['server_running']=True;state['server_pid']=os.getpid();save()
+    state_lock.close()
     while not (root/'stop-server').exists():time.sleep(.1)
     sys.exit(0)
 elif args==['status','server','--json']:
@@ -46,7 +64,7 @@ elif args[:2]==['pane','run']:
     pane=state['panes'][args[2]]
     assert 'codex-tui-attach' in args[3]
     quoted=re.findall(r"'((?:[^']|'')*)'",args[3]);host=json.loads((Path(quoted[1].replace("''","'"))/'host.json').read_text(encoding='utf-8'))
-    pid=state['provider_pids'].pop(0);pane['foreground_pid']=pid;pane['agent']='codex'
+    pid=take_provider(pane);pane['foreground_pid']=pid;pane['agent']='codex'
     pane['argv']=[host['executable'],'--remote',host['endpoint'],'resume',host['thread_id']]
     row={'name':None,'agent':'codex','agent_status':'idle','pane_id':pane['pane_id'],'workspace_id':pane['workspace_id'],
          'terminal_id':pane['terminal_id'],'tab_id':pane['workspace_id']+':t1','interactive_ready':True,
@@ -54,8 +72,8 @@ elif args[:2]==['pane','run']:
     state.setdefault('agents',{})['host-unnamed']=row;save();result={'status':'ok'}
 elif args[:2]==['agent','start']:
     name=args[2];pane=state['panes'][option('--pane')];kind=option('--kind')
-    assert not pane.get('agent') and not any(a['name']==name for a in state.get('agents',{}).values())
-    pid=state['provider_pids'].pop(0)
+    assert not pane.get('agent') and not any(a.get('name')==name for a in state.get('agents',{}).values())
+    pid=take_provider(pane)
     pane['foreground_pid']=pid;pane['agent']=kind
     status=state.get('start_status','idle')
     row={'name':name,'agent':kind,'agent_status':status,'pane_id':pane['pane_id'],'workspace_id':pane['workspace_id'],
@@ -114,6 +132,7 @@ elif args[1]=='report-metadata':
         if value=='--title':row['title']=args[index+1]
     save();result={'status':'ok'}
 else:raise AssertionError(args)
+state_lock.close()
 if trigger and fault.get('mode')=='after-error':sys.exit(1)
 if trigger and fault.get('mode')=='hang-after':
     (root/'mutation-finished').write_text('ready')

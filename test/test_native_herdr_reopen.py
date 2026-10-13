@@ -81,7 +81,11 @@ def test_recovery_rejects_a_provider_that_resumed_the_wrong_native_session(stopp
     log.write_text(json.dumps(header)+'\n',encoding='utf-8')
     change(p['backend'],lambda s:s.update(provider_pids=[replacement.pid],agent_sessions={p['provider']:{'agent':p['provider'],'kind':'id','value':foreign,'source':'fixture'}}))
     result=p['open']()
-    assert result.returncode!=0 and 'recovered native session' in result.stderr
+    if result.returncode==0:
+        wait_for(lambda:read(p['state']/'herdr-open-start.json')['status']=='failed',timeout=30)
+        error=read(p['state']/'herdr-open-start.json')['error']
+    else:error=result.stderr
+    assert 'recovered native session' in error
     assert cli('--state-root',p['runtime'],'ping').returncode!=0
     assert read(p['state']/'herdr-recovery.json')['phase']=='reset'
 
@@ -147,7 +151,7 @@ def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,nat
         p['file'].write_text(json.dumps(p['options']),encoding='utf-8')
         change(p['backend'],lambda s:s.update(shell_name='pwsh.exe'))
     assert p['open']().returncode==0
-    wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=20)
+    wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=60)
     original=json.loads(p['pi'].args[2]);history=Path(original['native_session_path'])
     expected_pi=original['session_id']
     history.write_text(json.dumps({'type':'session','id':original['session_id'],'cwd':str(p['root'])})+'\n',encoding='utf-8')
@@ -173,10 +177,16 @@ def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,nat
         gate.touch();assert json.loads(pi.stdout.readline())['ready']
         if fresh_pi:
             rejected=p['open']()
-            assert rejected.returncode!=0 and 'recovered native session' in rejected.stderr
+            if rejected.returncode==0:
+                wait_for(lambda:read(p['native']/'herdr/herdr-open-start.json')['status']=='failed',timeout=30)
+                error=read(p['native']/'herdr/herdr-open-start.json')['error']
+            else:error=rejected.stderr
+            assert 'recovered native session' in error
             assert p['ready']() is None
             return
-        wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=20)
+        # Include real no-model Codex host initialization under the product's
+        # unchanged 60-second startup budget, rather than a 20-second fixture cap.
+        wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=60)
         recovery=read(p['native']/'herdr/herdr-recovery.json')
         assert recovery['sessions']['lead']['session_id']==expected_pi
         assert history.read_bytes()==history_before

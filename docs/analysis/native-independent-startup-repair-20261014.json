@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "record_type": "native_startup_repair_receipt",
+  "source_base_commit": "b664fca8",
+  "date_local": "2026-10-14",
+  "scope": "Independent Windows Herdr startup, cancellation of incomplete startup, and exact-session reopen",
+  "installation": {
+    "status": "verified",
+    "runtime": "rust",
+    "version": "8.7.10",
+    "operation_id": "f60a5029-919a-4e12-9e57-6a8fba96fe42",
+    "old_binary_sha256": "5d1ac6e9a8c8828daf151951d08deeebfbff859303913fb9a34972da4971c49d",
+    "binary_sha256": "578b72c2c166c7bb67ea75ca90da0bef6e0b3ef6f86ad58c96015e4eaf530ca8",
+    "manifest_sha256": "fafcb64dbac54ef4a6f92f7549e631172458c2d3d41924826cafc9ba9b1bfa8a",
+    "aliases_match": ["ccb.exe", "ccb-native.exe", "ask.exe"],
+    "backup_retained": true,
+    "path_modified": false,
+    "provider_settings_modified": false,
+    "runtime_state_changed": false,
+    "python_prefix_on_user_path": false
+  },
+  "validation": {
+    "release_build": "passed",
+    "clippy_all_kernel_targets_with_warnings_denied": "passed",
+    "diff_check": "passed",
+    "old_binary_regression": "The two independent-startup and incomplete-kill regressions both failed with the old installed binary.",
+    "final_agents": {"passed": 21, "report": "native-independent-startup-final-agents-20261014.xml"},
+    "final_ownership_fences": {"passed": 4, "report": "native-independent-startup-final-fences-20261014.xml"},
+    "core_run": {
+      "passed": 5,
+      "report": "native-independent-startup-final-core-20261014.xml",
+      "initial_observation_failure": "The hosted reopen observation exceeded its old 20-second fixture cap while the backend was running and its Codex display had launched. Rechecked successfully using the installed build and unchanged 60-second product startup budget."
+    },
+    "installed_reopen": {"status": "passed", "passed": 3, "cases": ["terminal session and callback continuation", "native Codex host preserves its thread", "foreign Pi session rejected"], "report": "native-independent-startup-final-installed-reopen-20261014.xml"},
+    "formal_project_dry_run": "passed; builtin pi/claude/codex discovered; mutations=false",
+    "live_acceptance": "See native-startup-incident-20261013.json: Claude waiting for input, Pi and Codex ready, then kill of the still-opening generation returned closed.",
+    "test_sessions_closed": true,
+    "scope_note": "Reports with failures from intermediate diagnostic runs are preserved as history, not represented as current green validation. This is targeted validation, not a claim that the entire repository suite was run."
+  },
+  "behavior": [
+    "Slow or blocked terminal providers do not prevent the native Codex host from starting.",
+    "Later ready agents join through reload without replacing the existing host or native session.",
+    "Startup authority is persisted before resource allocation; kill cancels the recorded opener and closes only verified owned resources.",
+    "Missing initial authority is rejected rather than reconstructed from current configuration.",
+    "Reopen preserves verified history and refuses a different native session.",
+    "Backend readiness and interface readiness are reported separately; the default background startup budget remains 60000 ms."
+  ],
+  "limits": [
+    "The original seventy-second Pi delay did not reproduce, so its original cause remains unidentified.",
+    "No paid model tasks or trust confirmations were submitted. Automatic callback routing is exercised by offline protocol fixtures.",
+    "The formal project remains closed. Application source, provider account configuration and unrelated workspaces were not changed."
+  ]
+}

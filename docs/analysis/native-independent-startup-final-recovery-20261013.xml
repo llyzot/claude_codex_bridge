@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="7" time="184.380" timestamp="2026-10-13T21:19:30.671299+08:00" hostname="HOST"><testcase classname="test.test_native_herdr_reopen" name="test_pi_and_codex_reopen_preserves_sessions_and_callback_routing[terminal]" time="35.273" /><testcase classname="test.test_native_herdr_reopen" name="test_pi_and_codex_reopen_preserves_sessions_and_callback_routing[hosted]" time="47.275" /><testcase classname="test.test_native_herdr_reopen" name="test_pi_and_codex_reopen_preserves_sessions_and_callback_routing[foreign_pi]" time="31.910" /><testcase classname="test.test_native_herdr_agents" name="test_mount_keeps_layout_focus_and_binds_local_process_lifetimes" time="12.798" /><testcase classname="test.test_native_herdr_agents" name="test_hook_report_without_native_bridge_proof_cannot_repair_a_lost_name" time="11.049" /><testcase classname="test.test_native_herdr_agents" name="test_lost_start_receipt_recovers_by_unique_alias_without_relaunch[after-error]" time="12.947" /><testcase classname="test.test_native_herdr_agents" name="test_lost_start_receipt_recovers_by_unique_alias_without_relaunch[hang-after]" time="31.916"><failure message="subprocess.TimeoutExpired: Command '['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\debug\\ccb-native.exe', 'herdr-agents']' timed out after 25 seconds">test\test_native_herdr_agents.py:66: in test_lost_start_receipt_recovers_by_unique_alias_without_relaunch
+    result=run(request)['mount'];assert result['status']=='ready'
+           ^^^^^^^^^^^^
+test\test_native_herdr_agents.py:27: in run
+    result=call(request);assert result.returncode==0,result.stderr
+           ^^^^^^^^^^^^^
+test\test_native_herdr_agents.py:25: in call
+    return subprocess.run([str(BIN),'herdr-agents'],input=json.dumps(request),capture_output=True,text=True,encoding='utf-8',timeout=25)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:557: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:1221: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:1664: in _communicate
+    raise TimeoutExpired(self.args, orig_timeout)
+E   subprocess.TimeoutExpired: Command '['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\rust\\target\\debug\\ccb-native.exe', 'herdr-agents']' timed out after 25 seconds</failure></testcase></testsuite></testsuites>

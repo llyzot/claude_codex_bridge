@@ -5,6 +5,7 @@ No Herdr server, real provider or account is started by this fixture.
 import json
 import os
 import time
+from pathlib import Path
 
 import pytest
 from test_native_daemon import Server, await_watch
@@ -77,6 +78,41 @@ def test_ping_external_herdr_does_not_upgrade_historical_readiness_to_health(run
     assert row['diagnostics']['reason']=='external_provider_not_freshly_probed'
     assert mutate_count(r['backend'],['agent','prompt'])==1
     assert all(p.poll() is None for p in r['processes'])
+
+def test_busy_worker_bounds_herdr_queries_but_keeps_native_completion_prompt(runtime):
+    from test_native_herdr_namespace import calls
+    r=runtime;s=r['start']();receipt=r['submit'](s)
+    prompt=wait_for(lambda:r['prompts']())[-1]
+    before=mutate_count(r['backend'],['api','snapshot'])
+    time.sleep(4)
+    queries=mutate_count(r['backend'],['api','snapshot'])-before
+    assert queries<=5,f'busy observation launched {queries} Herdr snapshots in four seconds'
+    begin=time.monotonic();r['finish'](prompt)
+    row=await_watch(s,receipt['job_id'],lambda row:row['terminal'],timeout=2)
+    completion_ms=(time.monotonic()-begin)*1000
+    assert row['reply']=='terminal worker result'
+    assert completion_ms<1000,'native completion waited for the slow liveness interval'
+    decision=job(s,receipt)['terminal_decision']
+    timings=decision['diagnostics']['herdr_polling']
+    assert timings['history_polls']>timings['live_observations']
+    assert timings['live_observations']<=5 and timings['live_observation_ms']>=0
+    dispatch=decision['diagnostics']['herdr_dispatch_timings']
+    assert all(dispatch[key]>=0 for key in ['preflight_ms','permit_wait_ms','recheck_ms','prompt_rpc_ms'])
+    if output:=os.environ.get('CCB_TEST_POLL_TIMING_REPORT'):
+        Path(output).write_text(json.dumps({'busy_window_seconds':4,'herdr_snapshot_queries':queries,
+            'completion_observed_ms':completion_ms,'polling':timings,'dispatch':dispatch},indent=2),encoding='utf-8')
+    assert mutate_count(r['backend'],['agent','prompt'])==1
+
+
+def test_busy_liveness_detects_lost_identity_without_dispatching_next_job(runtime):
+    r=runtime;s=r['start']();receipt=r['submit'](s)
+    wait_for(lambda:r['prompts']())
+    r['submit'](s,body='queued second task')
+    change(r['backend'],lambda state:state['agents'].pop(r['name']))
+    wait_for(lambda:(s.root/'providers/codex/worker/fault.json').exists(),timeout=3)
+    assert not s.rpc('watch',{'target':receipt['job_id']})['terminal']
+    assert len(r['prompts']())==1
+
 
 def test_pi_lead_yields_then_receives_herdr_result_and_continues(runtime):
     r=runtime;s=r['start']();receipt=r['submit'](s,'lead')

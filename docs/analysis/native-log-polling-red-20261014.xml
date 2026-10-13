@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="20.268" timestamp="2026-10-14T01:41:01.454704+08:00" hostname="HOST"><testcase classname="test.test_native_herdr_worker" name="test_busy_worker_bounds_herdr_queries_but_keeps_native_completion_prompt" time="19.261"><failure message="AssertionError: busy observation launched 11 Herdr snapshots in four seconds&#10;assert 11 &lt;= 5">test\test_native_herdr_worker.py:88: in test_busy_worker_bounds_herdr_queries_but_keeps_native_completion_prompt
+    assert queries&lt;=5,f'busy observation launched {queries} Herdr snapshots in four seconds'
+E   AssertionError: busy observation launched 11 Herdr snapshots in four seconds
+E   assert 11 &lt;= 5</failure></testcase></testsuite></testsuites>

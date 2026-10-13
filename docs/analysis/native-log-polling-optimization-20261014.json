@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "source_base": "a30b0b23",
+  "log_evidence": "native-log-analysis-20261014.json",
+  "change": "Separate native completion polling from periodic busy Herdr liveness observations; retain fresh readiness and identity checks at send and completion.",
+  "baseline": {
+    "binary_sha256": "8d611ca9f40da7726177d63f8b763bde46849198fbca4bbe543121b93d148007",
+    "busy_window_seconds": 4,
+    "herdr_snapshot_queries": 11,
+    "report": "native-log-polling-red-20261014.xml"
+  },
+  "after": {
+    "busy_window_seconds": 4,
+    "herdr_snapshot_queries": 4,
+    "completion_observed_ms": 218.16370001761243,
+    "polling": {
+      "busy_liveness_interval_ms": 1000,
+      "history_interval_ms": 100,
+      "history_poll_ms": 54,
+      "history_polls": 32,
+      "live_observation_ms": 976,
+      "live_observations": 4,
+      "scope": "until_terminal_observation"
+    },
+    "dispatch": {
+      "permit_wait_ms": 30,
+      "preflight_ms": 550,
+      "prompt_rpc_ms": 248,
+      "recheck_ms": 523,
+      "resumed": false
+    }
+  },
+  "query_reduction_percent": 63.64,
+  "diagnostics": {
+    "destination": "Existing completion_terminal event payload.diagnostics and terminal decision diagnostics",
+    "fields": [
+      "herdr_dispatch_timings",
+      "herdr_polling"
+    ],
+    "extra_per_poll_log_writes": 0,
+    "extra_durability_commits": 0,
+    "prompt_or_credential_logging": false,
+    "scope": "Successful observation of a native terminal outcome; unknown/faulted tasks do not synthesize a completion or complete metrics."
+  },
+  "verification": [
+    {
+      "report": "native-log-polling-regression-20261014.xml",
+      "passed": 23
+    },
+    {
+      "report": "native-log-polling-release-20261014.xml",
+      "passed": 4
+    }
+  ],
+  "clippy_warnings_denied": "passed",
+  "installation": {
+    "status": "verified",
+    "binary_sha256": "e215a69e5dd3637f24e57b77705b649638893509111aa9fe6bfd2a8f376553d4",
+    "operation_id": "ac76e75b-581e-4ad9-a552-fecabdfaade1",
+    "provider_settings_modified": false,
+    "runtime_state_changed": false,
+    "rollback_backup_retained": true
+  },
+  "tradeoffs": [
+    "Busy liveness checks are spaced one second after the previous check finishes. Ownership-loss detection during a working turn can therefore take longer than before.",
+    "Native completion polling retains 100 ms sleeps; actual latency also includes file IO and any in-flight Herdr request.",
+    "Fresh checks before a prompt, Claude terminal confirmation, and readiness before the next FIFO task remain required.",
+    "The 11-to-4 query comparison is a controlled four-second busy-state reproduction, not a production CPU percentage or end-to-end model speedup.",
+    "The real log samples predate this build. No real model tasks or global provider sessions were created during verification."
+  ]
+}

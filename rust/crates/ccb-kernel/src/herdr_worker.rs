@@ -22,6 +22,35 @@ pub(crate) enum Event {
     Fault,
     Unsent,
 }
+#[derive(Default)]
+struct PollMetrics {
+    history_polls: u64,
+    history_ms: u64,
+    live_observations: u64,
+    live_ms: u64,
+}
+impl PollMetrics {
+    fn poll(&mut self, history: &mut ProviderReader) -> Result<Option<Value>> {
+        let started = Instant::now();
+        let result = history.poll();
+        self.history_polls += 1;
+        self.history_ms += started.elapsed().as_millis() as u64;
+        result
+    }
+    fn observe(&mut self, action: impl FnOnce() -> Result<Value>) -> Result<Value> {
+        let started = Instant::now();
+        let result = action();
+        self.live_observations += 1;
+        self.live_ms += started.elapsed().as_millis() as u64;
+        result
+    }
+    fn snapshot(&self) -> Value {
+        json!({"history_polls":self.history_polls,"history_poll_ms":self.history_ms,
+            "live_observations":self.live_observations,"live_observation_ms":self.live_ms,
+            "history_interval_ms":100,"busy_liveness_interval_ms":1000,
+            "scope":"until_terminal_observation"})
+    }
+}
 pub(crate) struct Worker {
     pub events: mpsc::Receiver<Event>,
     pub grant: mpsc::Sender<()>,
@@ -222,6 +251,8 @@ fn run(
     alive: &AtomicBool,
     permitted: &mut bool,
 ) -> Result<()> {
+    let dispatch_started = Instant::now();
+    let mut dispatch_timings = json!({"resumed":!saved.is_null()});
     let anchor = format!("{task}:{execution}");
     let provider = crate::records::string(spec, "provider")?;
     let input = format!("CCB_REQ_ID: {anchor}\n{prompt}");
@@ -276,6 +307,8 @@ fn run(
         );
         let proof = json!({"schema_version":1,"job_id":task,"execution_instance_id":execution,"request_anchor":anchor,
             "identity":live["identity"],"history_binding":binding,"resolved_history_binding":observed_binding,"baseline":baseline});
+        dispatch_timings["preflight_ms"] = json!(dispatch_started.elapsed().as_millis() as u64);
+        let grant_started = Instant::now();
         events.send(Event::Prepared(proof.clone()))?;
         loop {
             if !alive.load(Ordering::Acquire) {
@@ -293,6 +326,8 @@ fn run(
         if !alive.load(Ordering::Acquire) {
             return Ok(());
         }
+        dispatch_timings["permit_wait_ms"] = json!(grant_started.elapsed().as_millis() as u64);
+        let recheck_started = Instant::now();
         if provider == "pi" {
             let (_, current) = crate::pi_terminal::resolve(
                 binding,
@@ -316,6 +351,8 @@ fn run(
             live["interactive_ready"] == true,
             "Herdr worker changed readiness before send"
         );
+        dispatch_timings["recheck_ms"] = json!(recheck_started.elapsed().as_millis() as u64);
+        let prompt_started = Instant::now();
         // ACK failure is ambiguous: preserve the permit and observe; never replay.
         let _ = herdr_agents::rpc(
             request,
@@ -326,6 +363,7 @@ fn run(
                 input,
             ],
         );
+        dispatch_timings["prompt_rpc_ms"] = json!(prompt_started.elapsed().as_millis() as u64);
         proof
     } else {
         ensure!(
@@ -365,20 +403,24 @@ fn run(
     let started = Instant::now();
     let timeout = spec["timeout_s"].as_f64().unwrap_or(3600.0);
     let mut completed = false;
+    let mut next_live_observation = Instant::now();
+    let mut metrics = PollMetrics::default();
     while alive.load(Ordering::Acquire) {
         // Read terminal evidence even if the Agent just exited: a known result
         // remains deliverable, but no next input is allowed without live readiness.
         if !completed {
-            if let Some(mut decision) = history.poll()? {
+            if let Some(mut decision) = metrics.poll(&mut history)? {
                 if provider == "claude" {
-                    let live = observe(
-                        request,
-                        agent,
-                        &observed_binding,
-                        provider,
-                        None,
-                        Some(&proof["identity"]),
-                    )?;
+                    let live = metrics.observe(|| {
+                        observe(
+                            request,
+                            agent,
+                            &observed_binding,
+                            provider,
+                            None,
+                            Some(&proof["identity"]),
+                        )
+                    })?;
                     if live["interactive_ready"] != true {
                         ensure!(
                             started.elapsed().as_secs_f64() < timeout,
@@ -387,28 +429,38 @@ fn run(
                         std::thread::sleep(Duration::from_millis(100));
                         continue;
                     }
-                    let Some(latest) = history.poll()? else {
+                    let Some(latest) = metrics.poll(&mut history)? else {
                         continue;
                     };
                     decision = latest;
                     crate::herdr_terminal_evidence::attach(&mut decision, &live, &observed_binding);
                 }
                 decision["diagnostics"]["native_execution_instance"] = json!(execution);
+                decision["diagnostics"]["herdr_polling"] = metrics.snapshot();
+                decision["diagnostics"]["herdr_dispatch_timings"] = dispatch_timings.clone();
                 events.send(Event::Completed(decision))?;
                 completed = true;
             }
         }
-        let live = observe(
-            request,
-            agent,
-            &observed_binding,
-            provider,
-            producer.as_ref(),
-            Some(&proof["identity"]),
-        )?;
-        if completed && live["interactive_ready"] == true {
-            events.send(Event::Ready)?;
-            return Ok(());
+        // Native completion stays on the fast history cadence. Busy liveness
+        // checks are bounded separately; completion and every new dispatch
+        // still require fresh identity/readiness observations.
+        if completed || Instant::now() >= next_live_observation {
+            let live = metrics.observe(|| {
+                observe(
+                    request,
+                    agent,
+                    &observed_binding,
+                    provider,
+                    producer.as_ref(),
+                    Some(&proof["identity"]),
+                )
+            })?;
+            next_live_observation = Instant::now() + Duration::from_secs(1);
+            if completed && live["interactive_ready"] == true {
+                events.send(Event::Ready)?;
+                return Ok(());
+            }
         }
         ensure!(
             started.elapsed().as_secs_f64() < timeout,

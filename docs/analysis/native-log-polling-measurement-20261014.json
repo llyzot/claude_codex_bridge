@@ -1,0 +1,21 @@
+{
+  "busy_window_seconds": 4,
+  "herdr_snapshot_queries": 4,
+  "completion_observed_ms": 218.16370001761243,
+  "polling": {
+    "busy_liveness_interval_ms": 1000,
+    "history_interval_ms": 100,
+    "history_poll_ms": 54,
+    "history_polls": 32,
+    "live_observation_ms": 976,
+    "live_observations": 4,
+    "scope": "until_terminal_observation"
+  },
+  "dispatch": {
+    "permit_wait_ms": 30,
+    "preflight_ms": 550,
+    "prompt_rpc_ms": 248,
+    "recheck_ms": 523,
+    "resumed": false
+  }
+}

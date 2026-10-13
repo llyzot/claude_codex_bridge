@@ -48,5 +48,6 @@
     "cli.rs": "65e8ac8d7b930c0f9c217c3a80a84e1ece4e79dbf09d13c90d4cc20b11ebb40e",
     "installation.rs": "9d1a5dbbce26fd387d248490f74aa56df583f712579f38b09dbe199691066950"
   },
-  "earlier_probe": "installed executable disappeared before the second red probe; missing-install XML is not a configuration failure reproduction"
+  "earlier_probe": "installed executable disappeared before the second red probe; missing-install XML is not a configuration failure reproduction",
+  "source_commit": "6e9bd128362fc805e5af8f294eb84670655c218a"
 }

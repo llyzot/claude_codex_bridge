@@ -689,7 +689,7 @@
   },
   "installed_candidate": {
     "prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
-    "rust_source_commit": "2f7c14d2",
+    "rust_source_commit": "6e9bd128362fc805e5af8f294eb84670655c218a",
     "binary_sha256": "5d1ac6e9a8c8828daf151951d08deeebfbff859303913fb9a34972da4971c49d",
     "account_default": true,
     "evidence": "docs/analysis/native-default-project-20261013.json"

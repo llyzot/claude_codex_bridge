@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="1.121" timestamp="2026-10-13T15:17:15.632296+08:00" hostname="HOST"><testcase classname="test.test_native_default_project" name="test_herdr_open_without_config_previews_defaults_without_launching[False]" time="0.075"><failure message="FileNotFoundError: [WinError 2] 系统找不到指定的文件。">test\test_native_default_project.py:67: in test_herdr_open_without_config_previews_defaults_without_launching
+    result=cli('herdr','open','--dry-run','--herdr-exe',tools/'herdr.exe',cwd=nested if git_project else root,env=env)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_cli_security.py:18: in cli
+    return subprocess.run([str(BIN),*map(str,args)],text=True,capture_output=True,encoding='utf-8',timeout=timeout,**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:555: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:1039: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:1553: in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+E   FileNotFoundError: [WinError 2] 系统找不到指定的文件。</failure></testcase><testcase classname="test.test_native_default_project" name="test_herdr_open_without_config_previews_defaults_without_launching[True]" time="0.273"><failure message="FileNotFoundError: [WinError 2] 系统找不到指定的文件。">test\test_native_default_project.py:67: in test_herdr_open_without_config_previews_defaults_without_launching
+    result=cli('herdr','open','--dry-run','--herdr-exe',tools/'herdr.exe',cwd=nested if git_project else root,env=env)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_cli_security.py:18: in cli
+    return subprocess.run([str(BIN),*map(str,args)],text=True,capture_output=True,encoding='utf-8',timeout=timeout,**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:555: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:1039: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+..\..\..\..\..\scoop\apps\python\current\Lib\subprocess.py:1553: in _execute_child
+    hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+E   FileNotFoundError: [WinError 2] 系统找不到指定的文件。</failure></testcase></testsuite></testsuites>

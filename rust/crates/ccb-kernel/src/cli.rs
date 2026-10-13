@@ -386,10 +386,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             "config compile requires project root and optional executable manifest"
         );
         let root = Path::new(&args[2]).canonicalize()?;
-        let document = crate::config::parse_at(
-            &std::fs::read_to_string(root.join(".ccb/ccb.config"))?,
-            Some(&root),
-        )?;
+        let document = crate::config::project_document(&root)?;
         let executables: Value = if args.len() == 4 {
             serde_json::from_slice(&std::fs::read(Path::new(&args[3]))?)?
         } else {
@@ -596,10 +593,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         let config = if let Some(config) = options.get("config") {
             config.clone()
         } else {
-            let source = crate::config::parse_at(
-                &std::fs::read_to_string(project.join(".ccb/ccb.config"))?,
-                Some(project),
-            )?;
+            let source = crate::config::project_document(project)?;
             crate::herdr_open::default_config(project, source)?
         };
         let result =
@@ -691,10 +685,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
                 .clone()
                 .map(Ok)
                 .unwrap_or_else(|| crate::config::project_root(&std::env::current_dir()?))?;
-            let document = crate::config::parse_at(
-                &std::fs::read_to_string(project.join(".ccb/ccb.config"))?,
-                Some(&project),
-            )?;
+            let document = crate::config::project_document(&project)?;
             let executables = if let Some(path) = manifest {
                 serde_json::from_slice(&std::fs::read(path)?)?
             } else {

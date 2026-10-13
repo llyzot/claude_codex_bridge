@@ -5,7 +5,8 @@ use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
 pub fn project_root(cwd: &Path) -> Result<PathBuf> {
-    let mut path = cwd.canonicalize()?;
+    let original = cwd.canonicalize()?;
+    let mut path = original.clone();
     loop {
         if let Some(project) = crate::workspaces::binding_project(&path)? {
             ensure!(
@@ -14,13 +15,71 @@ pub fn project_root(cwd: &Path) -> Result<PathBuf> {
             );
             return Ok(project);
         }
-        if path.join(".ccb/ccb.config").is_file() {
+        if std::fs::symlink_metadata(path.join(".ccb/ccb.config")).is_ok() {
+            return Ok(path);
+        }
+        // A nested repository is its own project even when an outer repository
+        // has CCB configuration. Runtime roots keep config-free projects stable
+        // when later commands are invoked from a subdirectory.
+        if std::fs::symlink_metadata(path.join(".git")).is_ok()
+            || path.join(".ccb/ccbd").is_dir()
+            || path.join(".ccb/runtime-root-ref.json").is_file()
+            || path.join(".ccb/project.identity.json").is_file()
+        {
             return Ok(path);
         }
         if !path.pop() {
-            anyhow::bail!("no .ccb/ccb.config found above current directory");
+            return Ok(original);
         }
     }
+}
+const BUILTIN_ORIGIN: &str = "pi-claude-codex-v1";
+
+/// Read an explicit project configuration, or select the builtin three-agent
+/// layout without materializing a config file. Missing former custom configs
+/// must not silently replace the persisted agent set with defaults.
+pub(crate) fn project_document(root: &Path) -> Result<Value> {
+    let path = root.join(".ccb/ccb.config");
+    match std::fs::read_to_string(&path) {
+        Ok(text) => {
+            let mut document = parse_at(&text, Some(root))?;
+            if let Some(fields) = document.as_object_mut() {
+                fields.remove("_native_default_configuration");
+            }
+            return Ok(document);
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            ensure!(
+                std::fs::symlink_metadata(&path).is_err(),
+                "project configuration target is missing"
+            );
+        }
+        Err(error) => return Err(error.into()),
+    }
+    let record_path = state_root(root)?.join("configuration.json");
+    crate::startup::unlinked(&record_path)?;
+    match std::fs::File::open(&record_path) {
+        Ok(file) => {
+            use std::io::Read;
+            let mut bytes = Vec::new();
+            file.take(2 * 1024 * 1024 + 1).read_to_end(&mut bytes)?;
+            ensure!(
+                bytes.len() <= 2 * 1024 * 1024,
+                "committed configuration exceeds read limit"
+            );
+            let record: Value = serde_json::from_slice(&bytes)?;
+            let previous = crate::restart_config::restore(&record)?;
+            ensure!(previous["project_id"] == project_id(root)?
+                && previous["source_config"]["_native_default_configuration"] == BUILTIN_ORIGIN,
+                "project configuration is missing for an existing custom runtime; restore .ccb/ccb.config or use explicit --resume-config");
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    let mut document = parse_at(
+        "version=2\n[windows]\nmain=\"pi:pi; claude:claude; codex:codex\"\n[runtime.mux]\nbackend=\"herdr\"\n", Some(root))?;
+    document["_native_default_configuration"] = json!(BUILTIN_ORIGIN);
+    Ok(document)
 }
 pub(crate) fn shutdown_project_root(cwd: &Path) -> Result<PathBuf> {
     let original = cwd.canonicalize()?;

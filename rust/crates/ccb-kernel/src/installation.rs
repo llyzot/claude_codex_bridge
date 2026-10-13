@@ -152,7 +152,7 @@ fn populate(prefix: &Path, bytes: &[u8], sha: &str) -> Result<()> {
         }
         files[relative] = json!(sha);
     }
-    let guide = format!("{GUIDE}\nTo remove a stopped native prefix, use an external ccb-native.exe:\n  ccb-native installation remove --prefix <directory> --dry-run\n  ccb-native installation remove --prefix <directory>\nOnly verified program files are removed. Project data, PATH, provider settings and retained upgrade backups are preserved. A retained backup can be removed by naming its exact directory separately; that gives up rollback to that backup. If interrupted, inspect installation status and repeat remove with its recorded --operation-id.\n");
+    let guide = format!("{GUIDE}\nWithout .ccb/ccb.config, ccb herdr open defaults to three agents named pi, claude and codex, using their existing CLI settings. No project config file is generated. An existing config takes precedence. Nested commands use the nearest Git project or CCB runtime root. A missing former custom config is rejected; restore it or explicitly resume its saved configuration.\n\nTo remove a stopped native prefix, use an external ccb-native.exe:\n  ccb-native installation remove --prefix <directory> --dry-run\n  ccb-native installation remove --prefix <directory>\nOnly verified program files are removed. Project data, PATH, provider settings and retained upgrade backups are preserved. A retained backup can be removed by naming its exact directory separately; that gives up rollback to that backup. If interrupted, inspect installation status and repeat remove with its recorded --operation-id.\n");
     for (relative, content) in [
         ("LICENSE", LICENSE),
         ("VERSION", version()),

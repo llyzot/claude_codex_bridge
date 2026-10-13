@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="1.125" timestamp="2026-10-13T15:14:17.865276+08:00" hostname="HOST"><testcase classname="test.test_native_default_project" name="test_builtin_configuration_has_three_agents_and_does_not_create_files" time="0.488"><failure message="AssertionError: ccb-native: 系统找不到指定的路径。 (os error 3)&#10;  &#10;assert 1 == 0&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\bin\\ccb-native.e...iltin_configuration_has0\\executables.json'], returncode=1, stdout='', stderr='ccb-native: 系统找不到指定的路径。 (os error 3)\n').returncode">test\test_native_default_project.py:31: in test_builtin_configuration_has_three_agents_and_does_not_create_files
+    cfg=compile_default(root,tmp_path)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test\test_native_default_project.py:25: in compile_default
+    assert result.returncode==0,result.stderr
+E   AssertionError: ccb-native: 系统找不到指定的路径。 (os error 3)
+E
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['C:\\Users\\user\\Desktop\\work\\4.user\\2.github\\claude_codex_bridge\\bin\\ccb-native.e...iltin_configuration_has0\\executables.json'], returncode=1, stdout='', stderr='ccb-native: 系统找不到指定的路径。 (os error 3)\n').returncode</failure></testcase></testsuite></testsuites>

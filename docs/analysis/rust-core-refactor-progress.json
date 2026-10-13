@@ -259,7 +259,8 @@
     "Claude original-terminal idle/transcript confirmation is committed before finalization with execution/session/process/file-boundary identity; cold recovery rereads current history and rejects hook continuation, changed reply or corrupt evidence. New attempts drop old native permissions and observation receipts",
     "User-selected sample-project now runs the installed Rust CCB in its own named Herdr session with Pi Lead and native Codex Worker. Actual read-only chain returned 5767, callback done, one Lead dispatch tool and first-turn release 2.653887 seconds before Worker completion; tracked application source clean and global PATH unchanged",
     "Ordinary pwsh Herdr reconnect now retains the protected implicit launch PATH without ignoring actual config changes. Account default ccb/ask selects the verified Rust prefix; sample-project direct reconnect passed with same Workspace, Pi process/session and Codex thread, and helper startup script is obsolete",
-    "Native offline worktree lifecycle supports inspect, explicit target integration in a detached stage, conflict resolution/recovery, whole-checkout retirement/restore and opt-in branch cleanup. Durable operation IDs, commit pins, runtime/process guards and cooperative Git/materialization locks preserve dirty/untracked/ignored work and avoid replay after process death. Current installed sample-project binaries were not replaced."
+    "Native offline worktree lifecycle supports inspect, explicit target integration in a detached stage, conflict resolution/recovery, whole-checkout retirement/restore and opt-in branch cleanup. Durable operation IDs, commit pins, runtime/process guards and cooperative Git/materialization locks preserve dirty/untracked/ignored work and avoid replay after process death. Current installed sample-project binaries were not replaced.",
+    "Native no-config project startup defaults to Pi/Claude/Codex without writing ccb.config. Nearest Git/runtime discovery supports nested commands; explicit configuration overrides defaults and missing former custom configs remain fenced. Installed native CLI and real sample project read-only preview passed."
   ],
   "remaining": [
     "Validate real Pi/Codex/Claude interrupted-turn recovery, native Claude terminal hooks, cancellation, context controls and interactive approval in scoped test resources.",
@@ -668,13 +669,14 @@
     "native_shell_reconnect": "Original release failed the caller-PATH-only test with the same migration error. Debug 3 passed. Final release 86 passed in 753.59s; fmt/Clippy passed. Project backend upgraded under stopped-image guards, same Pi PID/session and Codex thread preserved, direct fresh-account-path pwsh ccb herdr open returned running, and foreground Herdr client observed. Legacy Python installation retained and User PATH rollback saved. See native-herdr-shell-reconnect-20261012.json.",
     "legacy_python_uninstall": "User completed deletion of normal and MSIX LocalCache copies; both paths verified absent. Old sample-project-2 Python daemon stopped via authenticated project shutdown before removal. Rust daemon/Pi/Codex identities and sessions unchanged; shared skills retained and original user-config backup preserved outside removed prefixes.",
     "native_worktree_lifecycle": "22 distinct lifecycle cases passed on the final release in two batches (14 initial passes before a fixture-only extended-path failure, 8 final passes after correcting Git for Windows path conversion). The no-op/replay case then passed with additional already-integrated ancestry assertions. Prior release selection: 60 passed including 40 unchanged workspace/startup regressions. Existing Rust 47 passed/2 subprocess helpers ignored; added hosted-provider lifetime guard passed separately. fmt, all-targets Clippy -D warnings and diff checks passed. No sample-project Git mutations, Agent controls or installed-prefix upgrade; see native-worktree-lifecycle-20261012.json and docs/native-worktree-lifecycle.md.",
-    "native_worktree_lifecycle_installation": "Stopped-prefix upgrade committed, retained prior binary backup, all three aliases and installation manifest verified. Fresh account PATH resolves ccb/ask to the upgraded Rust prefix. One installed ccb.exe lifecycle integration test passed, including correlated merge, completed replay and already-integrated no-op. sample-project Keeper remains stopped and Git status clean; no project/provider controls or runtime-state migration. Old foreground CCB entry exited before stop attempt. See native-worktree-lifecycle-installation-20261012.json."
+    "native_worktree_lifecycle_installation": "Stopped-prefix upgrade committed, retained prior binary backup, all three aliases and installation manifest verified. Fresh account PATH resolves ccb/ask to the upgraded Rust prefix. One installed ccb.exe lifecycle integration test passed, including correlated merge, completed replay and already-integrated no-op. sample-project Keeper remains stopped and Git status clean; no project/provider controls or runtime-state migration. Old foreground CCB entry exited before stop attempt. See native-worktree-lifecycle-installation-20261012.json.",
+    "native_default_project": "8 debug cases passed, 99 affected release regressions passed, final installed ccb.exe passed all 8 default-project cases. Real sample_d9_hmi preview selects Pi/Claude/Codex with mutations=false and no .ccb directory. Original source-install directory was absent and was restored at the same prefix; user PATH and provider settings unchanged. See native-default-project-20261013.json."
   },
   "next_rollout_action": {
     "project": "C:\\Users\\user\\Desktop\\work\\1.code\\5.Tool\\sample-project",
     "candidate_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
     "next_action": "Offline worktree lifecycle release is installed and verified. Project runtimes remain stopped. Next broaden real Pi/Codex/Claude interruption/approval acceptance in scoped test resources; no automatic merge, cleanup or new provider launch in sample-project.",
-    "latest_evidence": "docs/analysis/native-worktree-lifecycle-installation-20261012.json",
+    "latest_evidence": "docs/analysis/native-default-project-20261013.json",
     "herdr_preflight": {
       "trial_root": "C:\\Users\\user\\Desktop\\work\\ccb-rust-herdr-acceptance-gjjd92m_",
       "session": "ccb-rust-ui-gjjd92m_",
@@ -688,9 +690,9 @@
   "installed_candidate": {
     "prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
     "rust_source_commit": "2f7c14d2",
-    "binary_sha256": "e4190dd00339525d2689d83d7bf749589988336104fa3c68d786a72ea53c4035",
+    "binary_sha256": "5d1ac6e9a8c8828daf151951d08deeebfbff859303913fb9a34972da4971c49d",
     "account_default": true,
-    "evidence": "docs/analysis/native-worktree-lifecycle-installation-20261012.json"
+    "evidence": "docs/analysis/native-default-project-20261013.json"
   },
   "active_scope": {
     "platform": "Windows 11 + pwsh + Herdr",

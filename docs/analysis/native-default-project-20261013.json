@@ -1,0 +1,52 @@
+{
+  "source_base_commit": "530e5187",
+  "feature": "builtin Pi/Claude/Codex startup without project config",
+  "configuration_file_created": false,
+  "default_agents": [
+    "pi",
+    "claude",
+    "codex"
+  ],
+  "models": "provider CLI defaults; no CCB model overrides",
+  "explicit_configuration_precedence": true,
+  "missing_former_custom_configuration": "refused; explicit restore/resume required",
+  "project_discovery": "nearest explicit config, workspace binding, Git root or native runtime; fresh plain directories use cwd",
+  "release_regression": {
+    "file": "docs/analysis/native-default-project-release-20261013.xml",
+    "tests": 99,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 213.536
+  },
+  "installed_tests": {
+    "file": "docs/analysis/native-default-project-installed-20261013.xml",
+    "tests": 8,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 3.211
+  },
+  "installed_prefix": "C:\\Users\\user\\Desktop\\work\\ccb-rust",
+  "installation_mode": "fresh restore: previous installation and backups absent; existing user PATH retained",
+  "binary_sha256": "5d1ac6e9a8c8828daf151951d08deeebfbff859303913fb9a34972da4971c49d",
+  "runtime_state_migration": false,
+  "real_project": {
+    "path": "C:\\Users\\user\\Desktop\\work\\1.code\\5.Tool\\sample_d9_hmi",
+    "preview_status": "planned",
+    "mutations": false,
+    "configuration_file_exists": false,
+    "runtime_directory_exists": false,
+    "original_dirty_paths": [
+      "comlog.txt",
+      "release/",
+      "scripts/m02_hcanbus_test/"
+    ]
+  },
+  "format": "passed",
+  "clippy": "all-targets -D warnings passed before final guide-only change",
+  "source_file_sha256": {
+    "config.rs": "b9f2432496191f279608991aa5d71e2f0aa1f180d566e15e0ba4667e8f0500f0",
+    "cli.rs": "65e8ac8d7b930c0f9c217c3a80a84e1ece4e79dbf09d13c90d4cc20b11ebb40e",
+    "installation.rs": "9d1a5dbbce26fd387d248490f74aa56df583f712579f38b09dbe199691066950"
+  },
+  "earlier_probe": "installed executable disappeared before the second red probe; missing-install XML is not a configuration failure reproduction"
+}

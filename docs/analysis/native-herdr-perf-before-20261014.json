@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "native": "C:\\Users\\user\\Desktop\\work\\ccb-rust\\bin\\ccb.exe",
+  "rows": [
+    {
+      "kind": "cold",
+      "milliseconds": 16312.449000019114,
+      "herdr_calls": {
+        "status server": 3,
+        "server": 1,
+        "api schema": 2,
+        "workspace list": 14,
+        "workspace create": 1,
+        "workspace report-metadata": 1,
+        "pane list": 18,
+        "pane report-metadata": 2,
+        "pane split": 1,
+        "api snapshot": 9,
+        "pane process-info": 8,
+        "agent start": 2
+      }
+    },
+    {
+      "kind": "reconnect",
+      "milliseconds": 4240.688299993053,
+      "herdr_calls": {
+        "status server": 1,
+        "api schema": 1,
+        "workspace list": 2,
+        "pane list": 4,
+        "api snapshot": 4,
+        "pane process-info": 4
+      }
+    },
+    {
+      "kind": "reconnect",
+      "milliseconds": 4350.691300001927,
+      "herdr_calls": {
+        "status server": 1,
+        "api schema": 1,
+        "workspace list": 2,
+        "pane list": 4,
+        "api snapshot": 4,
+        "pane process-info": 4
+      }
+    },
+    {
+      "kind": "reconnect",
+      "milliseconds": 4521.467000013217,
+      "herdr_calls": {
+        "status server": 1,
+        "api schema": 1,
+        "workspace list": 2,
+        "pane list": 4,
+        "api snapshot": 4,
+        "pane process-info": 4
+      }
+    }
+  ],
+  "reconnect_median_ms": 4350.691300001927,
+  "limits": "Offline Herdr subprocess fixture; no real provider initialization or network model latency.",
+  "verified": {
+    "agent_launches": 2,
+    "model_prompts": 0,
+    "same_daemon_after_reconnect": true
+  }
+}

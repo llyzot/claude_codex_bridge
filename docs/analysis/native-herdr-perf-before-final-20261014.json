@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "native": "C:\\Users\\user\\Desktop\\work\\ccb-rust\\bin\\ccb.exe",
+  "rows": [
+    {
+      "kind": "cold",
+      "milliseconds": 15058.290500019211,
+      "herdr_calls": {
+        "status server": 3,
+        "server": 1,
+        "api schema": 2,
+        "workspace list": 14,
+        "workspace create": 1,
+        "workspace report-metadata": 1,
+        "pane list": 18,
+        "pane report-metadata": 2,
+        "pane split": 1,
+        "api snapshot": 9,
+        "pane process-info": 8,
+        "agent start": 2
+      }
+    },
+    {
+      "kind": "reconnect",
+      "milliseconds": 3933.496700017713,
+      "herdr_calls": {
+        "status server": 1,
+        "api schema": 1,
+        "workspace list": 2,
+        "pane list": 4,
+        "api snapshot": 4,
+        "pane process-info": 4
+      }
+    },
+    {
+      "kind": "reconnect",
+      "milliseconds": 3996.335799980443,
+      "herdr_calls": {
+        "status server": 1,
+        "api schema": 1,
+        "workspace list": 2,
+        "pane list": 4,
+        "api snapshot": 4,
+        "pane process-info": 4
+      }
+    },
+    {
+      "kind": "reconnect",
+      "milliseconds": 4089.4496999680996,
+      "herdr_calls": {
+        "status server": 1,
+        "api schema": 1,
+        "workspace list": 2,
+        "pane list": 4,
+        "api snapshot": 4,
+        "pane process-info": 4
+      }
+    },
+    {
+      "kind": "reconnect",
+      "milliseconds": 4027.8736000182107,
+      "herdr_calls": {
+        "status server": 1,
+        "api schema": 1,
+        "workspace list": 2,
+        "pane list": 4,
+        "api snapshot": 4,
+        "pane process-info": 4
+      }
+    },
+    {
+      "kind": "reconnect",
+      "milliseconds": 3936.645600013435,
+      "herdr_calls": {
+        "status server": 1,
+        "api schema": 1,
+        "workspace list": 2,
+        "pane list": 4,
+        "api snapshot": 4,
+        "pane process-info": 4
+      }
+    }
+  ],
+  "native_sha256": "578b72c2c166c7bb67ea75ca90da0bef6e0b3ef6f86ad58c96015e4eaf530ca8",
+  "reconnect_median_ms": 3996.335799980443,
+  "limits": "Offline Herdr subprocess fixture; no real provider initialization or network model latency.",
+  "verified": {
+    "agent_launches": 2,
+    "model_prompts": 0,
+    "same_daemon_after_reconnect": true
+  }
+}

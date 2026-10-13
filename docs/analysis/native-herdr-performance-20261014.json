@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "scope": "Windows native Herdr startup and reconnect control-path optimization",
+  "source_base": "7a9da261",
+  "before_binary_sha256": "578b72c2c166c7bb67ea75ca90da0bef6e0b3ef6f86ad58c96015e4eaf530ca8",
+  "after_binary_sha256": "8d611ca9f40da7726177d63f8b763bde46849198fbca4bbe543121b93d148007",
+  "reconnect": {
+    "samples_per_binary": 5,
+    "before_median_ms": 3996.335799980443,
+    "after_median_ms": 2566.370700020343,
+    "reduction_percent": 35.78190551372329,
+    "before_queries": 16,
+    "after_queries": 10
+  },
+  "cold_start": {
+    "samples_per_binary": 1,
+    "before_ms": 15058.290500019211,
+    "after_ms": 13076.585499977227,
+    "reduction_percent": 13.160225591606533,
+    "before_queries": 62,
+    "after_queries": 53
+  },
+  "changes": [
+    "Validate all namespace slots from one fresh pane inventory per pass.",
+    "Reuse the current live mount result during session binding, while retaining fresh observations after external mutations.",
+    "Skip writes when namespace and agent ledgers are unchanged; changed state still follows the existing durable transaction path."
+  ],
+  "verification": {
+    "performance_regression_test": {
+      "status": "passed",
+      "tests": 1,
+      "report": "native-herdr-perf-green-20261014.xml"
+    },
+    "identity_callback_and_cancellation_tests": {
+      "status": "passed",
+      "tests": 16,
+      "report": "native-herdr-perf-regression-20261014.xml"
+    },
+    "release_host_recovery": {
+      "status": "passed",
+      "tests": 3,
+      "report": "native-herdr-perf-host-recovery-20261014.xml"
+    },
+    "clippy_warnings_denied": "passed",
+    "installation": {
+      "status": "verified",
+      "operation_id": "51f85c77-7451-4ea5-969f-e5d71464e540",
+      "manifest_sha256": "c33ec27e291e379e7146d5900c36aa40e201ecbf2f543e826e0fc97948018fcb",
+      "aliases": [
+        "ccb",
+        "ccb-native",
+        "ask"
+      ],
+      "rollback_backup_retained": true,
+      "runtime_state_changed": false,
+      "provider_settings_modified": false,
+      "formal_project_dry_run": "passed; mutations=false"
+    },
+    "diff_check": "passed"
+  },
+  "limits": [
+    "Offline Herdr protocol fixture with scripted providers; these are control-flow timings, not full live Pi/Claude/Codex startup timings.",
+    "Five reconnect samples and one cold-start sample per binary; no p95 or broad workload speedup claim.",
+    "The original seventy-second Pi extension initialization issue was not reproduced or attributed.",
+    "No real model requests or global provider sessions were created.",
+    "Ordinary CLI and core admission baseline were measured; this patch changes Herdr orchestration only."
+  ],
+  "cli_baseline_median_ms": {
+    "help": 75.617,
+    "project_dry_run": 90.612,
+    "samples_each": 7
+  }
+}

@@ -475,6 +475,20 @@ fn find_history(provider: &str, root: &Path, id: &str, cwd: &Path) -> Result<Opt
     }
     Ok(found)
 }
+// Only consume the live mount result from the current open iteration here.
+// Disk inspection is not a substitute for this observation. A mutation such
+// as reporting a Pi session still performs its own fresh bound() observation.
+fn mounted_binding(mounted: &Value, agent: &str) -> Result<Value> {
+    let mut live = mounted["agents"][agent].clone();
+    ensure!(
+        live["binding"].is_object()
+            && ["ready", "working", "blocked", "starting"]
+                .contains(&live["status"].as_str().unwrap_or("")),
+        "mounted Herdr provider is no longer present"
+    );
+    live["identity"] = crate::herdr_agents::recorded_identity(mounted, agent);
+    Ok(live)
+}
 fn binding(
     request: &Value,
     bridges: &Value,
@@ -482,8 +496,12 @@ fn binding(
     agent: &str,
     journal: &Path,
     record: &mut Value,
+    mounted: Option<&Value>,
 ) -> Result<Option<Value>> {
-    let mut live = crate::herdr_agents::bound(request, agent)?;
+    let mut live = match mounted {
+        Some(mounted) => mounted_binding(mounted, agent)?,
+        None => crate::herdr_agents::bound(request, agent)?,
+    };
     let spec = &request["config"]["agents"][agent];
     if spec["provider"] == "pi" {
         use std::io::Read;
@@ -661,7 +679,7 @@ fn restart_stopped_backend(
             if hosted(spec) {
                 recovery::native_host_session(&runtime, spec, name, &agents)?;
             } else {
-                let bound = binding(request, bridges, options, name, root, record)?
+                let bound = binding(request, bridges, options, name, root, record, None)?
                     .context("live terminal session is not ready for backend restart")?;
                 ensure!(
                     record["bindings"][name] == bound,
@@ -1071,9 +1089,15 @@ pub(crate) fn open(
                                 && record["bindings"][name]["discovery"].is_object()
                         {
                             record["bindings"].as_object_mut().unwrap().remove(name);
-                            if let Some(bound) =
-                                binding(&request, &bridges, options, name, &root, &mut record)?
-                            {
+                            if let Some(bound) = binding(
+                                &request,
+                                &bridges,
+                                options,
+                                name,
+                                &root,
+                                &mut record,
+                                Some(&mounted),
+                            )? {
                                 if recovery::verify_session(
                                     expected_session.as_ref(),
                                     &request["config"]["agents"][name],
@@ -1095,7 +1119,7 @@ pub(crate) fn open(
                                 )?,
                                 "recovered native session has not been confirmed"
                             );
-                            let live = crate::herdr_agents::bound(&request, name)?;
+                            let live = mounted_binding(&mounted, name)?;
                             if request["config"]["agents"][name]["provider"] == "pi" {
                                 let configured: crate::terminal_history::Binding =
                                     serde_json::from_value(saved["history"].clone())?;

@@ -152,7 +152,9 @@ impl Manager<'_> {
             .store
             .as_mut()
             .context("read-only Herdr observer cannot save")?;
-        store.save(RECORD, &self.record)?;
+        if store.json(RECORD)?.as_ref() != Some(&self.record) {
+            store.save(RECORD, &self.record)?;
+        }
         store.commit()
     }
     fn snapshot(&self) -> Result<Value> {

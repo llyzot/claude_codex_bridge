@@ -387,10 +387,13 @@ struct Controller<'a> {
 }
 impl Controller<'_> {
     fn save(&mut self) -> Result<()> {
-        self.store
-            .save(RECORD, &self.record)
-            .and_then(|_| self.store.commit())
-            .map_err(|error| Persistence(error).into())
+        (|| {
+            if self.store.json(RECORD)?.as_ref() != Some(&self.record) {
+                self.store.save(RECORD, &self.record)?;
+            }
+            self.store.commit()
+        })()
+        .map_err(|error| Persistence(error).into())
     }
     fn rpc(&self, args: Vec<String>) -> Result<Value> {
         let metadata = args.get(1).is_some_and(|value| value == "report-metadata");
@@ -462,30 +465,35 @@ impl Controller<'_> {
         Ok(rows[0].clone())
     }
     fn binding_visible(&self, slot: &str, tagged: bool) -> Result<bool> {
+        Ok(self.binding_in_inventory(&self.panes()?, slot, tagged))
+    }
+    fn binding_in_inventory(&self, panes: &[Value], slot: &str, tagged: bool) -> bool {
         let binding = &self.record["bindings"][slot];
-        let rows: Vec<_> = self
-            .panes()?
-            .into_iter()
+        let rows: Vec<_> = panes
+            .iter()
             .filter(|p| {
                 p["pane_id"] == binding["pane_id"]
                     && p["workspace_id"] == self.record["workspace_id"]
             })
             .collect();
-        Ok(rows.len() == 1
+        rows.len() == 1
             && if tagged {
-                self.owns(&rows[0], Some(slot))
+                self.owns(rows[0], Some(slot))
             } else {
-                rows[0]["tokens"]["ccb_native_owner"].is_null() || self.owns(&rows[0], Some(slot))
-            })
+                rows[0]["tokens"]["ccb_native_owner"].is_null() || self.owns(rows[0], Some(slot))
+            }
     }
     fn validate_bound(&self) -> Result<()> {
         self.workspace(true)?;
+        // One live inventory covers every slot in this validation pass. A
+        // subsequent mutation still requires a new post-operation observation.
+        let panes = self.panes()?;
         for (slot, binding) in self.record["bindings"]
             .as_object()
             .context("invalid namespace bindings")?
         {
             ensure!(
-                self.binding_visible(slot, binding["tagged"] == true)?,
+                self.binding_in_inventory(&panes, slot, binding["tagged"] == true),
                 "namespace pane changed or disappeared"
             );
         }

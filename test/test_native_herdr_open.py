@@ -328,6 +328,39 @@ def test_changed_request_does_not_replace_running_agents_or_daemon(project):
     refused=p['open']();assert refused.returncode!=0
     assert mutate_count(p['backend'],['agent','start'])==2 and p['ready']()['pid']==before['pid']
 
+def test_reconnect_does_not_repeat_live_binding_queries_or_rewrite_unchanged_ledgers(project):
+    from test_native_herdr_namespace import calls
+    p=project;assert p['open']().returncode==0
+    wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=60)
+    before=p['ready']()['pid'];offset=len(calls(p['backend']))
+    ledgers=[p['native']/'herdr'/name for name in ['namespace.json','herdr-agents.json']]
+    versions=[(path.read_bytes(),path.stat().st_mtime_ns) for path in ledgers]
+    result=p['open']();assert result.returncode==0,result.stderr
+    wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=60)
+    queried=calls(p['backend'])[offset:]
+    assert sum(c[:2]==['pane','process-info'] for c in queried)==2,queried
+    assert sum(c[:2]==['api','snapshot'] for c in queried)==2,queried
+    assert sum(c[:2]==['pane','list'] for c in queried)==2,queried
+    assert [(path.read_bytes(),path.stat().st_mtime_ns) for path in ledgers]==versions
+    assert p['ready']()['pid']==before and mutate_count(p['backend'],['agent','start'])==2
+    assert not p['prompts']()
+
+
+def test_reconnect_rejects_lost_agent_even_when_disk_binding_exists(project):
+    p=project;assert p['open']().returncode==0
+    wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=60)
+    ledger=read(p['native']/'herdr/herdr-agents.json')
+    worker=ledger['agents']['worker'];assert worker['binding']
+    change(p['backend'],lambda s:s['agents'].pop(worker['herdr_name']))
+    result=p['open']()
+    if result.returncode==0:
+        wait_for(lambda:read(p['native']/'herdr/herdr-open-start.json')['status']=='failed',timeout=30)
+        error=read(p['native']/'herdr/herdr-open-start.json')['error']
+    else:error=result.stderr
+    assert 'no longer present' in error
+    assert mutate_count(p['backend'],['agent','start'])==2
+
+
 def test_reconnect_from_another_powershell_path_preserves_running_environment(project):
     p=project;assert p['open']().returncode==0;before=wait_for(p['ready'],timeout=20)
     ledger=read(p['native']/'herdr/herdr-open.json')

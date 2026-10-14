@@ -90,27 +90,40 @@ def test_reopen_restarts_stopped_daemon_without_restarting_herdr_or_pi(hosted,re
     assert new_session['state']['thread_id']==session['state']['thread_id']
     assert mutate_count(p['backend'],['agent','start'])==1 and mutate_count(p['backend'],['pane','run'])==2
 
-def test_background_restart_refuses_missing_native_history(hosted):
+def held_activation(native,agent):
+    """Per-actor hold: the authority runs, but this agent's session gate stays closed."""
+    def observe():
+        result=cli('--state-root',native,'agents')
+        if result.returncode!=0:return None
+        row=next(a for a in json.loads(result.stdout)['agents'] if a['agent_name']==agent)
+        return row['activation'] if row['activation'] and not row['activation']['session_gate_open'] else None
+    return wait_for(observe,timeout=30)
+
+def test_background_restart_never_replaces_missing_native_history(hosted):
     p=hosted;s=read(p['native']/'providers/codex/worker/session.json');daemon=p['ready']()['pid']
     cli('--state-root',p['native'],'stop');wait_for(lambda:cli('process-identity',daemon).returncode!=0)
     remove_display(p);Path(s['state']['path']).unlink()
-    result=p['open']();assert result.returncode!=0
-    assert not p['ready']() and mutate_count(p['backend'],['pane','run'])==1
+    result=p['open']();assert result.returncode==0,result.stderr
+    assert json.loads(result.stdout)['status']!='running' and not p['ready']()
+    assert mutate_count(p['backend'],['pane','run'])==1 and not Path(s['state']['path']).exists()
+    assert read(p['native']/'providers/codex/worker/session.json')['state']['thread_id']==s['state']['thread_id']
 
 def test_background_restart_does_not_replay_unfinished_lead_job(hosted):
     p=hosted;asked=cli('--state-root',p['native'],'ask','lead','hold this request');assert asked.returncode==0,asked.stderr
     wait_for(lambda:len(p['prompts']())==1)
     daemon=p['ready']()['pid'];cli('--state-root',p['native'],'stop');wait_for(lambda:cli('process-identity',daemon).returncode!=0)
-    remove_display(p);result=p['open']()
-    assert result.returncode!=0 and 'unfinished' in result.stderr
-    assert not p['ready']() and len(p['prompts']())==1
+    remove_display(p);result=p['open']();assert result.returncode==0,result.stderr
+    wait_for(lambda:cli('--state-root',p['native'],'ping').returncode==0,timeout=30)
+    watched=json.loads(cli('--state-root',p['native'],'watch',json.loads(asked.stdout)['job_id']).stdout)
+    assert watched['status']=='running' and len(p['prompts']())==1
 
-def test_background_restart_refuses_changed_live_pi_binding(hosted):
+def test_background_restart_holds_changed_live_pi_binding(hosted):
     p=hosted;daemon=p['ready']()['pid'];ledger=read(p['native']/'herdr/herdr-agents.json')
     cli('--state-root',p['native'],'stop');wait_for(lambda:cli('process-identity',daemon).returncode!=0)
     remove_display(p)
     change(p['backend'],lambda s:s['agents'][ledger['agents']['lead']['herdr_name']]['agent_session'].update(value=str(p['root']/'different-pi-history.jsonl')))
-    result=p['open']();assert result.returncode!=0 and 'session' in result.stderr
+    result=p['open']();assert result.returncode==0,result.stderr
+    assert held_activation(p['native'],'lead')['reason']=='session_rejected'
     assert not p['ready']() and p['pi'].poll() is None
     assert mutate_count(p['backend'],['agent','start'])==1
 
@@ -202,13 +215,15 @@ def test_stopped_native_host_resumes_exact_thread_and_new_owned_process(stopped_
     assert read(p['state']/'herdr-recovery.json')['phase']=='complete'
     assert mutate_count(p['backend'],['pane','run'])==2 and mutate_count(p['backend'],['workspace','close'])==1
 
-def test_missing_host_history_blocks_before_restarting_server(stopped_host):
-    p=stopped_host;p['log'].unlink();r=p['open'](True)
-    assert r.returncode!=0 and not server(p['backend'])['server_running']
-    assert 'not integrated' not in r.stderr
-    assert mutate_count(p['backend'],['workspace','close'])==0
+def test_missing_host_history_holds_worker_without_a_fresh_thread(stopped_host):
+    p=stopped_host;p['log'].unlink();r=p['open'](True);assert r.returncode==0,r.stderr
+    assert held_activation(p['runtime'],'worker')['reason']=='recovery_evidence_required'
+    assert mutate_count(p['backend'],['pane','run'])==1 and not p['log'].exists()
+    assert read(p['runtime']/'providers/codex/worker/session.json')['state']['thread_id']==p['old']['state']['thread_id']
 
-def test_foreign_native_host_session_record_blocks_recovery(stopped_host):
+def test_foreign_native_host_session_record_holds_worker(stopped_host):
     p=stopped_host;path=p['runtime']/'providers/codex/worker/session.json';saved=read(path);saved['pid']=os.getpid();path.write_text(json.dumps(saved),encoding='utf-8')
-    r=p['open'](True);assert r.returncode!=0 and 'another host' in r.stderr
-    assert not server(p['backend'])['server_running'] and mutate_count(p['backend'],['workspace','close'])==0
+    r=p['open'](True);assert r.returncode==0,r.stderr
+    activation=held_activation(p['runtime'],'worker')
+    assert activation['reason']=='recovery_evidence_required' and 'another host' in activation['error']
+    assert mutate_count(p['backend'],['pane','run'])==1 and read(path)['pid']==os.getpid()

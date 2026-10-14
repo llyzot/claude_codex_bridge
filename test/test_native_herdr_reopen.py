@@ -138,8 +138,8 @@ def test_retired_namespace_reopens_after_its_owned_server_also_stops(stopped):
     assert read(p['state']/'herdr-recovery.json')['sessions']['worker']['session_id']==p['session']
     assert mutate_count(p['backend'],['workspace','close'])==1
 
-@pytest.mark.parametrize('native_host,fresh_pi',[(False,False),(True,False),(False,True)],ids=['terminal','hosted','foreign_pi'])
-def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,native_host,fresh_pi):
+@pytest.mark.parametrize('native_host,fresh_pi,pending_work',[(False,False,False),(True,False,False),(False,True,False),(True,False,True),(True,True,False)],ids=['terminal','hosted','foreign_pi','hosted_pending','hosted_foreign_pi'])
+def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,native_host,fresh_pi,pending_work,record_property):
     from test_native_codex_tui_host import CODEX
     from test_native_pi_terminal import HOST
     p=project
@@ -157,6 +157,11 @@ def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,nat
     history.write_text(json.dumps({'type':'session','id':original['session_id'],'cwd':str(p['root'])})+'\n',encoding='utf-8')
     history_before=history.read_bytes()
     worker_before=read(p['native']/'providers/codex/worker/session.json') if native_host else None
+    if pending_work:
+        first=cli('--state-root',p['native'],'ask','lead','old active task');assert first.returncode==0,first.stderr
+        wait_for(lambda:p['prompts']())
+        queued=cli('--state-root',p['native'],'ask','lead','preserve queued task');assert queued.returncode==0,queued.stderr
+        queued_id=json.loads(queued.stdout)['job_id']
     result=cli('--state-root',p['native'],'kill',timeout=25)
     assert result.returncode==0 and json.loads(result.stdout)['status']=='closed',result.stderr
     for proc in [p['pi'],p['codex']]:proc.kill();proc.wait(timeout=5)
@@ -174,6 +179,25 @@ def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,nat
         change(p['backend'],lambda s:s.update(provider_pids=[pi.pid,codex.pid]))
         assert p['open'](0).returncode==0
         wait_for(lambda:(p['native']/'herdr/herdr-recovery.json').exists() and read(p['native']/'herdr/herdr-recovery.json')['phase']=='reset',timeout=20)
+        if native_host and not pending_work:
+            # Hold Pi's new bridge generation back. A quiet recovery must not
+            # serialize Codex initialization behind this unrelated provider.
+            def early_host():
+                path=p['native']/'providers/codex/worker/session.json'
+                value=read(path) if path.exists() else {}
+                return value if value.get('runtime_instance_id')!=worker_before['runtime_instance_id'] and value.get('state',{}).get('thread_id') else None
+            started=time.monotonic()
+            early=wait_for(early_host,timeout=15)
+            record_property('codex_ready_while_pi_blocked_ms',round((time.monotonic()-started)*1000,2))
+            assert early['state']['thread_id']==worker_before['state']['thread_id']
+            assert 'lead' not in [a['agent_name'] for a in json.loads(cli('--state-root',p['native'],'agents').stdout)['agents']]
+            assert cli('--state-root',p['native'],'ask','lead','must wait for verified binding').returncode!=0
+        elif pending_work:
+            # Allow several opener iterations. Unsent old work must keep the
+            # original all-session barrier, never boot a partial daemon.
+            time.sleep(2)
+            assert p['ready']() is None
+            assert read(p['native']/'providers/codex/worker/session.json')['runtime_instance_id']==worker_before['runtime_instance_id']
         gate.touch();assert json.loads(pi.stdout.readline())['ready']
         if fresh_pi:
             rejected=p['open']()
@@ -182,7 +206,11 @@ def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,nat
                 error=read(p['native']/'herdr/herdr-open-start.json')['error']
             else:error=rejected.stderr
             assert 'recovered native session' in error
-            assert p['ready']() is None
+            if native_host:
+                assert 'lead' not in [a['agent_name'] for a in json.loads(cli('--state-root',p['native'],'agents').stdout)['agents']]
+                assert not p['prompts']()
+            else:
+                assert p['ready']() is None
             return
         # Include real no-model Codex host initialization under the product's
         # unchanged 60-second startup budget, rather than a 20-second fixture cap.
@@ -194,6 +222,12 @@ def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,nat
         if native_host:
             after=read(p['native']/'providers/codex/worker/session.json')
             assert after['state']['thread_id']==worker_before['state']['thread_id'] and after['pid']!=worker_before['pid']
+            if not pending_work:
+                assert after['runtime_instance_id']==early['runtime_instance_id']
+            else:
+                wait_for(lambda:any('preserve queued task' in row['body'] for row in p['prompts']()))
+                assert sum('preserve queued task' in row['body'] for row in p['prompts']())==1
+                assert json.loads(cli('--state-root',p['native'],'watch',queued_id).stdout)['status'] not in ['failed','cancelled']
         else:
             asked=cli('--state-root',p['native'],'ask','lead','delegate after reopen');assert asked.returncode==0,asked.stderr
             job=json.loads(asked.stdout)['job_id'];lead=wait_for(lambda:p['prompts']())[-1]

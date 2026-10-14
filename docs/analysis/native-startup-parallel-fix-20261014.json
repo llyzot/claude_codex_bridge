@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-14",
+  "source_base": "389e623b",
+  "scope": "Remove cross-provider startup dependency during quiet Herdr recovery",
+  "changes": [
+    "Quiet restored generations may initialize native Codex hosts before terminal peers publish their recovered sessions.",
+    "Eligibility rechecks all prior agents for unfinished jobs, pending mailboxes, callbacks, outstanding replies and provider faults under the authorization writer.",
+    "Queued-work recovery still requires the complete verified graph. Missing/wrong terminal sessions are never mounted.",
+    "Later verified bindings use the existing guarded reload and preserve Codex process and thread identity."
+  ],
+  "validation": {
+    "red": "Old release fails hosted recovery test after 15 seconds with Pi readiness withheld.",
+    "green": "Same dependency test passed on changed code.",
+    "debug_regression": {
+      "passed": 5,
+      "report": "native-startup-parallel-regression-20261014.xml"
+    },
+    "release_regression": {
+      "passed": 3,
+      "report": "native-startup-parallel-release-20261014.xml",
+      "cases": [
+        "hosted foreign Pi session rejected without admitting lead",
+        "child result returned once and FIFO queue preserved",
+        "opener crash with durable work retains recovery behavior"
+      ]
+    },
+    "clippy": "all ccb-kernel targets, warnings denied, passed",
+    "release_build": "passed",
+    "diff_check": "passed",
+    "no_model_calls": true
+  },
+  "measurement": {
+    "test_condition": "Actual installed Codex app-server, private unauthenticated home; fixture Herdr and gated Pi bridge",
+    "codex_ready_after_recovery_reset_ms": 7877.66,
+    "pi_ready_at_measurement": false,
+    "limit": "Single debug-build sample; this is evidence of removed dependency, not a measured production speedup."
+  },
+  "release": {
+    "binary_sha256": "f6405c87095fce39b90f4a3e127442c203cbfd00a01961b76ec247bb0c75fcd9",
+    "install_status": "not installed: native installation active-use guard refused with os error 32",
+    "installed_binary_sha256": "5d157dd7ab91444f4b6135fdf5b436d5018c7e6158c0e0c0f2c86e23e5c6fdc4",
+    "formal_project_restarted": false
+  },
+  "limits": [
+    "Active-work recovery intentionally retains the complete-session barrier.",
+    "Mixed-version Codex model catalog cache churn remains upstream; no supported independent model-cache path was found in the official configuration reference. No custom catalog override, CODEX_HOME clone, downgrade or global configuration change applied.",
+    "No Herdr pane reads or controls performed; formal project observed only through passive CCB status."
+  ],
+  "reference": "https://learn.chatgpt.com/docs/config-file/config-reference"
+}

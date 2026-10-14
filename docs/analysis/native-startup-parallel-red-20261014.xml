@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="36.780" timestamp="2026-10-14T10:30:53.993444+08:00" hostname="HOST"><testcase classname="test.test_native_herdr_reopen" name="test_pi_and_codex_reopen_preserves_sessions_and_callback_routing[hosted]" time="35.695"><failure message="Failed: expected fixture state not observed">project = {'root': WindowsPath('C:/Users/user/AppData/Local/Temp/pytest-of-user/pytest-602/test_pi_and_codex_reopen_prese0...boser/AppData/Local/Temp/pytest-of-user/pytest-602/test_pi_and_codex_reopen_prese0/project/open-options.json'), ...}
+native_host = True, fresh_pi = False
+
+    @pytest.mark.parametrize('native_host,fresh_pi',[(False,False),(True,False),(False,True)],ids=['terminal','hosted','foreign_pi'])
+    def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,native_host,fresh_pi):
+        from test_native_codex_tui_host import CODEX
+        from test_native_pi_terminal import HOST
+        p=project
+        if native_host:
+            if not CODEX.exists():pytest.skip('Installed Codex required for no-model host resumption')
+            home=p['root']/'private-codex-home';home.mkdir()
+            p['options']['config']['agents']['worker'].update(command=[str(CODEX),'app-server','--stdio'],driver_kind='codex_app_server',
+                profile_family='protocol_turn',tui_host_root=str(p['root']/'hosts'),env={'CODEX_HOME':str(home)})
+            p['file'].write_text(json.dumps(p['options']),encoding='utf-8')
+            change(p['backend'],lambda s:s.update(shell_name='pwsh.exe'))
+        assert p['open']().returncode==0
+        wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=60)
+        original=json.loads(p['pi'].args[2]);history=Path(original['native_session_path'])
+        expected_pi=original['session_id']
+        history.write_text(json.dumps({'type':'session','id':original['session_id'],'cwd':str(p['root'])})+'\n',encoding='utf-8')
+        history_before=history.read_bytes()
+        worker_before=read(p['native']/'providers/codex/worker/session.json') if native_host else None
+        result=cli('--state-root',p['native'],'kill',timeout=25)
+        assert result.returncode==0 and json.loads(result.stdout)['status']=='closed',result.stderr
+        for proc in [p['pi'],p['codex']]:proc.kill();proc.wait(timeout=5)
+        gate=p['root']/'new-epoch-ready';original['start_gate']=str(gate)
+        if fresh_pi:
+            original['session_id']=str(uuid.uuid4());original['native_session_path']=str(p['root']/'wrong-pi-session.jsonl')
+            Path(original['native_session_path']).write_text(json.dumps({'type':'session','id':original['session_id'],'cwd':str(p['root'])})+'\n',encoding='utf-8')
+            change(p['backend'],lambda s:s['agent_sessions']['pi'].update(value=original['native_session_path']))
+        pi=subprocess.Popen([NODE,str(HOST),json.dumps(original)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8',creationflags=0x08000000)
+        codex=subprocess.Popen([sys.executable,'-I','-c','import time;time.sleep(180)'],creationflags=0x08000000)
+        def command(**data):
+            pi.stdin.write(json.dumps(data)+'\n');pi.stdin.flush()
+            line=pi.stdout.readline();assert line,pi.stderr.read();return json.loads(line)
+        try:
+            change(p['backend'],lambda s:s.update(provider_pids=[pi.pid,codex.pid]))
+            assert p['open'](0).returncode==0
+            wait_for(lambda:(p['native']/'herdr/herdr-recovery.json').exists() and read(p['native']/'herdr/herdr-recovery.json')['phase']=='reset',timeout=20)
+            if native_host:
+                # Hold Pi's new bridge generation back. A quiet recovery must not
+                # serialize Codex initialization behind this unrelated provider.
+                def early_host():
+                    path=p['native']/'providers/codex/worker/session.json'
+                    value=read(path) if path.exists() else {}
+                    return value if value.get('runtime_instance_id')!=worker_before['runtime_instance_id'] and value.get('state',{}).get('thread_id') else None
+&gt;               early=wait_for(early_host,timeout=15)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+test\test_native_herdr_reopen.py:184:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+fn = &lt;function test_pi_and_codex_reopen_preserves_sessions_and_callback_routing.&lt;locals&gt;.early_host at 0x000002C5FCBBF5E0&gt;
+timeout = 15
+
+    def wait_for(fn, timeout=12):
+        deadline=time.monotonic()+timeout
+        while time.monotonic()&lt;deadline:
+            value=fn()
+            if value:return value
+            time.sleep(.05)
+&gt;       pytest.fail('expected fixture state not observed')
+E       Failed: expected fixture state not observed
+
+test\test_native_herdr_worker.py:25: Failed</failure></testcase></testsuite></testsuites>

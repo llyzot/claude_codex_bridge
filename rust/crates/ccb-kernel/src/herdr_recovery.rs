@@ -11,7 +11,7 @@ use std::{
 const STATE: &str = "herdr-recovery.json";
 #[path = "herdr_work_handoff.rs"]
 mod work_handoff;
-pub(super) use work_handoff::{authorize_start, handoff_allowed};
+pub(super) use work_handoff::{authorize_start, handoff_allowed, partial_start_allowed};
 pub(super) fn expected_session(root: &Path, open: &Value, agent: &str) -> Result<Option<Value>> {
     let Some(recovery) = read(root, STATE)? else {
         return Ok(None);

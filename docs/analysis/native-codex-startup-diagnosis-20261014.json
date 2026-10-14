@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "kind": "read_only_startup_diagnosis",
+  "date": "2026-10-14",
+  "project_label": "sample-project-3",
+  "agent": "codex",
+  "source_commit": "389e623b",
+  "authority": {
+    "runtime": "mounted, healthy, protocol ready, idle",
+    "queued_jobs": 0,
+    "active_job": null,
+    "scope": "one live project, no restart or model requests",
+    "pane_evidence": "not collected; user chose disk-log analysis only"
+  },
+  "timeline_local_Asia_Shanghai": [
+    {
+      "event": "CCB opener process",
+      "at": "10:13:08.068",
+      "seconds_from_open": 0
+    },
+    {
+      "event": "Claude process",
+      "at": "10:13:11.319",
+      "seconds_from_open": 3.25
+    },
+    {
+      "event": "Pi process",
+      "at": "10:13:11.392",
+      "seconds_from_open": 3.32
+    },
+    {
+      "event": "Pi publishes bridge identity",
+      "at": "10:13:15.666",
+      "seconds_from_open": 7.598
+    },
+    {
+      "event": "Codex app-server process",
+      "at": "10:13:17.073",
+      "seconds_from_open": 9.005
+    },
+    {
+      "event": "WebSocket listener",
+      "at": "10:13:17.743",
+      "seconds_from_open": 9.675
+    },
+    {
+      "event": "initialize received",
+      "at": "10:13:18.091",
+      "seconds_from_open": 10.023
+    },
+    {
+      "event": "coordination config/read received",
+      "at": "10:13:18.167",
+      "seconds_from_open": 10.099
+    },
+    {
+      "event": "CCB thread/resume received",
+      "at": "10:13:18.323",
+      "seconds_from_open": 10.255
+    },
+    {
+      "event": "CCB thread binding observed",
+      "at": "10:13:22.828",
+      "seconds_from_open": 14.76
+    },
+    {
+      "event": "Codex TUI process",
+      "at": "10:13:23.840",
+      "seconds_from_open": 15.772
+    },
+    {
+      "event": "TUI initial frame scheduled",
+      "at": "10:13:25.239",
+      "seconds_from_open": 17.171
+    }
+  ],
+  "findings": [
+    {
+      "confidence": "high",
+      "finding": "CCB recovery creates a cross-provider startup dependency",
+      "evidence": "sync_daemon refuses to start the restored daemon until all previously mounted actors are bound. Pi's bridge identity was available at 10:13:15.666, Codex server began at 10:13:17.073.",
+      "source": "rust/crates/ccb-kernel/src/herdr_open.rs:727",
+      "limit": "The first 9.005 seconds include recovery checks, namespace work and provider binding; no per-operation trace exists to allocate every millisecond."
+    },
+    {
+      "confidence": "high",
+      "finding": "Model catalog cache version mismatch forces online refresh",
+      "evidence": [
+        "10:13:18.383: expected 0.162.1, cached 0.162.0; no usable cache entry",
+        "10:13:20.036: thread/resume model request returned HTTP 200",
+        "10:13:22.492: cache hit, cached version 0.162.1",
+        "10:13:24.285: cache had changed back to 0.162.0; no usable cache entry",
+        "10:13:25: another models GET returned HTTP 200"
+      ],
+      "versions": {
+        "desktop_embedded": "0.162.0-alpha.17.2",
+        "ccb_cli": "0.162.1"
+      },
+      "limit": "Same-path cache version churn is proven. The process that wrote the 0.162.0 entry was not positively attributed."
+    },
+    {
+      "confidence": "high",
+      "finding": "UI rendering is not the main measured delay",
+      "evidence": "TUI initial-frame log: duration_ms=964, bootstrap_ms=930, thread_and_widget_ms=23, initial_session_ms=6, event_stream_ms=0. Reusing running thread, not a second full model session startup.",
+      "limit": "Initial-frame scheduling is not an observed interactive-ready timestamp."
+    },
+    {
+      "confidence": "high",
+      "finding": "New coordination config/read is small relative to total",
+      "evidence": "config/read request at 10:13:18.167, thread/resume request at 10:13:18.323: about 156 ms including transport/control-loop work."
+    }
+  ],
+  "checks": {
+    "actual_process_identity_lag_seconds": 12.447,
+    "replay_verdict": "Codex TUI process >5s after Pi: reproduced",
+    "query_mode": "SQLite read-only, exact runtime PIDs and bounded timestamps",
+    "changes": "diagnostic report only"
+  },
+  "recommended_next_steps": [
+    "Split provider prewarming from durable-job admission during recovery; retain full recovery barriers for dispatch and callbacks.",
+    "Resolve mixed-version shared model-cache churn without copying whole provider homes or deleting shared cache.",
+    "Add bounded per-stage startup durations so future regressions can be attributed without raw payload logs."
+  ],
+  "excluded_claims": [
+    "No evidence that a slow model response caused startup delay; no model task was sent.",
+    "No evidence that disabling all plugins or replacing PowerShell is needed.",
+    "No performance improvement claimed; this task diagnosed the existing startup."
+  ]
+}

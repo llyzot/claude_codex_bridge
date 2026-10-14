@@ -89,6 +89,21 @@ fn normalized(config: &Value, resume: &Value) -> Result<Value> {
     Ok(result)
 }
 
+fn quiet_generation(kernel: &mut crate::Kernel, prior: &Value) -> Result<bool> {
+    let names = prior["agents"]
+        .as_object()
+        .context("recovery agents missing")?
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    Ok(crate::daemon::recovery_blockers(kernel, &names)?.is_empty())
+}
+
+pub(in crate::herdr_open) fn partial_start_allowed(runtime: &Path, prior: &Value) -> Result<bool> {
+    crate::daemon::verify_owner(runtime)?;
+    quiet_generation(&mut crate::Kernel::open(runtime)?, prior)
+}
+
 fn validate(
     kernel: &mut crate::Kernel,
     root: &Path,
@@ -116,6 +131,19 @@ fn validate(
         "native work handoff old generation changed"
     );
     let prior = crate::restart_config::restore(&committed)?;
+    let partial = prior["agents"]
+        .as_object()
+        .context("recovery agents missing")?
+        .keys()
+        .any(|name| desired["agents"].get(name).is_none());
+    if partial {
+        // Recheck under the writer used to authorize this generation. A queued
+        // job, pending reply or callback must still take the full handoff path.
+        ensure!(
+            quiet_generation(kernel, &prior)?,
+            "partial recovery would strand unfinished work"
+        );
+    }
     let mut resume = json!({});
     for (name, saved) in recovery["sessions"]
         .as_object()
@@ -123,6 +151,9 @@ fn validate(
     {
         resume[name] = saved["args"].clone();
         let spec = &desired["agents"][name];
+        if partial && spec.is_null() {
+            continue;
+        }
         if !super::super::hosted(spec) {
             ensure!(
                 super::verify_session(
@@ -139,9 +170,15 @@ fn validate(
             );
         }
     }
+    let mut expected = normalized(&prior, &recovery["previous_open"]["resume_args"])?;
+    if partial {
+        expected["agents"]
+            .as_object_mut()
+            .unwrap()
+            .retain(|name, _| desired["agents"].get(name).is_some());
+    }
     ensure!(
-        normalized(&prior, &recovery["previous_open"]["resume_args"])?
-            == normalized(desired, &resume)?,
+        expected == normalized(desired, &resume)?,
         "native work handoff substantive configuration changed"
     );
     ensure!(
@@ -150,21 +187,34 @@ fn validate(
         "native work handoff bindings changed"
     );
     let namespace = read(root, "namespace.json")?.context("recovery namespace missing")?;
-    let agents = read(root, "herdr-agents.json")?.context("recovery mounted agents missing")?;
+    let agents = read(root, "herdr-agents.json")?.unwrap_or(Value::Null);
     ensure!(
         namespace["status"] == "prepared"
             && namespace["owner_id"] != recovery["namespace"]["owner_id"]
-            && namespace["workspace_id"] == open["workspace_id"]
-            && agents["namespace_owner"] == namespace["owner_id"]
-            && agents["workspace_id"] == namespace["workspace_id"]
-            && agents["plan"]["namespace_plan_hash"] == namespace["plan_hash"],
+            && namespace["workspace_id"] == open["workspace_id"],
         "native work handoff namespace changed"
     );
-    recoverable(kernel, desired)?;
+    if agents.is_null() {
+        ensure!(
+            partial
+                && desired["agents"]
+                    .as_object()
+                    .is_some_and(|a| !a.is_empty() && a.values().all(super::super::hosted)),
+            "recovery mounted agents missing"
+        );
+    } else {
+        ensure!(
+            agents["namespace_owner"] == namespace["owner_id"]
+                && agents["workspace_id"] == namespace["workspace_id"]
+                && agents["plan"]["namespace_plan_hash"] == namespace["plan_hash"],
+            "native work handoff namespace changed"
+        );
+    }
+    recoverable(kernel, if partial { &prior } else { desired })?;
     Ok(
         json!({"schema_version":1,"operation_id":recovery["operation_id"],
         "prior_config_fingerprint":committed["config_fingerprint"],
-        "desired_config_fingerprint":crate::config::fingerprint(desired)?,
+        "desired_config_fingerprint":crate::config::fingerprint(desired)?,"partial_quiet_start":partial,
         "namespace_owner":namespace["owner_id"],"workspace_id":namespace["workspace_id"],"plan_hash":namespace["plan_hash"],"agents_plan_hash":agents["plan_hash"]}),
     )
 }

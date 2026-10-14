@@ -740,7 +740,12 @@ fn sync_daemon(request: &Value, root: &Path, record: &mut Value, wait: Duration)
             .keys()
             .any(|name| daemon["agents"].get(name).is_none())
         {
-            return Ok(false);
+            // There is nothing to transfer in a quiet generation. Let hosted
+            // providers initialize now; recovered terminal bindings are added
+            // by the ordinary guarded reload without replacing the host.
+            if !recovery::partial_start_allowed(&runtime, &prior)? {
+                return Ok(false);
+            }
         }
     }
     if daemon["agents"].as_object().unwrap().is_empty() {

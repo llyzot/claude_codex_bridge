@@ -280,6 +280,7 @@ pub(crate) fn run(
     events: &mpsc::Sender<Event>,
     grant: &mpsc::Receiver<()>,
     alive: &AtomicBool,
+    interrupt: &mut crate::herdr_worker::Interrupt,
     permitted: &mut bool,
 ) -> Result<()> {
     let d: Discovery = serde_json::from_value(spec["herdr_discovery"].clone())?;
@@ -403,6 +404,7 @@ pub(crate) fn run(
     let mut completed = false;
     while alive.load(Ordering::Acquire) {
         if !completed {
+            interrupt.send(request, &proof["identity"])?;
             if !fixed && scan.elapsed() >= Duration::from_secs(1) {
                 for binding in candidates(&d, since, provider)? {
                     if !readers.contains_key(&binding.path) {
@@ -468,6 +470,14 @@ pub(crate) fn run(
             }
         }
         let live = observed(request, agent, Some(&proof["identity"]))?;
+        if !completed {
+            if let Some(mut decision) = interrupt.settled(&live) {
+                decision["diagnostics"]["native_execution_instance"] = json!(execution);
+                events.send(Event::Completed(decision))?;
+                completed = true;
+                continue;
+            }
+        }
         if completed && live["interactive_ready"] == true {
             events.send(Event::Ready)?;
             return Ok(());

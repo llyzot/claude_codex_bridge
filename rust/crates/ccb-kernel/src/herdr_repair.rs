@@ -53,11 +53,15 @@ pub(super) fn fresh_session(project: &Path, agent: &str, dry_run: bool) -> Resul
     let prior = crate::restart_config::restore(&committed)?;
     let provider = crate::records::string(&prior["agents"][agent], "provider")
         .with_context(|| format!("agent {agent} is not in the committed configuration"))?;
-    if let Some(fault) = read(&runtime, &crate::provider_fault::path(provider, agent))? {
-        ensure!(
-            fault["status"] != "blocked",
-            "provider fault requires explicit provider recovery, not a fresh session"
-        );
+    // A terminal fault is settled by stopped-history reconciliation; a native
+    // host fault concerns processes CCB owns and needs provider recovery.
+    if prior["agents"][agent]["driver_kind"] != "herdr_tui" {
+        if let Some(fault) = read(&runtime, &crate::provider_fault::path(provider, agent))? {
+            ensure!(
+                fault["status"] != "blocked",
+                "provider fault requires explicit provider recovery, not a fresh session"
+            );
+        }
     }
     let mut kernel = kernel;
     let rows = kernel.dispatch(

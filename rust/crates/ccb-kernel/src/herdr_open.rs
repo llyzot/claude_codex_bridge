@@ -1058,7 +1058,15 @@ pub(crate) fn open(
                             Ok(())
                         })();
                         if let Err(error) = activation {
-                            record["bindings"].as_object_mut().unwrap().remove(name);
+                            // Stop activation, but keep the verified session as
+                            // evidence for a later stopped recovery.
+                            if let Some(lost) =
+                                record["bindings"].as_object_mut().unwrap().remove(name)
+                            {
+                                if !lost["history"].is_null() || !lost["discovery"].is_null() {
+                                    record["retained_bindings"][name] = lost;
+                                }
+                            }
                             record["binding_errors"][name] = json!(error.to_string());
                         } else if let Some(errors) = record["binding_errors"].as_object_mut() {
                             errors.remove(name);

@@ -222,8 +222,65 @@ def test_unknown_send_without_log_is_held_across_restart_and_never_resent(runtim
     resumed=r['start']();time.sleep(.5)
     assert not resumed.rpc('watch',{'target':receipt['job_id']})['terminal']
     assert mutate_count(r['backend'],['agent','prompt'])==1 and not r['prompts']()
-    with pytest.raises(AssertionError):resumed.rpc('cancel',{'job_id':receipt['job_id']})
+    # Cancelling interrupts the terminal and settles without ever resending.
+    assert resumed.rpc('cancel',{'job_id':receipt['job_id']})['status']=='cancellation_requested'
+    row=await_watch(resumed,receipt['job_id'],lambda row:row['terminal'],timeout=20)
+    assert row['status']=='cancelled' and row['completion_reason']=='herdr_terminal_interrupted'
+    assert mutate_count(r['backend'],['agent','prompt'])==1 and not r['prompts']()
     assert all(p.poll() is None for p in r['processes'])
+
+def keys(r):
+    p=r['backend']/'keys.jsonl'
+    return [json.loads(line) for line in p.read_text(encoding='utf-8').splitlines()] if p.exists() else []
+
+def test_running_terminal_cancel_interrupts_once_and_records_provider_abort(runtime):
+    r=runtime;s=r['start']();receipt=r['submit'](s);prompt=wait_for(lambda:r['prompts']())[-1]
+    queued=r['submit'](s,body='queued after cancel')
+    assert s.rpc('cancel',{'job_id':receipt['job_id']})['status']=='cancellation_requested'
+    assert s.rpc('cancel',{'job_id':receipt['job_id']})['status']=='cancellation_requested'
+    assert wait_for(lambda:keys(r))==[{'name':r['name'],'keys':['esc']}]
+    e=r['event'];r['append'](e('task_started',turn_id='t'),e('user_message',message=prompt['body']),e('turn_aborted',turn_id='t'))
+    change(r['backend'],lambda state:state['agents'][r['name']].update(agent_status='idle',interactive_ready=True))
+    row=await_watch(s,receipt['job_id'],lambda row:row['terminal'])
+    assert row['status']=='cancelled' and row['completion_reason']=='codex_turn_aborted'
+    rows=s.rpc('records.latest',{'stream':'jobs','identity':'job_id','agent_name':'worker'},version=1)['result']
+    diagnostics=next(j for j in rows if j['job_id']==receipt['job_id'])['terminal_decision']['diagnostics']
+    assert diagnostics['cancel_requested'] is True and diagnostics['result_reply_enabled'] is True
+    nxt=wait_for(lambda:r['prompts']() if len(r['prompts']())==2 else None)[-1]
+    assert 'queued after cancel' in nxt['body'] and len(keys(r))==1
+    r['finish'](nxt,turn='next')
+    assert await_watch(s,queued['job_id'],lambda row:row['terminal'])['status']=='completed'
+
+def test_turn_finished_before_interrupt_still_completes(runtime):
+    r=runtime;s=r['start']();receipt=r['submit'](s);prompt=wait_for(lambda:r['prompts']())[-1]
+    s.rpc('cancel',{'job_id':receipt['job_id']});wait_for(lambda:keys(r))
+    r['finish'](prompt)
+    row=await_watch(s,receipt['job_id'],lambda row:row['terminal'])
+    assert row['status']=='completed' and row['reply']=='terminal worker result'
+
+def test_interrupt_without_history_marker_settles_once_terminal_stays_idle(runtime):
+    r=runtime;s=r['start']();receipt=r['submit'](s);wait_for(lambda:r['prompts']())
+    s.rpc('cancel',{'job_id':receipt['job_id']});wait_for(lambda:keys(r))
+    time.sleep(1);assert not s.rpc('watch',{'target':receipt['job_id']})['terminal']
+    change(r['backend'],lambda state:state['agents'][r['name']].update(agent_status='idle',interactive_ready=True))
+    row=await_watch(s,receipt['job_id'],lambda row:row['terminal'],timeout=20)
+    assert row['status']=='cancelled' and row['completion_reason']=='herdr_terminal_interrupted'
+    assert len(r['prompts']())==1
+
+def test_cancel_before_terminal_permit_never_prompts_or_interrupts(runtime):
+    r=runtime
+    change(r['backend'],lambda state:state['agents'][r['name']].update(agent_status='working',interactive_ready=False))
+    s=r['start']();receipt=r['submit'](s)
+    wait_for(lambda:s.rpc('watch',{'target':receipt['job_id']})['status']=='running')
+    assert s.rpc('cancel',{'job_id':receipt['job_id']})['status']=='cancelled'
+    row=s.rpc('watch',{'target':receipt['job_id']})
+    assert row['status']=='cancelled' and row['completion_reason']=='cancel_info'
+    assert job(s,receipt)['terminal_decision']['diagnostics']['provider_prompt_sent'] is False
+    change(r['backend'],lambda state:state['agents'][r['name']].update(agent_status='idle',interactive_ready=True))
+    second=r['submit'](s,body='after unsent cancel');prompt=wait_for(lambda:r['prompts']())[-1]
+    assert 'after unsent cancel' in prompt['body'] and len(r['prompts']())==1 and not keys(r)
+    r['finish'](prompt,turn='second')
+    assert await_watch(s,second['job_id'],lambda row:row['terminal'])['status']=='completed'
 
 def test_provider_task_error_cannot_become_success_or_deliver_final_looking_text(runtime):
     r=runtime;s=r['start']();receipt=r['submit'](s)

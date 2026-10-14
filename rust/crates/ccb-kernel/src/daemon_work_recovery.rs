@@ -19,15 +19,19 @@ impl Daemon {
             config,
             &format!("recovery-{}", uuid::Uuid::new_v4()),
         )?;
-        ensure!(
-            daemon
-                .faults
-                .keys()
-                .all(
-                    |agent| daemon.config["herdr_activation"]["blocked_agents"][agent].is_string()
-                ),
-            "unfinished recovery requires explicit provider fault repair"
-        );
+        // Terminal faults only lost observation; their stopped work is settled
+        // from history below. Other faults still need explicit provider repair.
+        let mut terminal_faults = Vec::new();
+        for agent in daemon.faults.keys().cloned().collect::<Vec<_>>() {
+            if daemon.config["herdr_activation"]["blocked_agents"][&agent].is_string() {
+                continue;
+            }
+            ensure!(
+                daemon.registered_spec(&agent)?["driver_kind"] == "herdr_tui",
+                "unfinished recovery requires explicit provider fault repair"
+            );
+            terminal_faults.push(agent);
+        }
         let mut rows = Vec::new();
         for agent in daemon.config["agents"].as_object().unwrap().keys() {
             let jobs = records::dispatch(
@@ -114,7 +118,22 @@ impl Daemon {
                 recovered.push(json!({"job_id":job["job_id"],"status":result["job"]["status"]}));
             }
         }
-        let report = json!({"schema_version":1,"provider_io":false,"automatic_replay":false,"jobs":recovered});
+        let mut cleared = Vec::new();
+        for agent in terminal_faults {
+            let mut fault = daemon.faults[&agent].clone();
+            fault["status"] = json!("recovered");
+            fault["recovered_at"] = json!(now());
+            fault["recovered_by"] = json!("stopped_terminal_reconciliation");
+            let provider = records::string(&fault, "provider")?.to_owned();
+            daemon
+                .kernel
+                .store
+                .save(&crate::provider_fault::path(&provider, &agent), &fault)?;
+            daemon.kernel.store.commit()?;
+            daemon.faults.remove(&agent);
+            cleared.push(json!({"agent_name":agent,"fault_id":fault["fault_id"]}));
+        }
+        let report = json!({"schema_version":1,"provider_io":false,"automatic_replay":false,"jobs":recovered,"cleared_terminal_faults":cleared});
         Ok((daemon, report))
     }
 
@@ -198,8 +217,10 @@ impl Daemon {
                     }
                 }
             } else {
+                // Without newer evidence, the permit records exactly what was sent.
                 ensure!(
-                    permit["history_binding"] == spec["herdr_history"],
+                    spec["herdr_history"].is_null()
+                        || permit["history_binding"] == spec["herdr_history"],
                     "stopped terminal history binding changed"
                 );
                 let configured: Binding =
@@ -223,7 +244,8 @@ impl Daemon {
                         .as_ref()
                         .context("Pi execution producer missing")?;
                     ensure!(
-                        producer["owner"] == spec["pi_bridge_owner"]
+                        (spec["pi_bridge_owner"].is_null()
+                            || producer["owner"] == spec["pi_bridge_owner"])
                             && producer["process"] == identity["process"],
                         "stopped Pi producer differs from permitted input"
                     );

@@ -427,16 +427,17 @@ impl Daemon {
         }
         results
     }
-    /// Herdr terminals report verified session evidence. Native Codex hosts
-    /// report their owned app-server session and any recorded provider fault.
+    /// Herdr terminals report verified session evidence, native Codex hosts
+    /// their owned app-server session; any blocked provider fault wins.
     pub(crate) fn agent_activation(&self, name: &str, spec: &Value) -> Value {
-        let view = self.activation.view(name, spec);
-        if !view.is_null() || spec["provider"] != "codex" || spec["tui_host_root"].is_null() {
-            return view;
-        }
+        // A blocked fault closes the gate whatever session evidence says.
         if let Some(fault) = self.faults.get(name) {
             return json!({"registered":true,"session_verified":false,"session_gate_open":false,
                 "reason":"provider_fault","error":fault["reason"],"fault_id":fault["fault_id"]});
+        }
+        let view = self.activation.view(name, spec);
+        if !view.is_null() || spec["provider"] != "codex" || spec["tui_host_root"].is_null() {
+            return view;
         }
         let verified = self
             .codex
@@ -772,8 +773,27 @@ impl Daemon {
                     let record_reply = p["record_reply"] != false;
                     session.validate_interrupt(id, record_reply)?;
                     self.mark_provider_cancel(job, record_reply, false)?;
+                } else if self.herdr.get(&agent).is_some_and(|w| w.job == id) {
+                    let record_reply = p["record_reply"] != false;
+                    if job["provider_options"]["herdr_dispatch"].is_null() {
+                        // The actor grants input only after committing a permit,
+                        // so no prompt has reached the terminal yet.
+                        self.herdr.remove(&agent);
+                        let marked = self.mark_provider_cancel(job, record_reply, false)?;
+                        let mut decision = failure(
+                            "cancelled",
+                            "cancel_info",
+                            "Cancelled before provider execution.",
+                        );
+                        decision["diagnostics"] = json!({"cancel_requested":true,"result_reply_enabled":record_reply,
+                            "provider_prompt_sent":false,"completion_authority":"herdr_unsent_cancellation"});
+                        self.complete(&marked, &decision)?;
+                        return Ok(json!({"job_id":id,"agent_name":agent,"status":"cancelled"}));
+                    }
+                    self.mark_provider_cancel(job, record_reply, false)?;
+                    self.herdr[&agent].interrupt();
                 } else {
-                    bail!("native cancellation control is not yet implemented for this provider");
+                    bail!("native cancellation requires the provider's active observer; inspect provider-status");
                 }
                 Ok(json!({"job_id":id,"agent_name":agent,"status":"cancellation_requested"}))
             }

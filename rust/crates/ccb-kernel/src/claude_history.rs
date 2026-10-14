@@ -240,6 +240,27 @@ impl Reader {
                 .is_some_and(|v| v.iter().any(|b| b["type"] == "tool_result"));
         if user {
             let body = text(&row["message"]["content"]);
+            if self.anchor.is_some()
+                && body
+                    .trim_start()
+                    .starts_with("[Request interrupted by user")
+            {
+                // Claude Code records Esc as a marker child of the interrupted turn.
+                let parent = row["parentUuid"].as_str().unwrap_or("");
+                ensure!(
+                    self.seen.contains_key(parent),
+                    "Claude interruption belongs to another turn"
+                );
+                let id = crate::records::string(row, "uuid")?;
+                ensure!(
+                    !id.is_empty() && id.len() <= 256,
+                    "invalid Claude record UUID"
+                );
+                self.seen.insert(id.into(), fingerprint(row));
+                self.last_assistant.clear();
+                self.finish("cancelled", "claude_turn_interrupted");
+                return Ok(());
+            }
             let exact = prompt_body(&body).trim_start().lines().next()
                 == Some(&format!("CCB_REQ_ID: {}", self.request));
             if let Some(anchor) = &self.anchor {
@@ -399,6 +420,37 @@ mod tests {
             "job:execution".into(),
         )
         .unwrap()
+    }
+    #[test]
+    fn interruption_marker_cancels_only_its_own_turn() {
+        let marker = |b: &Binding, id: &str, parent: &str| {
+            row(
+                b,
+                "user",
+                id,
+                Some(parent),
+                json!({"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]}),
+            )
+        };
+        let (_d, b) = setup();
+        let mut r = reader(&b);
+        append(
+            &b,
+            &[
+                user(&b),
+                assistant(&b, "partial", "request", Value::Null, "half"),
+            ],
+        );
+        assert!(r.poll().unwrap().is_none());
+        append(&b, &[marker(&b, "stop", "partial")]);
+        let decision = r.poll().unwrap().unwrap();
+        assert_eq!(decision["status"], "cancelled");
+        assert_eq!(decision["reason"], "claude_turn_interrupted");
+        assert_eq!(decision["reply"], "");
+        let (_d, b) = setup();
+        let mut r = reader(&b);
+        append(&b, &[user(&b), marker(&b, "foreign-stop", "old")]);
+        assert!(r.poll().is_err());
     }
     #[test]
     fn exact_activation_and_parent_chain_survive_cold_resume() {

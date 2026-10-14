@@ -288,11 +288,14 @@ fn resumes(
             "recovery history belongs to another project"
         );
         let session = (|| -> Result<()> {
-            if read(
-                runtime,
-                &crate::provider_fault::path(crate::records::string(spec, "provider")?, name),
-            )?
-            .is_some_and(|fault| fault["status"] == "blocked")
+            // A terminal fault only lost observation; stopped-history
+            // reconciliation settles its work. A native host owns processes.
+            if super::hosted(spec)
+                && read(
+                    runtime,
+                    &crate::provider_fault::path(crate::records::string(spec, "provider")?, name),
+                )?
+                .is_some_and(|fault| fault["status"] == "blocked")
             {
                 anyhow::bail!("provider fault requires explicit recovery");
             }
@@ -307,8 +310,9 @@ fn resumes(
                     state["owner"] == bridge["owner"]
                         && state["bridge"]["owner"] == bridge["owner"]
                         && state["agent_name"] == *name
-                        && state["bridge"]["process"]
-                            == agents["agents"][name]["binding"]["process"],
+                        && (state["bridge"]["process"]
+                            == agents["agents"][name]["binding"]["process"]
+                            || unlaunched_and_gone(agents, name, &state["bridge"]["process"])?),
                     "Pi recovery producer does not match the recorded process"
                 );
                 let path = PathBuf::from(crate::records::string(&state["bridge"], "session_path")?);
@@ -341,7 +345,9 @@ fn resumes(
                 let mut history = if cache.is_object() {
                     ensure!(
                         cache["identity"]["process"]
-                            == agents["agents"][name]["binding"]["process"],
+                            == agents["agents"][name]["binding"]["process"]
+                            || unlaunched_and_gone(agents, name, &cache["identity"]["process"])?
+                            || resumed_same_session(root, open, name, &cache["history"])?,
                         "Codex recovery cache belongs to another process"
                     );
                     cache["history"].clone()
@@ -397,11 +403,12 @@ fn resumes(
             }
             Ok(())
         })();
-        let faulted = read(
-            runtime,
-            &crate::provider_fault::path(crate::records::string(spec, "provider")?, name),
-        )?
-        .is_some_and(|fault| fault["status"] == "blocked");
+        let faulted = super::hosted(spec)
+            && read(
+                runtime,
+                &crate::provider_fault::path(crate::records::string(spec, "provider")?, name),
+            )?
+            .is_some_and(|fault| fault["status"] == "blocked");
         if let (Err(error), Some(repair)) = (&session, repairs.get(name).filter(|r| r.is_object()))
         {
             if !faulted {
@@ -442,10 +449,31 @@ fn resumes(
                 open["bindings"][name]["history"]["path"].clone()
             };
             result[name] = json!({"provider":spec["provider"],"args":[],"session_id":id,"path":path,
-                "history":open["bindings"][name]["history"],"blocked_reason":error.to_string()});
+                "history":open["bindings"][name]["history"],"binding":open["bindings"][name],"blocked_reason":error.to_string()});
         }
     }
     Ok(result)
+}
+/// Evidence from an earlier generation still binds an agent that the latest
+/// generation never launched, once that earlier process has exited.
+fn unlaunched_and_gone(agents: &Value, name: &str, process: &Value) -> Result<bool> {
+    let row = &agents["agents"][name];
+    Ok(row["binding"]["process"].is_null()
+        && row["sent"] != true
+        && process.is_object()
+        && !crate::startup::owner_alive(&json!({"pid":process["pid"],"process":process}))?)
+}
+/// The latest generation resumed and verified this exact session after the
+/// cache was written; only the terminal process changed.
+fn resumed_same_session(root: &Path, open: &Value, name: &str, history: &Value) -> Result<bool> {
+    let Some(previous) = read(root, STATE)? else {
+        return Ok(false);
+    };
+    Ok(previous["operation_id"] == open["last_recovery_id"]
+        && open["bindings"][name].is_object()
+        && open["initialization_errors"][name].is_null()
+        && history["session_id"].is_string()
+        && previous["sessions"][name]["session_id"] == history["session_id"])
 }
 fn operator_sessions(sessions: &Value) -> Value {
     sessions
@@ -708,7 +736,9 @@ pub(super) fn step(
             .context("missing mounted recovery agents")?
             .values()
         {
+            // A held agent was never launched in its generation; it has no process.
             if retired
+                && row["binding"]["process"].is_object()
                 && crate::startup::owner_alive(&json!({
                     "pid":row["binding"]["process"]["pid"],"process":row["binding"]["process"]
                 }))?
@@ -748,17 +778,24 @@ pub(super) fn step(
         // A held generation never binds its agent. Carry the last verified
         // history binding forward so restored evidence resumes that session.
         let mut carried = open.clone();
-        if let (Some(held), Some(previous)) = (
-            open["initialization_errors"].as_object(),
-            read(root, STATE)?.filter(|r| r["operation_id"] == open["last_recovery_id"]),
-        ) {
-            for name in held.keys() {
-                if carried["bindings"][name].is_null()
-                    && previous["sessions"][name]["history"].is_object()
-                {
-                    carried["bindings"][name] =
-                        json!({"history":previous["sessions"][name]["history"]});
-                }
+        let previous = read(root, STATE)?.filter(|r| r["operation_id"] == open["last_recovery_id"]);
+        for name in config["agents"].as_object().unwrap().keys() {
+            if !carried["bindings"][name].is_null() {
+                continue;
+            }
+            // A binding dropped after its provider died, or one carried
+            // through a held generation, still identifies the session.
+            let held = &previous
+                .as_ref()
+                .filter(|_| open["initialization_errors"][name].is_string())
+                .map(|p| p["sessions"][name].clone())
+                .unwrap_or(Value::Null);
+            if open["retained_bindings"][name].is_object() {
+                carried["bindings"][name] = open["retained_bindings"][name].clone();
+            } else if held["binding"].is_object() {
+                carried["bindings"][name] = held["binding"].clone();
+            } else if held["history"].is_object() {
+                carried["bindings"][name] = json!({"history":held["history"]});
             }
         }
         let mut historical = crate::herdr_activation::historical(&prior, &carried["bindings"]);

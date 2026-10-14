@@ -57,6 +57,59 @@ pub(crate) struct Worker {
     pub view: Value,
     pub job: String,
     alive: Arc<AtomicBool>,
+    interrupt: Arc<AtomicBool>,
+}
+impl Worker {
+    /// Ask the observer to end the provider's current turn once.
+    pub(crate) fn interrupt(&self) {
+        self.interrupt.store(true, Ordering::Release);
+    }
+}
+/// Esc ends a terminal provider's current turn. Its history then records the
+/// outcome; a turn that finished first still completes. Only if history never
+/// classifies the turn does a sustained idle terminal confirm cancellation.
+pub(crate) struct Interrupt {
+    requested: Arc<AtomicBool>,
+    sent_at: Option<Instant>,
+    idle_since: Option<Instant>,
+}
+impl Interrupt {
+    fn new(requested: Arc<AtomicBool>) -> Self {
+        Self {
+            requested,
+            sent_at: None,
+            idle_since: None,
+        }
+    }
+    pub(crate) fn send(&mut self, request: &Value, identity: &Value) -> Result<()> {
+        if self.sent_at.is_none() && self.requested.load(Ordering::Acquire) {
+            self.sent_at = Some(Instant::now());
+            let _ = herdr_agents::rpc(
+                request,
+                vec![
+                    "agent".into(),
+                    "send-keys".into(),
+                    crate::records::string(identity, "herdr_name")?.into(),
+                    "esc".into(),
+                ],
+            );
+        }
+        Ok(())
+    }
+    pub(crate) fn settled(&mut self, live: &Value) -> Option<Value> {
+        let sent = self.sent_at?;
+        if live["interactive_ready"] != true {
+            self.idle_since = None;
+            return None;
+        }
+        let idle = *self.idle_since.get_or_insert_with(Instant::now);
+        (sent.elapsed() >= Duration::from_secs(5) && idle.elapsed() >= Duration::from_secs(2)).then(|| {
+            json!({"schema_version":2,"record_type":"completion_decision","terminal":true,"status":"cancelled",
+                "reason":"herdr_terminal_interrupted","confidence":"observed","anchor_seen":false,"reply_started":false,
+                "reply_stable":false,"reply":"","provider_turn_ref":null,"source_cursor":null,"finished_at":crate::daemon::now(),
+                "diagnostics":{"completion_authority":"herdr_interrupt_idle","interrupt_sent":true}})
+        })
+    }
 }
 impl Drop for Worker {
     fn drop(&mut self) {
@@ -193,6 +246,8 @@ impl Worker {
         let (grant, granted) = mpsc::channel();
         let alive = Arc::new(AtomicBool::new(true));
         let thread_alive = Arc::clone(&alive);
+        let interrupt = Arc::new(AtomicBool::new(false));
+        let mut thread_interrupt = Interrupt::new(Arc::clone(&interrupt));
         let task = job_id.clone();
         let runtime = execution.clone();
         std::thread::Builder::new()
@@ -212,6 +267,7 @@ impl Worker {
                         &send,
                         &granted,
                         &thread_alive,
+                        &mut thread_interrupt,
                         &mut permitted,
                     )
                 } else {
@@ -226,6 +282,7 @@ impl Worker {
                         &send,
                         &granted,
                         &thread_alive,
+                        &mut thread_interrupt,
                         &mut permitted,
                     )
                 };
@@ -242,6 +299,7 @@ impl Worker {
             grant,
             job: job_id,
             alive,
+            interrupt,
             view: json!({"external":true,"closed":false,"ready":false,"pid":pid,"runtime_instance_id":if pid.is_null() {Value::Null} else {json!(runtime)}}),
         })
     }
@@ -259,6 +317,7 @@ fn run(
     events: &mpsc::Sender<Event>,
     granted: &mpsc::Receiver<()>,
     alive: &AtomicBool,
+    interrupt: &mut Interrupt,
     permitted: &mut bool,
 ) -> Result<()> {
     let dispatch_started = Instant::now();
@@ -416,6 +475,9 @@ fn run(
     let mut next_live_observation = Instant::now();
     let mut metrics = PollMetrics::default();
     while alive.load(Ordering::Acquire) {
+        if !completed {
+            interrupt.send(request, &proof["identity"])?;
+        }
         // Read terminal evidence even if the Agent just exited: a known result
         // remains deliverable, but no next input is allowed without live readiness.
         if !completed {
@@ -467,6 +529,14 @@ fn run(
                 )
             })?;
             next_live_observation = Instant::now() + Duration::from_secs(1);
+            if !completed {
+                if let Some(mut decision) = interrupt.settled(&live) {
+                    decision["diagnostics"]["native_execution_instance"] = json!(execution);
+                    events.send(Event::Completed(decision))?;
+                    completed = true;
+                    continue;
+                }
+            }
             if completed && live["interactive_ready"] == true {
                 events.send(Event::Ready)?;
                 return Ok(());

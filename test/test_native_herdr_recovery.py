@@ -223,3 +223,58 @@ def test_pending_fresh_session_repair_is_superseded_when_evidence_returns(stoppe
     assert not json.loads((p['state']/'operator-repairs.json').read_text(encoding='utf-8')).get('worker')
     audit=[json.loads(r) for r in (p['state']/'operator-repairs.jsonl').read_text(encoding='utf-8').splitlines()]
     assert [a['phase'] for a in audit]==['requested','superseded']
+
+def test_terminal_observation_fault_is_settled_by_stopped_recovery_without_replay(stopped):
+    p=stopped;asked=cli('--state-root',p['runtime'],'ask','worker','must not replay');assert asked.returncode==0,asked.stderr
+    job=json.loads(asked.stdout)['job_id'];wait_for(lambda:mutate_count(p['backend'],['agent','prompt'])==1)
+    name,row=next(iter(server(p['backend'])['agents'].items()))
+    change(p['backend'],lambda s:s['agents'].pop(name))
+    fault=p['runtime']/f"providers/{p['provider']}/worker/fault.json"
+    wait_for(lambda:fault.exists() and json.loads(fault.read_text(encoding='utf-8'))['status']=='blocked',timeout=20)
+    agents=json.loads(cli('--state-root',p['runtime'],'agents').stdout)['agents']
+    assert agents[0]['activation']['reason']=='provider_fault'
+    change(p['backend'],lambda s:s['agents'].update({name:row}))
+    stop_all(p);replacement=p['helper']()
+    def restored_idle(s):
+        s['provider_pids']=[replacement.pid]
+        for agent in s['agents'].values():agent.update(agent_status='idle',interactive_ready=True)
+    change(p['backend'],restored_idle)
+    result=p['open'](True);assert result.returncode==0,result.stderr
+    wait_for(lambda:cli('--state-root',p['runtime'],'ping').returncode==0,timeout=30)
+    assert json.loads(cli('--state-root',p['runtime'],'watch',job).stdout)['status']=='incomplete'
+    recovered=json.loads(fault.read_text(encoding='utf-8'))
+    assert recovered['status']=='recovered' and recovered['recovered_by']=='stopped_terminal_reconciliation'
+    wait_for(lambda:json.loads(cli('--state-root',p['runtime'],'agents').stdout)['agents'][0]['activation']['session_verified'],timeout=30)
+    assert mutate_count(p['backend'],['agent','prompt'])==1
+
+def test_held_agent_survives_kill_and_retired_namespace_recovery(stopped):
+    p=stopped;job,held=held_worker(p)
+    killed=cli('--project',p['project'],'kill',timeout=60);assert killed.returncode==0,killed.stderr
+    held.kill();held.wait(timeout=5)
+    replacement=p['helper']()
+    change(p['backend'],lambda s:s.update(provider_pids=[replacement.pid]))
+    result=p['open']();assert result.returncode==0,result.stderr
+    wait_for(lambda:cli('--state-root',p['runtime'],'ping').returncode==0,timeout=30)
+    actor=json.loads(cli('--state-root',p['runtime'],'agents').stdout)['agents'][0]
+    assert actor['activation']['reason']=='recovery_evidence_required'
+    assert json.loads(cli('--state-root',p['runtime'],'watch',job).stdout)['status']=='running'
+    assert mutate_count(p['backend'],['agent','prompt'])==1
+
+@pytest.mark.parametrize('stopped',['codex','claude'],indirect=True)
+def test_dead_provider_reopen_retains_session_evidence_for_recovery(stopped):
+    p=stopped;name,row=next(iter(server(p['backend'])['agents'].items()))
+    change(p['backend'],lambda s:s['agents'].pop(name))
+    p['open'](ms=3000)
+    record=json.loads((p['state']/'herdr-open.json').read_text(encoding='utf-8'))
+    assert 'worker' not in record['bindings'] and record['binding_errors']['worker']
+    assert record['retained_bindings']['worker']['history']['session_id']==p['session']
+    change(p['backend'],lambda s:s['agents'].update({name:row}))
+    stop_all(p);replacement=p['helper']()
+    def restored_idle(s):
+        s['provider_pids']=[replacement.pid]
+        for agent in s['agents'].values():agent.update(agent_status='idle',interactive_ready=True)
+    change(p['backend'],restored_idle)
+    result=p['open'](True);assert result.returncode==0,result.stderr
+    launches=[r for r in json.loads('['+','.join((p['backend']/'calls.jsonl').read_text(encoding='utf-8').splitlines())+']') if r[:2]==['agent','start']]
+    selector='--resume' if p['provider']=='claude' else 'resume'
+    assert launches[-1][launches[-1].index(selector)+1]==p['session']

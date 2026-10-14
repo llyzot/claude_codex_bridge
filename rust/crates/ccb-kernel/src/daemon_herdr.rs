@@ -65,12 +65,25 @@ impl Daemon {
                     worker.view["last_observed_at"] = json!(super::now());
                     worker.grant.send(())?;
                 }
-                Event::Completed(decision) => {
+                Event::Completed(mut decision) => {
                     ensure!(
                         job["status"] == "running",
                         "Herdr completion job is not running"
                     );
-                    if job["provider"] == "claude" {
+                    if let Some(reply) =
+                        job["provider_options"]["native_cancel_intent"]["record_reply"].as_bool()
+                    {
+                        // A turn that finished before Esc still completes.
+                        decision["diagnostics"]["cancel_requested"] = json!(true);
+                        decision["diagnostics"]["result_reply_enabled"] = json!(reply);
+                        if decision["status"] != "completed" {
+                            decision["status"] = json!("cancelled");
+                        }
+                    }
+                    // An idle-confirmed interruption carries no transcript result to preserve.
+                    if job["provider"] == "claude"
+                        && decision["diagnostics"]["completion_authority"] != "herdr_interrupt_idle"
+                    {
                         // Preserve independently observed idle before callback /
                         // finalization. A dead owner can recover this exact result.
                         let spec = self.spec(agent)?;

@@ -95,6 +95,11 @@ elif args[:2]==['agent','prompt']:
     with (root/'prompts.jsonl').open('a',encoding='utf-8') as output:
         output.write(json.dumps({'name':args[2],'body':args[3]})+'\n')
     result={'type':'agent_prompted','agent':row}
+elif args[:2]==['agent','send-keys']:
+    assert args[2] in state['agents'] and len(args)>3
+    with (root/'keys.jsonl').open('a',encoding='utf-8') as output:
+        output.write(json.dumps({'name':args[2],'keys':args[3:]})+'\n')
+    result={'type':'ok'}
 elif args[:2]==['pane','report-agent-session']:
     matches=[a for a in state['agents'].values() if a['pane_id']==args[2]]
     assert len(matches)==1

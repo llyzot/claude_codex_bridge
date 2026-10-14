@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-14",
+  "source_base": "bc1348c4",
+  "project": "sample-project (user-authorized; prior .ccb/ccbd archived as ccbd.archived-20261014)",
+  "providers": {"pi_lead": "pi terminal", "codex_worker": "codex hosted app-server", "claude_reviewer": "claude terminal (discovery binding)"},
+  "binary": "repository release build staged outside the installed ccb-rust prefix; installed prefix and PATH unchanged",
+  "results": {
+    "T1_delegation": "pass: all three completed with provider-native completion reasons",
+    "T2_cancel_running": "initially failed for Pi/Claude (terminal cancel unimplemented); after fix all cancelled from provider evidence: pi_agent_aborted, codex_turn_interrupted, claude_turn_interrupted; follow-up tasks completed",
+    "T2_manual_claude_esc": "initially faulted the agent; after fix the stuck job re-observed as cancelled/claude_turn_interrupted without replay",
+    "T3_kill_provider_mid_turn": "Pi and Claude initially left permanently stuck; after fixes kill+open reconciled the jobs as incomplete/herdr_owner_stopped, cleared terminal faults and resumed the original session ids; hosted Codex settled incomplete/codex_process_exit and restarted on demand with the same thread",
+    "T4_daemon_stop_mid_turn": "pass: Pi and Claude reattached and completed with one prompt permit each; hosted Codex settled incomplete/native_owner_stopped",
+    "T5_approval": "not exercised: user Codex config sets approval_policy=never and sandbox danger-full-access; CCB manual mode inherits it; Claude runs in user auto mode"
+  },
+  "fixes": [
+    "Herdr terminal cancellation: Esc once via agent send-keys; provider history decides; finished turns still complete; idle fallback only without history classification; unsent permits cancel immediately",
+    "Claude transcript interruption marker within the anchored turn is a cancelled terminal result",
+    "Terminal observation faults are settled by stopped-history reconciliation and marked recovered",
+    "Verified bindings dropped by a dead-provider reopen are retained as recovery evidence; held session records keep the full binding",
+    "Retired-namespace recovery tolerates agents never launched in their generation",
+    "Multi-generation recovery accepts earlier-generation evidence for unlaunched agents and resumed same sessions",
+    "Any blocked provider fault is reported as provider_fault activation"
+  ],
+  "validation": {
+    "new_tests_red_before_green_after": true,
+    "full_native_suite": {"passed": 1399, "failed": 88, "skipped": 14, "new_failures": 0},
+    "known_flaky": "test_native_worktree_lifecycle Keeper stop timing fails a random 2-4 cases per run on HEAD and after",
+    "clippy": "ccb-kernel all targets, warnings denied, passed",
+    "target_repository_git_clean": true
+  },
+  "findings_not_changed": [
+    "herdr open launched from git-bash gives pane shells C:\WINDOWS cwd; pwsh launch works",
+    "open plan includes environment hash; reopening from a different shell environment requires migration",
+    "ask reads stdin to EOF whenever stdin is not a terminal (legacy-compatible contract); an open inherited pipe blocks it",
+    "adding or removing agents in an existing Herdr project requires unimplemented migration",
+    "first Claude workspace trust makes the initial open time out; a second open binds the session"
+  ]
+}

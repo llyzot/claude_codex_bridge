@@ -4,7 +4,7 @@ use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::HashSet,
+    collections::HashMap,
     fs,
     io::{BufRead, Read, Write},
     net::{TcpListener, TcpStream},
@@ -220,7 +220,7 @@ pub(crate) fn run(root: &Path, executable: &Path) -> Result<()> {
         }
     });
     let result = (|| -> Result<()> {
-        let mut pending = HashSet::new();
+        let mut pending = HashMap::new();
         let mut stdout = std::io::stdout().lock();
         loop {
             ensure!(child.try_wait()?.is_none(), "Codex app-server exited");
@@ -235,7 +235,12 @@ pub(crate) fn run(root: &Path, executable: &Path) -> Result<()> {
                                 pending.len() < 32 && !value["id"].is_null(),
                                 "invalid pending thread request"
                             );
-                            pending.insert(value["id"].to_string());
+                            pending.insert(
+                                value["id"].to_string(),
+                                value["params"]["developerInstructions"]
+                                    .as_str()
+                                    .map(str::to_owned),
+                            );
                         }
                         socket.send(Message::Text(serde_json::to_string(&value)?.into()))?;
                     }
@@ -248,9 +253,21 @@ pub(crate) fn run(root: &Path, executable: &Path) -> Result<()> {
                 Ok(Message::Text(text)) => {
                     let value: Value = serde_json::from_str(&text)?;
                     ensure!(value.is_object(), "non-object Codex response");
-                    if pending.remove(&value["id"].to_string()) && value["error"].is_null() {
+                    if let Some(instructions) = pending
+                        .remove(&value["id"].to_string())
+                        .filter(|_| value["error"].is_null())
+                    {
                         let id = crate::records::string(&value["result"]["thread"], "id")?;
                         uuid::Uuid::parse_str(id)?;
+                        if let Some(instructions) = instructions {
+                            crate::startup::save(
+                                &root.join("developer-instructions.json"),
+                                &json!({"thread_id":id,"text":instructions}),
+                            )?;
+                            state["coordination_bound"] = json!(true);
+                        } else if state["thread_id"] != id {
+                            state["coordination_bound"] = json!(false);
+                        }
                         state["thread_id"] = json!(id);
                         publish(root, &state)?;
                     }
@@ -373,7 +390,26 @@ pub(crate) fn attach(root: &Path, operation: Option<&str>) -> Result<()> {
     let mut proof = connect(endpoint, &token)?;
     let _ = proof.close(None);
     let launch = |thread: &str| -> Result<std::process::Child> {
-        Ok(Command::new(crate::records::string(&state, "executable")?)
+        let current: Value = serde_json::from_slice(&fs::read(root.join("host.json"))?)?;
+        ensure!(
+            same_owner(&current, &state),
+            "Codex attachment host changed before launch"
+        );
+        let mut command = Command::new(crate::records::string(&state, "executable")?);
+        if current["coordination_bound"] == true {
+            let instructions = crate::startup::load(&root.join("developer-instructions.json"))?
+                .context("Codex attachment instructions are missing")?;
+            ensure!(
+                instructions["thread_id"] == thread,
+                "Codex attachment instructions belong to another thread"
+            );
+            let text = crate::records::string(&instructions, "text")?;
+            command.args([
+                "--config",
+                &format!("developer_instructions={}", serde_json::to_string(text)?),
+            ]);
+        }
+        Ok(command
             .current_dir(crate::records::string(&state, "cwd")?)
             .args([
                 "--cd",

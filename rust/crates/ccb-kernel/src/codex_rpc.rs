@@ -56,6 +56,7 @@ pub struct Session {
     init: String,
     bind: String,
     spec: Value,
+    interactive_context: String,
     expected: String,
     recreate_empty: bool,
     pub runtime: String,
@@ -81,6 +82,7 @@ impl Session {
         token: &std::path::Path,
         saved: &Value,
         session_record: &std::path::Path,
+        interactive_context: String,
     ) -> Result<Self> {
         let effective = crate::permission_policy::protocol(spec)?;
         let spec = &effective;
@@ -225,6 +227,7 @@ impl Session {
             init,
             bind,
             spec: spec.clone(),
+            interactive_context,
             expected,
             recreate_empty,
             runtime,
@@ -751,10 +754,38 @@ impl Session {
                 "Codex initialization failed"
             );
             self.send(json!({"method":"initialized","params":{}}))?;
+            self.send(
+                json!({"id":format!("coordination-config-{}",self.init),"method":"config/read",
+                "params":{"includeLayers":false,"cwd":self.spec["workspace_path"]}}),
+            )?;
+            return Ok(());
+        }
+        if record["id"] == format!("coordination-config-{}", self.init) {
+            ensure!(record["error"].is_null() && record["result"]["config"].is_object(),
+                "Codex effective configuration is unavailable; refusing to replace user instructions");
             let mut params = self.spec["thread_options"]
                 .as_object()
                 .cloned()
                 .unwrap_or_default();
+            let existing = match params.get("developerInstructions") {
+                None | Some(Value::Null) => {
+                    let inherited = &record["result"]["config"]["developer_instructions"];
+                    if inherited.is_null() {
+                        ""
+                    } else {
+                        inherited
+                            .as_str()
+                            .context("Codex effective developer instructions must be text")?
+                    }
+                }
+                Some(value) => value
+                    .as_str()
+                    .context("Codex developerInstructions must be text")?,
+            };
+            params.insert(
+                "developerInstructions".into(),
+                json!(format!("{existing}\n{}", self.interactive_context)),
+            );
             if let Some(cwd) = self.spec["workspace_path"].as_str() {
                 params.insert("cwd".into(), json!(cwd));
             }

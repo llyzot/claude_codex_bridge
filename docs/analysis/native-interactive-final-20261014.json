@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-14",
+  "source_base": "0a6b0226",
+  "scope": "Interactive CCB coordination for Pi, Claude and Codex; evidence-based recovery of never-used Pi sessions",
+  "integration": {
+    "pi": "before_agent_start system prompt addition",
+    "claude": "managed append-system-prompt-file, preserves custom appended instructions",
+    "codex": "merged native developer_instructions for RPC thread start/resume and hosted TUI attachment",
+    "routing": "Plain asynchronous ask for interactive and reply-delivery stages; chain reserved for active parent dependencies"
+  },
+  "validation": {
+    "initial_red": "4 bootstrap tests failed on prior release",
+    "green_reports": [
+      "native-interactive-coordination-green-20261014.xml",
+      "native-interactive-coordination-protocol-20261014.xml",
+      "native-interactive-coordination-regression-20261014.xml",
+      "native-interactive-claude-file-20261014.xml",
+      "native-pi-unused-recovery-20261014.xml",
+      "native-pi-unused-real-sdk-20261014.xml"
+    ],
+    "rust_unit_tests": 3,
+    "clippy": "all targets, warnings denied, passed",
+    "release_build": "passed",
+    "live": {
+      "report": "native-interactive-live-20261014.json",
+      "binary_sha256": "47400f99538b2834125207f3f695758fd8c3d2cf09a41787f40e1b36b5b3e83d",
+      "prompt": "让claude分析该项目并让codex进行修复",
+      "result": "Claude analyzed with native tools, Codex repaired arithmetic.py, Pi automatically continued and independently verified tests",
+      "extra_operator_work_prompts": 0,
+      "subagent_calls": 0,
+      "subagent_inspection": "top-level tool calls and codemode arguments",
+      "tests_unchanged": true
+    }
+  },
+  "installation": {
+    "prefix": "C:/Users/user/Desktop/work/ccb-rust",
+    "operation_id": "5be75ef8-a998-4b55-a08f-f99a1e31e1a6",
+    "binary_sha256": "5d157dd7ab91444f4b6135fdf5b436d5018c7e6158c0e0c0f2c86e23e5c6fdc4",
+    "manifest_sha256": "896853d874f5191b9f7297f00d767529f16823243c4ecf5b752063b6ea09a249",
+    "status": "upgraded and verified",
+    "runtime_state_changed": false,
+    "provider_settings_modified": false,
+    "path_modified": false
+  },
+  "cleanup": {
+    "herdr_session": "ccb-interactive-402f6797",
+    "status": "CCB retired, exact server stopped and session deleted",
+    "native_test_histories": "exact Pi/Claude/Codex JSONL files removed; target Codex DB rows and provider indexes cleaned",
+    "postcheck": "all five recorded native file paths absent; no matching test processes; empty Claude session-env removed",
+    "retained": "test project source and local acceptance evidence; test-folder trust confirmation"
+  },
+  "incidents": [
+    {
+      "issue": "Unmarked temporary project initially resolved to user-home project",
+      "effect": "Failed startup record and possibly generated Pi bridge in user-home .ccb; request rejected before server or agent dispatch",
+      "resolution": "Initialized Git root in approved temp project and verified all planned workspaces before retry; did not erase home runtime state"
+    },
+    {
+      "issue": "Herdr rejected raw multiline Claude launch argument",
+      "resolution": "Changed to managed native append-system-prompt-file, stopped failed test resources, then completed fresh approved acceptance"
+    }
+  ],
+  "limits": [
+    "Live workflow used the binary before the subsequent empty-Pi-session recovery change; final recovery code separately passed fixture and real-installed-Pi no-model tests.",
+    "Used or legacy unverified Pi sessions with missing native history still fail explicitly; no synthetic transcript or silent reset.",
+    "Existing running providers require a normal close/reopen to load the new startup coordination."
+  ]
+}

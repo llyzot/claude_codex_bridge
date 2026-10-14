@@ -73,6 +73,18 @@ def project(setup):
         if process.poll() is None:process.kill()
         process.wait(timeout=5)
 
+def test_public_open_supplies_pi_coordination_before_interactive_input(project):
+    p=project;assert p['open']().returncode==0
+    wait_for(p['ready'],timeout=30)
+    p['command'](action='reload')
+    context=p['command'](action='context')['systemPrompt']
+    assert context.startswith('USER_SYSTEM_SENTINEL')
+    assert '<ccb_interactive_coordination>' in context
+    assert 'pi-subagents' in context and 'worker' in context
+    assert '--from' in context and 'lead' in context
+    assert 'plain ask' in context
+
+
 def test_cold_open_composes_server_agents_binding_daemon_and_same_pi_lead_review(project):
     p=project;opened=p['open']();assert opened.returncode==0,opened.stderr
     wait_for(p['ready'],timeout=20)

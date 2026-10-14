@@ -691,6 +691,17 @@ impl Manager<'_> {
                     continue;
                 }
                 let native_pi = self.pi_bridge(name)?.is_some();
+                let mut native = args(self.request, name)?;
+                if self.plan["agents"][name]["provider"] == "claude" {
+                    native = crate::coordination::claude_arguments(
+                        self.request,
+                        name,
+                        native,
+                        self.store
+                            .as_mut()
+                            .context("Claude coordination requires namespace writer")?,
+                    )?;
+                }
                 let timeout = if native_pi {
                     self.plan["startup_timeout_ms"].as_u64().unwrap().min(4000)
                 } else {
@@ -711,7 +722,6 @@ impl Manager<'_> {
                     "--timeout".into(),
                     timeout.to_string(),
                 ];
-                let native = args(self.request, name)?;
                 if !native.is_empty() {
                     arguments.push("--".into());
                     arguments.extend(native);

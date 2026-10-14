@@ -335,7 +335,8 @@ fn prepare_request(
         };
         if provider == "pi" {
             let bridge = crate::pi_terminal::execute(
-                &json!({"schema_version":1,"project_root":project,"agent_name":name}),
+                &json!({"schema_version":1,"project_root":project,"agent_name":name,
+                    "coordination":crate::coordination::interactive(name,config,&crate::config::state_root(project)?,&native)?}),
             )?;
             args.extend(serde_json::from_value::<Vec<String>>(
                 bridge["interactive_args"].clone(),

@@ -129,6 +129,26 @@ def test_native_driver_uses_host_and_publishes_matching_thread(tmp_path):
     finally:server.close()
     wait_for(lambda:subprocess.run([str(BIN),'process-identity',str(state['server_process']['pid'])],capture_output=True).returncode!=0)
 
+
+def test_real_host_preserves_global_instructions_for_interactive_attachment(tmp_path):
+    home=tmp_path/'home';home.mkdir()
+    (home/'config.toml').write_text('developer_instructions = "USER_GLOBAL_SENTINEL"\n',encoding='utf-8')
+    spec=dict(provider='codex',driver_kind='codex_app_server',profile_family='protocol_turn',
+              command=[str(CODEX),'app-server','--stdio'],workspace_path=str(tmp_path),
+              tui_host_root=str(tmp_path/'hosts'),env={'CODEX_HOME':str(home)})
+    server=Server(tmp_path/'state',{'codex':spec})
+    try:
+        path=server.root/'providers/codex/codex/session.json';wait_for(path.exists)
+        session=json.loads(path.read_text(encoding='utf-8'))
+        root=Path(session['state']['tui_host']['path'])
+        host=json.loads((root/'host.json').read_text(encoding='utf-8'))
+        instructions=json.loads((root/'developer-instructions.json').read_text(encoding='utf-8'))
+        assert host['coordination_bound'] and instructions['thread_id']==session['state']['thread_id']
+        assert instructions['text'].startswith('USER_GLOBAL_SENTINEL')
+        assert '<ccb_interactive_coordination>' in instructions['text']
+        assert not (home/'auth.json').exists()
+    finally:server.close()
+
 def test_installed_pi_accepts_canonical_windows_workspace(tmp_path):
     node=Path('C:/Users/user/scoop/apps/nodejs-lts/current/node.exe')
     pi=Path('C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')

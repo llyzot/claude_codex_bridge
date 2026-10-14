@@ -36,6 +36,8 @@ for line in sys.stdin.buffer:
     trace(command)
     method=command['method']
     if method=='initialize':response(command,{'userAgent':'fixture'})
+    elif method=='config/read':
+        response(command,{'config':{'developer_instructions':os.environ.get('CCB_FIXTURE_DEVELOPER_INSTRUCTIONS')}})
     elif method in {'thread/start','thread/resume'}:
         if method=='thread/resume':thread_id=command['params']['threadId']
         result={'thread':thread()}

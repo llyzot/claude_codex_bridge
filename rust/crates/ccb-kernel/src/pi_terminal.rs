@@ -190,7 +190,14 @@ pub(crate) fn execute(request: &Value) -> Result<Value> {
         owner.into()
     };
     std::fs::create_dir_all(&events)?;
-    let options = json!({"owner":owner,"agent_name":agent,"event_root":events,"native":std::env::current_exe()?});
+    ensure!(
+        request["coordination"].is_null()
+            || request["coordination"]
+                .as_str()
+                .is_some_and(|v| v.len() <= 32768),
+        "invalid Pi coordination context"
+    );
+    let options = json!({"owner":owner,"agent_name":agent,"event_root":events,"native":std::env::current_exe()?,"coordination":request["coordination"]});
     let source = include_str!("pi_terminal_bridge.mjs").replace(
         "__CCB_PI_TERMINAL_OPTIONS__",
         &serde_json::to_string(&options)?,

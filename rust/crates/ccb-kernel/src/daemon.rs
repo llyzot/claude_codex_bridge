@@ -2108,6 +2108,18 @@ impl Daemon {
                         .store
                         .json(&format!("providers/codex/{agent}/session.json"))?
                         .unwrap_or(Value::Null);
+                    let native = std::env::current_exe()?.with_file_name(if cfg!(windows) {
+                        "ccb-native.exe"
+                    } else {
+                        "ccb-native"
+                    });
+                    let root = self.kernel.store.owned_path("configuration.json")?;
+                    let interactive_context = crate::coordination::interactive(
+                        &agent,
+                        &self.config,
+                        root.parent().context("missing runtime root")?,
+                        &native,
+                    )?;
                     let session = match crate::codex_rpc::Session::spawn(
                         &agent,
                         &spec,
@@ -2118,6 +2130,7 @@ impl Daemon {
                             .kernel
                             .store
                             .owned_path(&format!("providers/codex/{agent}/session.json"))?,
+                        interactive_context,
                     ) {
                         Ok(session) => session,
                         Err(error) => {

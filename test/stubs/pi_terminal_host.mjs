@@ -16,8 +16,9 @@ let handlers;
 let currentSession = config.session_id;
 let branch = [];
 const ctx = { cwd: config.project, isIdle: () => true,
-  sessionManager: { getSessionId: () => currentSession, getSessionFile: () => config.native_session_path, getBranch: () => branch } };
-const emit = async (event, payload={}) => { for (const handler of handlers.get(event) || []) await handler({type:event,...payload},ctx); };
+  sessionManager: { getSessionId: () => currentSession, getSessionFile: () => config.native_session_path, getBranch: () => branch,
+    getEntries: () => branch, getHeader: () => ({type:'session',id:currentSession,cwd:config.project}) } };
+const emit = async (event, payload={}) => { let result; for (const handler of handlers.get(event) || []) { const value=await handler({type:event,...payload},ctx); if(value!==undefined) result=value; } return result; };
 const load = async () => {
   handlers = new Map();
   await bridge({on:(event,handler)=>handlers.set(event,[...(handlers.get(event)||[]),handler])});
@@ -27,6 +28,10 @@ await load();
 console.log(JSON.stringify({ready:true,pid:process.pid}));
 for await (const line of createInterface({input:process.stdin})) {
   const command = JSON.parse(line);
+  if (command.action === 'context') {
+    const result=await emit('before_agent_start',{prompt:command.prompt||'interactive request',systemPrompt:'USER_SYSTEM_SENTINEL'});
+    console.log(JSON.stringify({systemPrompt:result?.systemPrompt||'USER_SYSTEM_SENTINEL'}));continue;
+  }
   if (command.action === 'reload') {await emit('session_shutdown');await load();}
   else if (command.action === 'switch') {currentSession=command.session_id;await emit('session_switch');}
   else if (command.action === 'event') {await emit(command.event,command.payload);}

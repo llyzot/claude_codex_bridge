@@ -205,6 +205,9 @@ def test_public_open_mounts_original_claude_and_reconnects_without_relaunch(setu
         calls=[json.loads(s) for s in (backend/'calls.jsonl').read_text(encoding='utf-8').splitlines()]
         launch=next(c for c in calls if c[:2]==['agent','start'])
         assert '--effort' in launch and '--model' in launch and '--input-format' not in launch
+        assert '--append-system-prompt-file' in launch
+        context=Path(launch[launch.index('--append-system-prompt-file')+1]).read_text(encoding='utf-8')
+        assert '<ccb_interactive_coordination>' in context and '--from' in context
     finally:
         cli('--state-root',root,'stop')
         if child.poll() is None:child.kill()

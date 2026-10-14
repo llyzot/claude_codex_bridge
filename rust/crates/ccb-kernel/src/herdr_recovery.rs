@@ -139,6 +139,46 @@ fn native_header(path: &Path) -> Result<Value> {
     );
     Ok(serde_json::from_slice(&bytes)?)
 }
+fn unused_pi_session(state: &Value, events: &Path, rows: &Value) -> Result<bool> {
+    if state["native_unwritten_empty"] != true
+        || !rows.as_array().is_some_and(|rows| rows.is_empty())
+    {
+        return Ok(false);
+    }
+    let path = events.join(format!(
+        "{}.jsonl",
+        crate::records::string(&state["bridge"], "instance")?
+    ));
+    ensure!(
+        state["path"].as_str().map(Path::new) == Some(path.as_path()),
+        "Pi empty-session event path changed"
+    );
+    crate::herdr_namespace::unlinked(&path)?;
+    let mut bytes = Vec::new();
+    fs::File::open(&path)?.take(65537).read_to_end(&mut bytes)?;
+    if bytes.len() > 65536 || !bytes.ends_with(b"\n") {
+        return Ok(false);
+    }
+    let mut lines = std::str::from_utf8(&bytes)?.lines();
+    let header: Value = serde_json::from_str(lines.next().context("missing Pi event header")?)?;
+    ensure!(
+        header["type"] == "session_meta"
+            && header["payload"]["id"] == state["session_id"]
+            && header["payload"]["ccb_bridge"] == state["bridge"],
+        "Pi empty-session evidence changed"
+    );
+    for (index, line) in lines.enumerate() {
+        let event: Value = serde_json::from_str(line)?;
+        if event["type"] != "pi_event"
+            || event["bridge"] != state["bridge"]
+            || event["seq"] != json!(index + 1)
+            || event["payload"]["type"] != "bridge_shutdown"
+        {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
 fn resumes(
     root: &Path,
     runtime: &Path,
@@ -197,7 +237,13 @@ fn resumes(
                 "Pi recovery producer does not match the recorded process"
             );
             let path = PathBuf::from(crate::records::string(&state["bridge"], "session_path")?);
-            let header = native_header(&path)?;
+            if matches!(fs::symlink_metadata(&path),Err(ref e) if e.kind()==std::io::ErrorKind::NotFound)
+                && unused_pi_session(&state, &events, &rows)?
+            {
+                result[name] = json!({"provider":"pi","fresh":true,"args":[],"reason":"unused_native_session_never_persisted"});
+                continue;
+            }
+            let header = native_header(&path).with_context(||format!("Pi recovery history is unavailable: {}. A used or unverified session will not be replaced with a fresh one",path.display()))?;
             ensure!(
                 header["type"] == "session"
                     && header["id"] == state["session_id"]

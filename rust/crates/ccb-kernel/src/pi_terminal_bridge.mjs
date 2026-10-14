@@ -1,5 +1,5 @@
 // Pi API adapter only. Rust owns admission, completion decisions and delivery.
-import { appendFileSync, lstatSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, lstatSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -61,6 +61,11 @@ export default function (pi) {
     const id = String(ctx.sessionManager.getSessionId());
     const sessionPath = ctx.sessionManager.getSessionFile();
     if (!id || typeof sessionPath !== 'string' || !sessionPath) throw new Error('CCB Pi requires a persistent session');
+    const entries = ctx.sessionManager.getEntries?.();
+    const nativeHeader = ctx.sessionManager.getHeader?.();
+    const nativeUnwrittenEmpty = !existsSync(sessionPath) && nativeHeader?.id === id && !nativeHeader.parentSession &&
+      Array.isArray(entries) && !entries.some(e => e.type === 'compaction' || e.type === 'branch_summary' ||
+        (e.type === 'message' && ['user', 'assistant'].includes(e.message?.role)));
     const instance = randomUUID();
     const path = join(root, `${instance}.jsonl`);
     const identity = JSON.parse(execFileSync(options.native, ['process-identity', String(process.pid)],
@@ -71,7 +76,7 @@ export default function (pi) {
     const header = { type: 'session_meta', payload: { id, cwd: resolve(ctx.cwd), source: 'ccb_native_pi', ccb_bridge: bridge } };
     writeFileSync(path, JSON.stringify(header) + '\n', { encoding: 'utf8', flag: 'wx', mode: 0o600 });
     const state = { schema_version: 1, adapter_revision: 'canonical-session-branch-v1', provider: 'pi', ready: true, agent_name: options.agent_name,
-      owner: options.owner, session_id: id, cwd: resolve(ctx.cwd), path, bridge };
+      owner: options.owner, session_id: id, cwd: resolve(ctx.cwd), path, bridge, native_unwritten_empty: nativeUnwrittenEmpty };
     publish(root, state);
     generation = { path, bridge, root, state };
     active = null;
@@ -89,17 +94,21 @@ export default function (pi) {
     active = null;
   });
   pi.on('input', event => {
+    emit('native_input_observed');
     if (active) { emit('request_superseded'); active = null; }
     return { action: 'continue' };
   });
   pi.on('before_agent_start', event => {
+    const coordination = typeof options.coordination === 'string' && options.coordination
+      ? { systemPrompt: `${event.systemPrompt || ''}\n${options.coordination}` } : undefined;
     const request = anchor(event.prompt);
-    if (active && request === active.anchor && digest(event.prompt) === active.digest) return;
+    if (active && request === active.anchor && digest(event.prompt) === active.digest) return coordination;
     if (active) emit('request_superseded');
     active = request ? { anchor: request, digest: digest(event.prompt), turn: randomUUID(), assistant: null } : null;
     if (active) emit('request_start', { request_anchor: request });
+    return coordination;
   });
-  pi.on('agent_start', () => { if (active) emit('agent_start'); });
+  pi.on('agent_start', () => { emit('native_agent_activity'); if (active) emit('agent_start'); });
   pi.on('message_end', event => {
     if (!active) return;
     const message = event.message;

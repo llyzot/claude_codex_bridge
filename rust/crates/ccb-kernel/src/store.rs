@@ -144,7 +144,8 @@ impl Store {
                         "terminal-bridge-impl.mjs",
                     ]
                     .contains(&parts[3])
-                || parts[1] == "claude" && ["role-view.json", "role-view"].contains(&parts[3]));
+                || parts[1] == "claude"
+                    && ["role-view.json", "role-view", "coordination.md"].contains(&parts[3]));
         if provider_state {
             crate::models::validate_agent(parts[2])?;
         }

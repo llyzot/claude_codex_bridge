@@ -211,3 +211,41 @@ def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,nat
         for proc in [pi,codex]:
             if proc.poll() is None:proc.kill()
             proc.wait(timeout=5)
+
+
+@pytest.mark.parametrize('activity',[False,True],ids=['unused','activity_without_history'])
+def test_unwritten_pi_session_reopens_only_with_positive_empty_evidence(project,activity):
+    from test_native_pi_terminal import HOST
+    p=project;assert p['open']().returncode==0
+    wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=60)
+    original=json.loads(p['pi'].args[2]);assert not Path(original['native_session_path']).exists()
+    if activity:p['command'](action='event',event='agent_start')
+    result=cli('--state-root',p['native'],'kill',timeout=25)
+    assert result.returncode==0 and json.loads(result.stdout)['status']=='closed',result.stderr
+    for proc in [p['pi'],p['codex']]:proc.kill();proc.wait(timeout=5)
+    if activity:
+        result=p['open']()
+        if result.returncode==0:
+            wait_for(lambda:read(p['native']/'herdr/herdr-open-start.json')['status']=='failed',timeout=30)
+            error=read(p['native']/'herdr/herdr-open-start.json')['error']
+        else:error=result.stderr
+        assert 'Pi recovery history is unavailable' in error
+        assert mutate_count(p['backend'],['agent','start'])==2
+        return
+    gate=p['root']/'empty-reopen-ready';original.update(start_gate=str(gate),session_id='new-unused-pi',native_session_path=str(p['root']/'new-unused.jsonl'))
+    change(p['backend'],lambda s:s['agent_sessions']['pi'].update(value=original['native_session_path']))
+    pi=subprocess.Popen([NODE,str(HOST),json.dumps(original)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8',creationflags=0x08000000)
+    codex=subprocess.Popen([sys.executable,'-I','-c','import time;time.sleep(180)'],creationflags=0x08000000)
+    try:
+        change(p['backend'],lambda s:s.update(provider_pids=[pi.pid,codex.pid]))
+        assert p['open'](0).returncode==0
+        wait_for(lambda:(p['native']/'herdr/herdr-recovery.json').exists() and read(p['native']/'herdr/herdr-recovery.json')['phase']=='reset',timeout=30)
+        gate.touch();assert json.loads(pi.stdout.readline())['ready']
+        wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=60)
+        saved=read(p['native']/'herdr/herdr-recovery.json')['sessions']['lead']
+        assert saved['fresh'] and saved['reason']=='unused_native_session_never_persisted'
+        assert not Path(original['native_session_path']).exists(),'Recovery must not fabricate a native transcript'
+    finally:
+        for proc in [pi,codex]:
+            if proc.poll() is None:proc.kill()
+            proc.wait(timeout=5)

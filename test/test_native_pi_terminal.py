@@ -205,8 +205,12 @@ def test_installed_pi_loads_bridge_and_session_switch_rotates_log_without_a_mode
     try:
         actual=ready(instance);wait_for(state_file.exists)
         before=json.loads(state_file.read_text(encoding='utf-8'));assert before['bridge']['process']['pid']==actual['pid']
+        assert before['native_unwritten_empty'] is True
+        assert not Path(before['bridge']['session_path']).exists()
         assert settled(instance,control(instance,'clear'))['status']=='completed'
         after=json.loads(state_file.read_text(encoding='utf-8'))
+        assert after['native_unwritten_empty'] is True
+        assert not Path(after['bridge']['session_path']).exists()
         assert before['session_id']!=after['session_id'] and before['bridge']['instance']!=after['bridge']['instance']
         assert before['bridge']['process']==after['bridge']['process'] and Path(before['path']).exists()
         auth=home/'auth.json';assert not auth.exists() or json.loads(auth.read_text())=={}

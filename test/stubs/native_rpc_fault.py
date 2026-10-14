@@ -126,6 +126,8 @@ for line in sys.stdin.buffer:
             if first and mode == 'init':
                 emit({'id': command['id'], 'error': {'code': -32000, 'message': secret}}); hold()
             emit({'id': command['id'], 'result': {'userAgent': 'fixture'}})
+        elif kind == 'config/read':
+            emit({'id': command['id'], 'result': {'config': {'developer_instructions': None}}})
         elif kind in {'thread/start', 'thread/resume'}:
             emit({'id': command['id'], 'result': {'thread': thread}})
             if first and mode == 'stdin-closed': close_input()

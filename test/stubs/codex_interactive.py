@@ -78,6 +78,8 @@ for line in sys.stdin.buffer:
     method = command.get('method')
     if method == 'initialize':
         response(command, {'userAgent': 'fixture'})
+    elif method == 'config/read':
+        response(command, {'config': {'developer_instructions': None}})
     elif method in {'thread/start', 'thread/resume'}:
         if method == 'thread/resume':
             thread_id = command['params']['threadId']

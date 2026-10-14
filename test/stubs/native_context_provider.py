@@ -133,6 +133,7 @@ for line in sys.stdin:
     else:
         method = command['method']
         if method == 'initialize': response(command, {'userAgent':'context fixture'})
+        elif method == 'config/read': response(command, {'config':{'developer_instructions':None}})
         elif method in {'thread/start', 'thread/resume'}:
             thread_id = command['params'].get('threadId') or sid()
             history.setdefault(thread_id, [])

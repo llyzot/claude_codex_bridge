@@ -92,6 +92,8 @@ for line in sys.stdin.buffer:
         kind = command['method']
         if kind == 'initialize':
             emit({'id': command['id'], 'result': {'userAgent': 'fixture'}})
+        elif kind == 'config/read':
+            emit({'id': command['id'], 'result': {'config': {'developer_instructions': None}}})
         elif kind in {'thread/start', 'thread/resume'}:
             emit({'id': command['id'], 'result': {'thread': thread}})
             if first and mode == 'idle-exit':

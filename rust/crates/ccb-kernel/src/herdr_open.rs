@@ -793,6 +793,7 @@ pub(crate) fn open(
         lock.try_lock().is_ok(),
         "native Herdr open is already in progress"
     );
+    recovery::restore_retired_checkpoint(&runtime, &root)?;
     let mut record = crate::store::Store::open(&root)?
         .json(RECORD)?
         .unwrap_or(Value::Null);

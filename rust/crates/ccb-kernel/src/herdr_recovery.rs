@@ -12,6 +12,83 @@ const STATE: &str = "herdr-recovery.json";
 #[path = "herdr_work_handoff.rs"]
 mod work_handoff;
 pub(super) use work_handoff::{authorize_start, handoff_allowed};
+
+// An uncommitted recovery may have prepared a layout but transferred neither
+// authority nor work. Once that layout is explicitly retired, restore the last
+// retired checkpoint transactionally. Never roll back a sent launch or a live
+// daemon, and never reconstruct the checkpoint from the caller's environment.
+pub(super) fn restore_retired_checkpoint(runtime: &Path, root: &Path) -> Result<()> {
+    let Some(mut recovery) = read(root, STATE)? else {
+        return Ok(());
+    };
+    if recovery["phase"] != "reset"
+        || !recovery["work_handoff"].is_null()
+        || recovery["namespace"]["status"] != "retired"
+    {
+        return Ok(());
+    }
+    let Some(namespace) = read(root, "namespace.json")? else {
+        return Ok(());
+    };
+    if namespace["status"] != "retired"
+        || namespace["owner_id"] == recovery["namespace"]["owner_id"]
+    {
+        return Ok(());
+    }
+    let opened = read(root, RECORD)?.context("uncommitted recovery open record missing")?;
+    ensure!(
+        opened["last_recovery_id"] == recovery["operation_id"] && opened["daemon"].is_null(),
+        "recovery authority may already have transferred"
+    );
+    if let Some(agents) = read(root, "herdr-agents.json")? {
+        ensure!(
+            agents["agents"]
+                .as_object()
+                .is_some_and(|rows| rows.values().all(|r| r["sent"] == false)),
+            "uncommitted recovery contains a sent launch; observation is required"
+        );
+    }
+    crate::daemon::verify_owner(runtime)?;
+    ensure!(
+        crate::keeper::status(runtime)?["alive"] == false,
+        "recovery Keeper is still active"
+    );
+    let authority = crate::Kernel::open(runtime)?;
+    let committed = authority
+        .store
+        .json("configuration.json")?
+        .context("recovery configuration missing")?;
+    ensure!(
+        committed["config_fingerprint"] == recovery["prior_config_fingerprint"],
+        "recovery configuration has already committed"
+    );
+    let prepared = super::prepared_configuration(runtime)?
+        .context("uncommitted namespace configuration missing")?;
+    crate::herdr_namespace::inspect_retired(&prepared["herdr"])?;
+    let observed = snapshot(&prepared["herdr"])?;
+    ensure!(
+        !target(&observed, &recovery)?,
+        "previous retired namespace reappeared"
+    );
+    let mut previous = recovery["previous_open"].clone();
+    previous["server_process"] = opened["server_process"].clone();
+    let owner = crate::records::string(&namespace, "owner_id")?;
+    uuid::Uuid::parse_str(owner)?;
+    let mut store = crate::store::Store::open(root)?;
+    store.save(
+        &format!("archived-partial/{owner}/namespace.json"),
+        &namespace,
+    )?;
+    recovery["phase"] = json!("rolled_back_before_activation");
+    recovery["discarded_open"] = opened;
+    store.append("herdr-recoveries.jsonl", &recovery)?;
+    store.save("namespace.json", &recovery["namespace"])?;
+    store.save("herdr-agents.json", &recovery["agents"])?;
+    store.save(RECORD, &previous)?;
+    store.remove("open-configuration.json")?;
+    store.remove(STATE)?;
+    store.commit()
+}
 pub(super) fn expected_session(root: &Path, open: &Value, agent: &str) -> Result<Option<Value>> {
     let Some(recovery) = read(root, STATE)? else {
         return Ok(None);
@@ -710,7 +787,12 @@ pub(super) fn step(
     for (name, session) in recovery["sessions"].as_object().unwrap() {
         resume[name] = session["args"].clone();
     }
-    let (next, next_bridges) = prepare_request(project, config, options, &resume)?;
+    let (mut next, next_bridges) = prepare_request(project, config, options, &resume)?;
+    // The request above was matched to the committed owner configuration.
+    // Recovery changes session selectors, not its resolved launch environment.
+    for (name, spec) in next["config"]["agents"].as_object_mut().unwrap() {
+        spec["env"]["PATH"] = request["config"]["agents"][name]["env"]["PATH"].clone();
+    }
     let next_hash = hash(&json!([
         next,
         options["history_roots"],

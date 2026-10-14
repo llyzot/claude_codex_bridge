@@ -64,16 +64,27 @@
     "clippy": "cargo clippy -p ccb-kernel --all-targets -- -D warnings: passed",
     "release_build": "passed",
     "model_calls": 0,
-    "limits": "Controlled Windows process/IPC fault-injection tests, fixture Herdr/Pi/Claude terminals, and real installed Codex app-server initialization with private unauthenticated homes. No new live three-model business workflow or production startup benchmark was run."
+    "limits": "Controlled Windows process/IPC fault-injection tests, fixture Herdr/Pi/Claude terminals, and real installed Codex app-server initialization with private unauthenticated homes. No new live three-model business workflow or production startup benchmark was run.",
+    "cutover_hotfix": {
+      "report": "native-recovery-launch-environment-20261014.xml",
+      "passed": 2,
+      "cases": [
+        "changed caller shell PATH",
+        "retired uncommitted failed recovery"
+      ],
+      "clippy": "passed; all ccb-kernel targets, warnings denied"
+    }
   },
   "delivery": {
-    "binary_sha256": "84dface997242c548baa6c65e90d9444c5a94d826ac20abe68b426b984124974",
-    "installed_binary_sha256": "5d157dd7ab91444f4b6135fdf5b436d5018c7e6158c0e0c0f2c86e23e5c6fdc4",
-    "installed": false,
-    "reason": "Existing sample-project-3 installation processes are still active; no approval to stop and restore that project has been received.",
-    "formal_project_restarted": false,
+    "binary_sha256": "a2b8fc853d3b5a18b3dbd893926a8c33ba3e7aae48a34c9361d0128305ae3a17",
+    "installed_binary_sha256": "a2b8fc853d3b5a18b3dbd893926a8c33ba3e7aae48a34c9361d0128305ae3a17",
+    "installed": true,
+    "formal_project_restarted": true,
     "herdr_panes_read": false,
-    "provider_settings_changed": false
+    "provider_settings_changed": false,
+    "status": "installed_and_restored",
+    "cutover_report": "sample-project-3-lifecycle-cutover-final-20261014.json",
+    "refactor_validation_binary_sha256": "84dface997242c548baa6c65e90d9444c5a94d826ac20abe68b426b984124974"
   },
   "remaining_limits": [
     "Mixed-version Codex model-catalog cache churn is unchanged.",

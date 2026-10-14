@@ -55,7 +55,8 @@ def test_plain_reply_waits_for_offline_lead_without_blocking_worker(project):
 
 
 @pytest.mark.skipif(not os.environ.get('CCB_PREVIOUS_NATIVE_BIN'),reason='Explicit previous-release migration probe')
-def test_previous_release_checkpoint_migrates_without_replacing_native_sessions(project):
+@pytest.mark.parametrize('resume_case',['same_shell','changed_shell','retired_uncommitted'])
+def test_previous_release_checkpoint_migrates_without_replacing_native_sessions(project,resume_case):
     from test_native_cli_security import BIN
     p=project;previous=Path(os.environ['CCB_PREVIOUS_NATIVE_BIN']).parent
     # Model the supported installation operation: replace executables in place.
@@ -64,8 +65,9 @@ def test_previous_release_checkpoint_migrates_without_replacing_native_sessions(
     program=p['root']/'program';program.mkdir()
     executable=program/'ccb-native.exe'
     shutil.copy2(previous/'ccb-native.exe',executable)
+    launch_env=os.environ.copy()
     def open_version():
-        return subprocess.run([str(executable),'--project',str(p['root']),'herdr','open','--options',str(p['file']),'--no-attach'],capture_output=True,text=True,encoding='utf-8',timeout=25)
+        return subprocess.run([str(executable),'--project',str(p['root']),'herdr','open','--options',str(p['file']),'--no-attach'],capture_output=True,text=True,encoding='utf-8',timeout=25,env=launch_env)
     original=json.loads(p['pi'].args[2]);history=Path(original['native_session_path'])
     history.write_text(json.dumps(dict(type='session',id=original['session_id'],cwd=str(p['root'])))+'\n',encoding='utf-8')
     before=history.read_bytes()
@@ -76,12 +78,25 @@ def test_previous_release_checkpoint_migrates_without_replacing_native_sessions(
     retired=subprocess.run([str(executable),'--state-root',str(p['native']),'kill'],capture_output=True,text=True,encoding='utf-8',timeout=25)
     assert retired.returncode==0,retired.stderr
     for proc in [p['pi'],p['codex']]:proc.kill();proc.wait(timeout=5)
-    shutil.copy2(BIN,executable)
+    if resume_case!='same_shell':
+        launch_env['PATH']=str(p['root']/'other-caller-tools')+os.pathsep+launch_env['PATH']
+    if resume_case=='retired_uncommitted':
+        bad=os.environ.get('CCB_BAD_NATIVE_BIN')
+        if not bad:pytest.skip('Explicit failed-generation binary required')
+        shutil.copy2(bad,executable)
+    else:shutil.copy2(BIN,executable)
     gate=p['root']/'migration-session-ready';original['start_gate']=str(gate)
     pi=subprocess.Popen([NODE,str(HOST),json.dumps(original)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8',creationflags=0x08000000)
     worker=subprocess.Popen(p['codex'].args,creationflags=0x08000000)
     try:
         change(p['backend'],lambda s:s.update(provider_pids=[pi.pid,worker.pid]))
+        if resume_case=='retired_uncommitted':
+            failed=open_version()
+            wait_for(lambda:read(p['native']/'herdr/herdr-open-start.json')['status']=='failed',timeout=20)
+            assert 'substantive configuration changed' in read(p['native']/'herdr/herdr-open-start.json')['error']
+            closed=subprocess.run([str(executable),'--project',str(p['root']),'kill'],capture_output=True,text=True,encoding='utf-8',timeout=25,env=launch_env)
+            assert closed.returncode==0,closed.stderr
+            shutil.copy2(BIN,executable)
         result=open_version();assert result.returncode==0,result.stderr
         wait_for(lambda:(p['native']/'herdr/herdr-recovery.json').exists() and read(p['native']/'herdr/herdr-recovery.json')['phase']=='reset',timeout=20)
         gate.touch();assert json.loads(pi.stdout.readline())['ready']

@@ -546,9 +546,38 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
     }
     if op == "herdr" {
         use std::io::IsTerminal;
+        if args.first().is_some_and(|v| v == "repair") {
+            let project = project
+                .as_deref()
+                .context("herdr repair requires a project, not an alternate --state-root")?;
+            ensure!(
+                args.len() >= 3,
+                "herdr repair requires an agent and --fresh-session"
+            );
+            let agent = arg(&args, 1)?;
+            let mut fresh = false;
+            let mut dry_run = false;
+            for index in 2..args.len() {
+                match arg(&args, index)? {
+                    "--fresh-session" => fresh = true,
+                    "--dry-run" => dry_run = true,
+                    other => bail!("unknown herdr repair option: {other}"),
+                }
+            }
+            ensure!(
+                fresh,
+                "herdr repair requires the explicit --fresh-session decision"
+            );
+            let project_path = PathBuf::from(crate::workspaces::portable(project)?);
+            println!(
+                "{}",
+                crate::herdr_open::repair_fresh_session(&project_path, agent, dry_run)?
+            );
+            return Ok(());
+        }
         ensure!(
             args.first().is_some_and(|v| v == "open"),
-            "native herdr requires open"
+            "native herdr requires open or repair"
         );
         let project = project
             .as_deref()

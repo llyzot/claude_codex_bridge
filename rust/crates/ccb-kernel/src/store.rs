@@ -182,6 +182,8 @@ impl Store {
                     "open-configuration.json",
                     "herdr-recovery.json",
                     "herdr-recoveries.jsonl",
+                    "operator-repairs.json",
+                    "operator-repairs.jsonl",
                     "herdr-attachments.jsonl",
                     "project-view.json",
                     "runtime-controls.jsonl",

@@ -112,6 +112,16 @@ fn readiness(config: &Value, record: &Value) -> Value {
 }
 #[path = "herdr_recovery.rs"]
 mod recovery;
+#[path = "herdr_repair.rs"]
+mod repair;
+
+pub(crate) fn repair_fresh_session(project: &Path, agent: &str, dry_run: bool) -> Result<Value> {
+    ensure!(
+        cfg!(windows),
+        "native Herdr repair currently requires Windows"
+    );
+    repair::fresh_session(project, agent, dry_run)
+}
 pub(crate) fn recovery_handoff_allowed(kernel: &mut crate::Kernel, config: &Value) -> Result<bool> {
     recovery::handoff_allowed(kernel, config)
 }

@@ -253,6 +253,7 @@ fn resumes(
     prior: &Value,
 ) -> Result<Value> {
     let mut result = json!({});
+    let repairs = super::repair::pending(root)?;
     for (name, spec) in config["agents"].as_object().unwrap() {
         let native = spec["startup_args"].as_array().cloned().unwrap_or_default();
         let selectors = if spec["provider"] == "pi" {
@@ -396,6 +397,32 @@ fn resumes(
             }
             Ok(())
         })();
+        let faulted = read(
+            runtime,
+            &crate::provider_fault::path(crate::records::string(spec, "provider")?, name),
+        )?
+        .is_some_and(|fault| fault["status"] == "blocked");
+        if let (Err(error), Some(repair)) = (&session, repairs.get(name).filter(|r| r.is_object()))
+        {
+            if !faulted {
+                // The operator explicitly accepted losing the unverifiable session.
+                // Its sent work closes without replay; the next launch is fresh.
+                ensure!(
+                    repair["mode"] == "fresh_session"
+                        && repair["provider"] == spec["provider"]
+                        && repair["session"] == open["session"],
+                    "operator repair does not match this agent"
+                );
+                let provider = crate::records::string(spec, "provider")?;
+                let cache = format!("providers/{provider}/{name}/herdr-history.json");
+                if kernel.store.json(&cache)?.is_some() {
+                    kernel.store.remove(&cache)?;
+                }
+                result[name] = json!({"provider":provider,"fresh":true,"args":[],"reason":"operator_fresh_session",
+                    "operator_repair":repair["operation_id"],"abandoned_error":error.to_string()});
+                continue;
+            }
+        }
         if let Err(error) = session {
             // Retain the last confirmed identity for ownership checks. Missing
             // execution evidence prevents activation, not recognition of an
@@ -415,10 +442,26 @@ fn resumes(
                 open["bindings"][name]["history"]["path"].clone()
             };
             result[name] = json!({"provider":spec["provider"],"args":[],"session_id":id,"path":path,
-                "blocked_reason":error.to_string()});
+                "history":open["bindings"][name]["history"],"blocked_reason":error.to_string()});
         }
     }
     Ok(result)
+}
+fn operator_sessions(sessions: &Value) -> Value {
+    sessions
+        .as_object()
+        .map(|sessions| {
+            sessions
+                .iter()
+                .filter_map(|(name, s)| {
+                    s["operator_repair"]
+                        .as_str()
+                        .map(|id| (name.clone(), json!(id)))
+                })
+                .collect::<serde_json::Map<String, Value>>()
+        })
+        .unwrap_or_default()
+        .into()
 }
 pub(super) fn native_host_session(
     runtime: &Path,
@@ -612,6 +655,21 @@ pub(super) fn step(
         // A registered generation can be stopped before all sessions activate.
         // Its next open is a new recovery operation, not a replay of the old one.
         recovery = Value::Null;
+    } else if recovery["phase"] == "reset"
+        && !recovery["work_handoff"].is_null()
+        && options["recover_stopped"] == true
+        && open["last_recovery_id"] == recovery["operation_id"]
+    {
+        // A held actor keeps its generation from reaching running, so the
+        // recovery never completes. Once that generation took authority and its
+        // server has stopped, the next explicit recovery is a new operation.
+        let status = crate::herdr_agents::rpc(
+            request,
+            vec!["status".into(), "server".into(), "--json".into()],
+        )?;
+        if status.get("server").unwrap_or(&status)["running"] == false {
+            recovery = Value::Null;
+        }
     }
     if recovery.is_null() || recovery["phase"] == "complete" {
         let namespace = read(root, "namespace.json")?.unwrap_or(Value::Null);
@@ -687,18 +745,35 @@ pub(super) fn step(
             prior["herdr"] == *request,
             "recovery source configuration changed"
         );
-        let mut historical = crate::herdr_activation::historical(&prior, &open["bindings"]);
+        // A held generation never binds its agent. Carry the last verified
+        // history binding forward so restored evidence resumes that session.
+        let mut carried = open.clone();
+        if let (Some(held), Some(previous)) = (
+            open["initialization_errors"].as_object(),
+            read(root, STATE)?.filter(|r| r["operation_id"] == open["last_recovery_id"]),
+        ) {
+            for name in held.keys() {
+                if carried["bindings"][name].is_null()
+                    && previous["sessions"][name]["history"].is_object()
+                {
+                    carried["bindings"][name] =
+                        json!({"history":previous["sessions"][name]["history"]});
+                }
+            }
+        }
+        let mut historical = crate::herdr_activation::historical(&prior, &carried["bindings"]);
         let sessions = resumes(
             root,
             &runtime,
             config,
-            open,
+            &carried,
             &agents,
             &mut kernel,
             &historical,
         )?;
         historical["herdr_activation"]["blocked_agents"] =
             crate::herdr_activation::blocked_sessions(&sessions);
+        historical["herdr_activation"]["operator_fresh_session"] = operator_sessions(&sessions);
         let (mut offline, work) =
             crate::daemon::Daemon::recover_closed_work(kernel, historical, &agents)?;
         let mut recovery_config = config.clone();
@@ -804,6 +879,29 @@ pub(super) fn step(
         "last_recovery_id":recovery["operation_id"],"observer_instance":options["opener_instance"]});
     recovery["phase"] = json!("reset");
     let mut store = crate::store::Store::open(root)?;
+    let mut repairs = super::repair::pending(root)?;
+    if repairs.as_object().is_some_and(|m| !m.is_empty()) {
+        let names: Vec<String> = repairs.as_object().unwrap().keys().cloned().collect();
+        for name in names {
+            let session = &recovery["sessions"][&name];
+            // Applied here, or superseded because verified evidence resumed.
+            // An agent that is still held keeps its pending decision.
+            let phase = if session["operator_repair"] == repairs[&name]["operation_id"] {
+                "applied"
+            } else if session.is_object() && session["blocked_reason"].is_null() {
+                "superseded"
+            } else {
+                continue;
+            };
+            let mut audit = repairs[&name].clone();
+            audit["phase"] = json!(phase);
+            audit["recovery_id"] = recovery["operation_id"].clone();
+            audit["recorded_at"] = json!(crate::daemon::now());
+            store.append(super::repair::AUDIT, &audit)?;
+            repairs.as_object_mut().unwrap().remove(&name);
+        }
+        store.save(super::repair::REPAIRS, &repairs)?;
+    }
     store.append("herdr-recoveries.jsonl", &recovery)?;
     store.remove("namespace.json")?;
     store.remove("herdr-agents.json")?;

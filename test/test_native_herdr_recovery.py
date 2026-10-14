@@ -131,3 +131,95 @@ def test_absent_old_workspace_does_not_allow_duplicate_live_session_elsewhere(st
     change(p['backend'],move)
     result=p['open'](True);assert result.returncode!=0 and 'already active' in result.stderr
     assert mutate_count(p['backend'],['agent','start'])==1
+
+def held_worker(p,aside=None):
+    """Leave a sent execution whose native history is gone, then recover it into an explicit hold."""
+    asked=cli('--state-root',p['runtime'],'ask','worker','must not replay');assert asked.returncode==0,asked.stderr
+    wait_for(lambda:mutate_count(p['backend'],['agent','prompt'])==1)
+    p['stop']()
+    if aside:p['log'].rename(aside)
+    else:p['log'].unlink()
+    replacement=p['helper']()
+    def restored_idle(s):
+        s['provider_pids']=[replacement.pid]
+        for agent in s['agents'].values():agent.update(agent_status='idle',interactive_ready=True)
+    change(p['backend'],restored_idle)
+    result=p['open'](True);assert result.returncode==0,result.stderr
+    wait_for(lambda:cli('--state-root',p['runtime'],'ping').returncode==0,timeout=30)
+    actor=json.loads(cli('--state-root',p['runtime'],'agents').stdout)['agents'][0]
+    assert actor['activation']['reason']=='recovery_evidence_required'
+    return json.loads(asked.stdout)['job_id'],replacement
+
+def stop_all(p):
+    p['stop']();start=p['state']/'herdr-open-start.json'
+    if start.exists():owned_stop(json.loads(start.read_text(encoding='utf-8')).get('process'))
+    wait_for(lambda:not json.loads(cli('--state-root',p['runtime'],'keeper-status').stdout)['alive'],timeout=20)
+
+def repair(p,*extra):return cli('--project',p['project'],'herdr','repair','worker','--fresh-session',*extra)
+
+@pytest.mark.parametrize('stopped',['codex','claude'],indirect=True)
+def test_operator_fresh_session_releases_held_agent_without_replay(stopped):
+    p=stopped;job,held=held_worker(p)
+    live=repair(p);assert live.returncode!=0 and ('stopped' in live.stderr or 'ccb kill' in live.stderr)
+    stop_all(p);held.kill();held.wait(timeout=5)
+    plan=repair(p,'--dry-run');assert plan.returncode==0,plan.stderr
+    planned=json.loads(plan.stdout)
+    assert planned['status']=='planned' and planned['agent']=='worker' and planned['mutations'] is False
+    assert [j['job_id'] for j in planned['abandoned_executions']]==[job] and planned['prior_error']
+    assert not (p['state']/'operator-repairs.json').exists()
+    done=repair(p);assert done.returncode==0,done.stderr
+    assert json.loads(done.stdout)['status']=='requested'
+    again=repair(p);assert again.returncode==0 and json.loads(again.stdout)['operation_id']==json.loads(done.stdout)['operation_id']
+    fresh=str(uuid.uuid4());history=p['log'].parent
+    header={'type':'user','uuid':'fresh','sessionId':fresh,'cwd':str(p['project']),'message':{'role':'user','content':'fresh'}} if p['provider']=='claude' else {'type':'session_meta','payload':{'id':fresh,'cwd':str(p['project'])}}
+    (history/(f'{fresh}.jsonl' if p['provider']=='claude' else f'rollout-{fresh}.jsonl')).write_text(json.dumps(header)+'\n',encoding='utf-8')
+    replacement=p['helper']()
+    def fresh_session(s):
+        s['provider_pids']=[replacement.pid]
+        for agent in s['agents'].values():agent['agent_session']['value']=fresh
+    change(p['backend'],fresh_session)
+    result=p['open'](True);assert result.returncode==0,result.stderr
+    wait_for(lambda:cli('--state-root',p['runtime'],'ping').returncode==0,timeout=30)
+    watched=json.loads(cli('--state-root',p['runtime'],'watch',job).stdout)
+    assert watched['status']=='incomplete'
+    assert mutate_count(p['backend'],['agent','prompt'])==1
+    launches=[r for r in json.loads('['+','.join((p['backend']/'calls.jsonl').read_text(encoding='utf-8').splitlines())+']') if r[:2]==['agent','start']]
+    selector='--resume' if p['provider']=='claude' else 'resume'
+    assert selector not in launches[-1] and p['session'] not in launches[-1]
+    wait_for(lambda:json.loads(cli('--state-root',p['runtime'],'agents').stdout)['agents'][0]['activation']['session_verified'],timeout=30)
+    assert not json.loads((p['state']/'operator-repairs.json').read_text(encoding='utf-8')).get('worker')
+    audit=[json.loads(r) for r in (p['state']/'operator-repairs.jsonl').read_text(encoding='utf-8').splitlines()]
+    assert [a['phase'] for a in audit]==['requested','applied']
+
+def test_fresh_session_repair_refuses_agent_that_is_not_held(stopped):
+    p=stopped;stop_all(p)
+    result=repair(p);assert result.returncode!=0 and 'not held' in result.stderr
+    assert not (p['state']/'operator-repairs.json').exists()
+
+def test_held_agent_survives_a_second_stopped_recovery_without_replay(stopped):
+    p=stopped;job,held=held_worker(p)
+    stop_all(p);held.kill();held.wait(timeout=5)
+    replacement=p['helper']()
+    change(p['backend'],lambda s:s.update(provider_pids=[replacement.pid]))
+    result=p['open'](True);assert result.returncode==0,result.stderr
+    wait_for(lambda:cli('--state-root',p['runtime'],'ping').returncode==0,timeout=30)
+    actor=json.loads(cli('--state-root',p['runtime'],'agents').stdout)['agents'][0]
+    assert actor['activation']['reason']=='recovery_evidence_required'
+    assert json.loads(cli('--state-root',p['runtime'],'watch',job).stdout)['status']=='running'
+    assert mutate_count(p['backend'],['agent','prompt'])==1
+    assert len((p['state']/'herdr-recoveries.jsonl').read_text(encoding='utf-8').splitlines())==2
+
+def test_pending_fresh_session_repair_is_superseded_when_evidence_returns(stopped):
+    p=stopped;aside=p['log'].with_suffix('.unavailable');job,held=held_worker(p,aside)
+    stop_all(p);held.kill();held.wait(timeout=5)
+    assert repair(p).returncode==0
+    aside.rename(p['log']);replacement=p['helper']()
+    change(p['backend'],lambda s:s.update(provider_pids=[replacement.pid]))
+    result=p['open'](True);assert result.returncode==0,result.stderr
+    launches=[r for r in json.loads('['+','.join((p['backend']/'calls.jsonl').read_text(encoding='utf-8').splitlines())+']') if r[:2]==['agent','start']]
+    selector='--resume' if p['provider']=='claude' else 'resume'
+    assert launches[-1][launches[-1].index(selector)+1]==p['session']
+    assert mutate_count(p['backend'],['agent','prompt'])==1
+    assert not json.loads((p['state']/'operator-repairs.json').read_text(encoding='utf-8')).get('worker')
+    audit=[json.loads(r) for r in (p['state']/'operator-repairs.jsonl').read_text(encoding='utf-8').splitlines()]
+    assert [a['phase'] for a in audit]==['requested','superseded']

@@ -133,7 +133,38 @@ impl Daemon {
         );
         let execution = records::string(&job["provider_options"], "native_execution_instance")?;
         uuid::Uuid::parse_str(execution)?;
-        let identity = crate::herdr_agents::recorded_identity(agents, agent);
+        let operator = &self.config["herdr_activation"]["operator_fresh_session"][agent];
+        if operator.is_string() {
+            // The operator accepted that this session's evidence is unavailable.
+            // Only the process that received the prompt must be proven gone.
+            let prompted = &permit["identity"]["process"];
+            ensure!(
+                permit.is_null()
+                    || prompted.is_object()
+                        && !crate::startup::owner_alive(
+                            &json!({"pid":prompted["pid"],"process":prompted})
+                        )?,
+                "prompted terminal process is live or unconfirmed"
+            );
+            let mut decision = json!({"schema_version":2,"record_type":"completion_decision",
+                "terminal":true,"status":"incomplete","reason":"operator_fresh_session","confidence":"degraded",
+                "reply":"The operator started a fresh provider session because the previous native session evidence was unavailable. Work may already have taken effect. Inspect the project before explicitly retrying.",
+                "anchor_seen":false,"reply_started":false,"reply_stable":false,"provider_turn_ref":null,"source_cursor":null,
+                "finished_at":now(),"diagnostics":{"operator_repair":operator,"recovery_no_replay":true,"automatic_replay":false,
+                "native_execution_instance":execution,"provider_prompt_permitted":!permit.is_null()}});
+            if let Some(reply) = cancel["record_reply"].as_bool() {
+                decision["status"] = json!("cancelled");
+                decision["diagnostics"]["result_reply_enabled"] = json!(reply);
+                decision["diagnostics"]["cancel_requested"] = json!(true);
+            }
+            return Ok(decision);
+        }
+        let mut identity = crate::herdr_agents::recorded_identity(agents, agent);
+        if identity["process"].is_null() && agents["agents"][agent]["sent"] != true {
+            // Held in the latest generation, so never relaunched there. The
+            // process that received this prompt is its only terminal owner.
+            identity = permit["identity"].clone();
+        }
         ensure!(
             identity["process"].is_object()
                 && !crate::startup::owner_alive(

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-14",
+  "source_base": "75ad2067",
+  "scope": "Recovery of agents held for missing session evidence, and an explicit operator exit",
+  "changes": [
+    "A recovery whose generation took authority but never reached running (held actor) no longer blocks the next --recover-stopped; previously it failed with os error 87 against the dead server process.",
+    "Held generations carry the last verified history binding forward, so evidence that becomes available again resumes the exact original session.",
+    "Stopped work owned by an agent that was not relaunched in the latest generation is fenced by the process recorded in its prompt permit.",
+    "New offline command: ccb herdr repair <agent> --fresh-session [--dry-run]. Records a durable, idempotent intent; the next recovery closes sent executions as incomplete (operator_fresh_session, never replayed), drops cached history and launches a fresh session. Intents are audited as requested/applied/superseded."
+  ],
+  "refusals": [
+    "agent not held",
+    "daemon, Keeper or Herdr opener still active",
+    "blocked provider fault",
+    "uncertain reply delivery"
+  ],
+  "validation": {
+    "red": "test_held_agent_survives_a_second_stopped_recovery_without_replay fails on the 75ad2067 debug build with os error 87.",
+    "new_cases": 6,
+    "full_native_suite_before": {"passed": 1279, "failed": 194, "skipped": 14},
+    "full_native_suite_after": {"passed": 1387, "failed": 91, "skipped": 14, "new_failures": 0},
+    "remaining_failures": [
+      "65 non-scope providers (qwen/qoder/cursor/copilot/kiro/grok/crush/zai/omp) and Windows symlink privilege fixtures",
+      "19 installation upgrade/remove fixtures time out at 20 s",
+      "5 herdr_host_recovery cases assert whole-open refusal; 1ce50623 changed the contract to per-actor holds (no replay or fresh substitution observed)",
+      "project_kill help fixture and one worktree Keeper-timing case"
+    ],
+    "clippy": "ccb-kernel all targets, warnings denied, passed",
+    "fmt": "passed",
+    "no_model_calls": true
+  },
+  "limits": [
+    "Fixture Herdr backend only; no real Pi/Codex/Claude provider was launched.",
+    "Fresh-session repair is offline (project fully stopped) and per agent.",
+    "A deleted-then-recreated history file is refused as replaced evidence; only the same file identity resumes."
+  ]
+}

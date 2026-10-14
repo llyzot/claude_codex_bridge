@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="4" skipped="0" tests="50" time="835.157" timestamp="2026-10-14T11:38:42.421233+08:00" hostname="HOST"><testcase classname="test.test_native_herdr_reopen" name="test_reopen_after_kill_preserves_exact_session_and_running_server[codex]" file="test\test_native_herdr_reopen.py" line="36" time="21.106" /><testcase classname="test.test_native_herdr_reopen" name="test_reopen_after_kill_preserves_exact_session_and_running_server[claude]" file="test\test_native_herdr_reopen.py" line="36" time="20.932" /><testcase classname="test.test_native_herdr_reopen" name="test_reopen_does_not_replace_missing_history_with_a_fresh_session" file="test\test_native_herdr_reopen.py" line="56" time="15.350" /><testcase classname="test.test_native_herdr_reopen" name="test_reappeared_retired_workspace_is_not_closed_or_replaced" file="test\test_native_herdr_reopen.py" line="65" time="10.486" /><testcase classname="test.test_native_herdr_reopen" name="test_reopen_rejects_same_session_active_elsewhere" file="test\test_native_herdr_reopen.py" line="73" time="11.132" /><testcase classname="test.test_native_herdr_reopen" name="test_recovery_rejects_a_provider_that_resumed_the_wrong_native_session[codex]" file="test\test_native_herdr_reopen.py" line="79" time="10.013"><failure message="AttributeError: 'NoneType' object has no attribute 'get'">stopped = {'project': WindowsPath('C:/Users/user/AppData/Local/Temp/pytest-of-user/pytest-616/test_recovery_rejects_a_prov...user/AppData/Local/Temp/pytest-of-user/pytest-616/test_recovery_rejects_a_provid0/project/.ccb/ccbd/herdr'), ...}
+
+    @pytest.mark.parametrize('stopped',['codex','claude'],indirect=True)
+    def test_recovery_rejects_a_provider_that_resumed_the_wrong_native_session(stopped):
+        p=stopped;retire(p);replacement=p['helper']();foreign=str(uuid.uuid4())
+        log=p['log'].parent/(f'{foreign}.jsonl' if p['provider']=='claude' else f'rollout-{foreign}.jsonl')
+        header={'type':'user','uuid':'foreign-user','sessionId':foreign,'cwd':str(p['project']),'message':{'role':'user','content':'foreign'}} if p['provider']=='claude' else {'type':'session_meta','payload':{'id':foreign,'cwd':str(p['project'])}}
+        log.write_text(json.dumps(header)+'\n',encoding='utf-8')
+        change(p['backend'],lambda s:s.update(provider_pids=[replacement.pid],agent_sessions={p['provider']:{'agent':p['provider'],'kind':'id','value':foreign,'source':'fixture'}}))
+        result=p['open'](ms=0);assert result.returncode==0,result.stderr
+&gt;       error=wait_for(lambda:read(p['state']/'herdr-open.json').get('binding_errors',{}).get('worker'),timeout=20)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+test\test_native_herdr_reopen.py:88:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+test\test_native_herdr_worker.py:22: in wait_for
+    value=fn()
+          ^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+&gt;   error=wait_for(lambda:read(p['state']/'herdr-open.json').get('binding_errors',{}).get('worker'),timeout=20)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'NoneType' object has no attribute 'get'
+
+test\test_native_herdr_reopen.py:88: AttributeError</failure></testcase><testcase classname="test.test_native_herdr_reopen" name="test_recovery_rejects_a_provider_that_resumed_the_wrong_native_session[claude]" file="test\test_native_herdr_reopen.py" line="79" time="10.144"><failure message="AttributeError: 'NoneType' object has no attribute 'get'">stopped = {'project': WindowsPath('C:/Users/user/AppData/Local/Temp/pytest-of-user/pytest-616/test_recovery_rejects_a_prov...user/AppData/Local/Temp/pytest-of-user/pytest-616/test_recovery_rejects_a_provid1/project/.ccb/ccbd/herdr'), ...}
+
+    @pytest.mark.parametrize('stopped',['codex','claude'],indirect=True)
+    def test_recovery_rejects_a_provider_that_resumed_the_wrong_native_session(stopped):
+        p=stopped;retire(p);replacement=p['helper']();foreign=str(uuid.uuid4())
+        log=p['log'].parent/(f'{foreign}.jsonl' if p['provider']=='claude' else f'rollout-{foreign}.jsonl')
+        header={'type':'user','uuid':'foreign-user','sessionId':foreign,'cwd':str(p['project']),'message':{'role':'user','content':'foreign'}} if p['provider']=='claude' else {'type':'session_meta','payload':{'id':foreign,'cwd':str(p['project'])}}
+        log.write_text(json.dumps(header)+'\n',encoding='utf-8')
+        change(p['backend'],lambda s:s.update(provider_pids=[replacement.pid],agent_sessions={p['provider']:{'agent':p['provider'],'kind':'id','value':foreign,'source':'fixture'}}))
+        result=p['open'](ms=0);assert result.returncode==0,result.stderr
+&gt;       error=wait_for(lambda:read(p['state']/'herdr-open.json').get('binding_errors',{}).get('worker'),timeout=20)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+test\test_native_herdr_reopen.py:88:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+test\test_native_herdr_worker.py:22: in wait_for
+    value=fn()
+          ^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+&gt;   error=wait_for(lambda:read(p['state']/'herdr-open.json').get('binding_errors',{}).get('worker'),timeout=20)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'NoneType' object has no attribute 'get'
+
+test\test_native_herdr_reopen.py:88: AttributeError</failure></testcase><testcase classname="test.test_native_herdr_reopen" name="test_recovery_gates_dispatch_but_not_daemon_start_on_session_confirmation" file="test\test_native_herdr_reopen.py" line="95" time="21.697" /><testcase classname="test.test_native_herdr_reopen" name="test_reopen_observes_started_agent_after_opener_crash_without_duplicate" file="test\test_native_herdr_reopen.py" line="112" time="19.037" /><testcase classname="test.test_native_herdr_reopen" name="test_reopen_waits_for_retired_foreground_exit_without_launching_replacement" file="test\test_native_herdr_reopen.py" line="124" time="19.629" /><testcase classname="test.test_native_herdr_reopen" name="test_retired_namespace_reopens_after_its_owned_server_also_stops" file="test\test_native_herdr_reopen.py" line="136" time="19.146" /><testcase classname="test.test_native_herdr_reopen" name="test_pi_and_codex_reopen_preserves_sessions_and_callback_routing[terminal]" file="test\test_native_herdr_reopen.py" line="146" time="32.667" /><testcase classname="test.test_native_herdr_reopen" name="test_pi_and_codex_reopen_preserves_sessions_and_callback_routing[hosted]" file="test\test_native_herdr_reopen.py" line="146" time="32.799"><properties><property name="codex_ready_while_pi_blocked_ms" value="7960.09" /></properties></testcase><testcase classname="test.test_native_herdr_reopen" name="test_pi_and_codex_reopen_preserves_sessions_and_callback_routing[foreign_pi]" file="test\test_native_herdr_reopen.py" line="146" time="26.311" /><testcase classname="test.test_native_herdr_reopen" name="test_pi_and_codex_reopen_preserves_sessions_and_callback_routing[hosted_pending]" file="test\test_native_herdr_reopen.py" line="146" time="19.110"><properties><property name="codex_ready_while_pi_blocked_ms" value="4309.66" /></properties></testcase><testcase classname="test.test_native_herdr_reopen" name="test_pi_and_codex_reopen_preserves_sessions_and_callback_routing[hosted_foreign_pi]" file="test\test_native_herdr_reopen.py" line="146" time="26.659"><properties><property name="codex_ready_while_pi_blocked_ms" value="8591.76" /></properties></testcase><testcase classname="test.test_native_herdr_reopen" name="test_unwritten_pi_session_reopens_only_with_positive_empty_evidence[unused]" file="test\test_native_herdr_reopen.py" line="251" time="29.846" /><testcase classname="test.test_native_herdr_reopen" name="test_unwritten_pi_session_reopens_only_with_positive_empty_evidence[activity_without_history]" file="test\test_native_herdr_reopen.py" line="251" time="16.543" /><testcase classname="test.test_native_herdr_recovery" name="test_recover_quiet_server_archives_epoch_and_resumes_exact_history[codex]" file="test\test_native_herdr_recovery.py" line="49" time="23.239" /><testcase classname="test.test_native_herdr_recovery" name="test_recover_quiet_server_archives_epoch_and_resumes_exact_history[claude]" file="test\test_native_herdr_recovery.py" line="49" time="21.570" /><testcase classname="test.test_native_herdr_recovery" name="test_recovery_reconciles_stopped_work_without_repeating_its_prompt" file="test\test_native_herdr_recovery.py" line="67" time="10.757" /><testcase classname="test.test_native_herdr_recovery" name="test_lost_close_ack_does_not_duplicate_retirement_or_launch" file="test\test_native_herdr_recovery.py" line="81" time="14.222" /><testcase classname="test.test_native_herdr_recovery" name="test_restored_foreign_session_is_not_closed" file="test\test_native_herdr_recovery.py" line="87" time="10.732" /><testcase classname="test.test_native_herdr_recovery" name="test_recovery_resumes_after_controller_dies_following_workspace_close" file="test\test_native_herdr_recovery.py" line="95" time="20.203" /><testcase classname="test.test_native_herdr_recovery" name="test_missing_verified_history_is_not_replaced_by_a_fresh_session" file="test\test_native_herdr_recovery.py" line="106" time="10.807"><failure message="assert (not True)">stopped = {'project': WindowsPath('C:/Users/user/AppData/Local/Temp/pytest-of-user/pytest-616/test_missing_verified_histor...user/AppData/Local/Temp/pytest-of-user/pytest-616/test_missing_verified_history_0/project/.ccb/ccbd/herdr'), ...}
+
+    def test_missing_verified_history_is_not_replaced_by_a_fresh_session(stopped):
+        p=stopped;p['stop']();p['log'].unlink()
+        result=p['open'](True);assert result.returncode!=0
+&gt;       assert not server(p['backend'])['server_running'] and mutate_count(p['backend'],['workspace','close'])==0
+E       assert (not True)
+
+test\test_native_herdr_recovery.py:110: AssertionError</failure></testcase><testcase classname="test.test_native_herdr_recovery" name="test_extra_restored_pane_is_not_closed" file="test\test_native_herdr_recovery.py" line="111" time="10.322" /><testcase classname="test.test_native_herdr_recovery" name="test_absent_old_workspace_does_not_allow_duplicate_live_session_elsewhere" file="test\test_native_herdr_recovery.py" line="118" time="10.458" /><testcase classname="test.test_native_herdr_work_recovery" name="test_reopen_delivers_child_once_and_preserves_unsent_fifo[completed]" file="test\test_native_herdr_work_recovery.py" line="33" time="47.249" /><testcase classname="test.test_native_herdr_work_recovery" name="test_reopen_delivers_child_once_and_preserves_unsent_fifo[interrupted]" file="test\test_native_herdr_work_recovery.py" line="33" time="30.838" /><testcase classname="test.test_native_herdr_work_recovery" name="test_reopen_delivers_child_once_and_preserves_unsent_fifo[opener_crash]" file="test\test_native_herdr_work_recovery.py" line="33" time="20.497" /><testcase classname="test.test_native_herdr_work_recovery" name="test_reopen_delivers_child_once_and_preserves_unsent_fifo[deferred_completed]" file="test\test_native_herdr_work_recovery.py" line="33" time="22.214" /><testcase classname="test.test_native_herdr_work_recovery" name="test_reopen_delivers_child_once_and_preserves_unsent_fifo[deferred_interrupted]" file="test\test_native_herdr_work_recovery.py" line="33" time="17.837" /><testcase classname="test.test_native_herdr_work_recovery" name="test_reopen_delivers_child_once_and_preserves_unsent_fifo[deferred_stale_cache]" file="test\test_native_herdr_work_recovery.py" line="33" time="20.312" /><testcase classname="test.test_native_herdr_work_recovery" name="test_reopen_delivers_child_once_and_preserves_unsent_fifo[late_lead_daemon_crash]" file="test\test_native_herdr_work_recovery.py" line="33" time="25.803" /><testcase classname="test.test_native_herdr_work_recovery" name="test_recovery_refuses_changed_owner_configuration_or_corrupt_execution[model]" file="test\test_native_herdr_work_recovery.py" line="155" time="5.208" /><testcase classname="test.test_native_herdr_work_recovery" name="test_recovery_refuses_changed_owner_configuration_or_corrupt_execution[environment]" file="test\test_native_herdr_work_recovery.py" line="155" time="5.219" /><testcase classname="test.test_native_herdr_work_recovery" name="test_recovery_refuses_changed_owner_configuration_or_corrupt_execution[permit]" file="test\test_native_herdr_work_recovery.py" line="155" time="5.366" /><testcase classname="test.test_native_herdr_work_recovery" name="test_recovery_refuses_changed_owner_configuration_or_corrupt_execution[cancel_intent]" file="test\test_native_herdr_work_recovery.py" line="155" time="5.260" /><testcase classname="test.test_native_herdr_work_recovery" name="test_recovery_refuses_changed_owner_configuration_or_corrupt_execution[lease_binding]" file="test\test_native_herdr_work_recovery.py" line="155" time="5.366" /><testcase classname="test.test_native_herdr_work_recovery" name="test_recovery_keeps_durable_silent_cancellation_without_a_reply" file="test\test_native_herdr_work_recovery.py" line="188" time="9.129" /><testcase classname="test.test_native_herdr_work_recovery" name="test_stopped_claude_reuses_only_unchanged_durable_idle_evidence[recorded-claude]" file="test\test_native_herdr_work_recovery.py" line="208" time="9.090" /><testcase classname="test.test_native_herdr_work_recovery" name="test_stopped_claude_reuses_only_unchanged_durable_idle_evidence[absent-claude]" file="test\test_native_herdr_work_recovery.py" line="208" time="9.373" /><testcase classname="test.test_native_herdr_work_recovery" name="test_stopped_claude_reuses_only_unchanged_durable_idle_evidence[hook_continued-claude]" file="test\test_native_herdr_work_recovery.py" line="208" time="9.328" /><testcase classname="test.test_native_herdr_work_recovery" name="test_stopped_claude_reuses_only_unchanged_durable_idle_evidence[foreign_execution-claude]" file="test\test_native_herdr_work_recovery.py" line="208" time="5.353" /><testcase classname="test.test_native_herdr_work_recovery" name="test_stopped_claude_reuses_only_unchanged_durable_idle_evidence[rewritten_history-claude]" file="test\test_native_herdr_work_recovery.py" line="208" time="5.475" /><testcase classname="test.test_native_herdr_work_recovery" name="test_deferred_recovery_refuses_unknown_or_ambiguous_session_without_launch[duplicate_anchor]" file="test\test_native_herdr_work_recovery.py" line="262" time="10.263" /><testcase classname="test.test_native_herdr_work_recovery" name="test_deferred_recovery_refuses_unknown_or_ambiguous_session_without_launch[foreign_anchor]" file="test\test_native_herdr_work_recovery.py" line="262" time="11.117" /><testcase classname="test.test_native_herdr_work_recovery" name="test_deferred_recovery_refuses_unknown_or_ambiguous_session_without_launch[missing_history]" file="test\test_native_herdr_work_recovery.py" line="262" time="11.648" /><testcase classname="test.test_native_herdr_activation" name="test_plain_reply_waits_for_offline_lead_without_blocking_worker" file="test\test_native_herdr_activation.py" line="15" time="9.313" /><testcase classname="test.test_native_herdr_activation" name="test_previous_release_checkpoint_migrates_without_replacing_native_sessions" file="test\test_native_herdr_activation.py" line="55" time="37.030"><failure message="Failed: expected fixture state not observed">project = {'root': WindowsPath('C:/Users/user/AppData/Local/Temp/pytest-of-user/pytest-616/test_previous_release_checkpoi0...boser/AppData/Local/Temp/pytest-of-user/pytest-616/test_previous_release_checkpoi0/project/open-options.json'), ...}
+
+    @pytest.mark.skipif(not os.environ.get('CCB_PREVIOUS_NATIVE_BIN'),reason='Explicit previous-release migration probe')
+    def test_previous_release_checkpoint_migrates_without_replacing_native_sessions(project):
+        p=project;previous=os.environ['CCB_PREVIOUS_NATIVE_BIN']
+        original=json.loads(p['pi'].args[2]);history=Path(original['native_session_path'])
+        history.write_text(json.dumps(dict(type='session',id=original['session_id'],cwd=str(p['root'])))+'\n',encoding='utf-8')
+        before=history.read_bytes()
+        opened=subprocess.run([previous,'--project',str(p['root']),'herdr','open','--options',str(p['file']),'--no-attach'],capture_output=True,text=True,encoding='utf-8',timeout=25)
+        assert opened.returncode==0,opened.stderr
+        wait_for(p['ready'],timeout=30)
+        retired=subprocess.run([previous,'--state-root',str(p['native']),'kill'],capture_output=True,text=True,encoding='utf-8',timeout=25)
+        assert retired.returncode==0,retired.stderr
+        for proc in [p['pi'],p['codex']]:proc.kill();proc.wait(timeout=5)
+        gate=p['root']/'migration-session-ready';original['start_gate']=str(gate)
+        pi=subprocess.Popen([NODE,str(HOST),json.dumps(original)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8',creationflags=0x08000000)
+        worker=subprocess.Popen(p['codex'].args,creationflags=0x08000000)
+        try:
+            change(p['backend'],lambda s:s.update(provider_pids=[pi.pid,worker.pid]))
+            assert p['open'](0).returncode==0
+            wait_for(lambda:(p['native']/'herdr/herdr-recovery.json').exists() and read(p['native']/'herdr/herdr-recovery.json')['phase']=='reset',timeout=20)
+            gate.touch();assert json.loads(pi.stdout.readline())['ready']
+&gt;           wait_for(p['ready'],timeout=30)
+
+test\test_native_herdr_activation.py:76:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+fn = &lt;function project.&lt;locals&gt;.ready at 0x0000027E72FDCEB0&gt;, timeout = 30
+
+    def wait_for(fn, timeout=12):
+        deadline=time.monotonic()+timeout
+        while time.monotonic()&lt;deadline:
+            value=fn()
+            if value:return value
+            time.sleep(.05)
+&gt;       pytest.fail('expected fixture state not observed')
+E       Failed: expected fixture state not observed
+
+test\test_native_herdr_worker.py:25: Failed</failure></testcase></testsuite></testsuites>

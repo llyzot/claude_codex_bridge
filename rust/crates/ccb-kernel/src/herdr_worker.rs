@@ -85,6 +85,16 @@ pub(crate) fn validate(config: &Value, name: &str, spec: &Value) -> Result<()> {
             && request["config"]["agents"][name]["workspace_path"] == spec["workspace_path"],
         "Herdr mount and driver provider/workspace differ"
     );
+    if crate::herdr_activation::managed(spec) {
+        ensure!(
+            config["herdr_activation"]["namespace_owner"].is_string()
+                && config["herdr_activation"]["workspace_id"].is_string()
+                && spec["herdr_history"].is_null()
+                && spec["herdr_discovery"].is_null(),
+            "managed terminal requires a runtime activation scope, not a configuration binding"
+        );
+        return Ok(());
+    }
     if spec["herdr_discovery"].is_object() {
         ensure!(
             (spec["provider"] == "codex" || spec["provider"] == "claude")

@@ -159,6 +159,8 @@ impl Daemon {
             ("degraded", "blocked", "reload_drain")
         } else if recovering {
             ("degraded", "unknown", "execution_recovery_required")
+        } else if !self.activation.ready(agent, &spec) {
+            ("starting", "blocked", "awaiting_verified_session")
         } else if driver == "herdr_tui" {
             ("unknown", "unknown", "external_provider_not_freshly_probed")
         } else if !["pi_rpc", "codex_app_server", "claude_stream"].contains(&driver) {
@@ -224,7 +226,7 @@ impl Daemon {
                 "pid":owned["pid"],"runtime_instance_id":owned["runtime_instance_id"],"session_id":session_id,
                 "process_observation":process,"protocol_idle_last_observed":owned["ready"],"pending_request_count":pending,
                 "transport_open":owned["transport_open"],"protocol_job_id":protocol_job,
-                "protocol_observed":protocol_observed,
+                "protocol_observed":protocol_observed,"activation":self.activation.view(agent,&spec),
                 "untracked_provider_activity":untracked_activity,
                 "fault_id":fault.map(|v|v["fault_id"].clone()),"fault_phase":fault.map(|v|v["phase"].clone()),
                 "dispatch_disabled":disabled,"reload_frozen":frozen,"admission_blocked":disabled || frozen || fault.is_some(),

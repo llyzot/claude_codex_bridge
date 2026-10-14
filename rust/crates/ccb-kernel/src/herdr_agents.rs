@@ -613,6 +613,21 @@ impl Manager<'_> {
         }
         let mut launches = Vec::new();
         for name in &names {
+            if self.request["startup_holds"][name].is_string()
+                || self.record["agents"][name]["status"] == "held"
+            {
+                ensure!(
+                    self.record["agents"][name]["sent"] == false,
+                    "cannot hold an already launched provider"
+                );
+                self.record["agents"][name]["status"] = json!("held");
+                if self.request["startup_holds"][name].is_string() {
+                    self.record["agents"][name]["startup_error"] =
+                        self.request["startup_holds"][name].clone();
+                }
+                self.save()?;
+                continue;
+            }
             if mount && self.sync_host_display(name)? {
                 continue;
             }
@@ -791,7 +806,10 @@ impl Manager<'_> {
             "lost"
         } else if rows.values().any(|r| r["status"] == "uncertain") {
             "uncertain"
-        } else if rows.values().any(|r| r["status"] == "blocked") {
+        } else if rows
+            .values()
+            .any(|r| r["status"] == "blocked" || r["status"] == "held")
+        {
             "blocked"
         } else {
             "starting"
@@ -1015,10 +1033,14 @@ fn validate(record: &Value, plan: &Value, namespace: &Value, request: &Value) ->
                 && row["sent"].is_boolean()
                 && row["terminal_id"].is_string()
                 && process_identity(&row["shell"])
-                && (row["sent"] == true || row["status"] == "prepared" && row["binding"].is_null())
+                && (row["sent"] == true
+                    || (row["status"] == "prepared"
+                        || row["status"] == "held" && row["startup_error"].is_string())
+                        && row["binding"].is_null())
                 && (row["binding"].is_null() || process_identity(&row["binding"]["process"]))
                 && [
                     "prepared",
+                    "held",
                     "uncertain",
                     "starting",
                     "blocked",

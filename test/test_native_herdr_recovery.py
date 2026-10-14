@@ -35,7 +35,7 @@ def stopped(setup,request):
         change(backend,lambda s:s.update(server_running=False,restore_without_tokens=True))
     try:
         started=open();assert started.returncode==0,started.stderr
-        wait_for(lambda:cli('--state-root',runtime,'ping').returncode==0)
+        wait_for(lambda:json.loads((state/'herdr-open.json').read_text(encoding='utf-8')).get('phase')=='running',timeout=30)
         yield dict(project=project,backend=backend,runtime=runtime,state=state,open=open,stop=stop,helper=helper,session=session,log=log,first=first,provider=provider)
     finally:
         start=state/'herdr-open-start.json'
@@ -56,7 +56,9 @@ def test_recover_quiet_server_archives_epoch_and_resumes_exact_history(stopped):
     new=json.loads((p['state']/'namespace.json').read_text(encoding='utf-8'));assert new['owner_id']!=old['owner_id'] and new['workspace_id']!=old['workspace_id']
     assert p['log'].read_bytes()==bytes_before
     rows=[json.loads(r) for r in (p['backend']/'calls.jsonl').read_text(encoding='utf-8').splitlines()]
-    launches=[r for r in rows if r[:2]==['agent','start']];assert len(launches)==2 and launches[-1][-3:]==['--','--resume' if p['provider']=='claude' else 'resume',p['session']]
+    launches=[r for r in rows if r[:2]==['agent','start']];assert len(launches)==2
+    selector='--resume' if p['provider']=='claude' else 'resume'
+    assert launches[-1][launches[-1].index(selector)+1]==p['session']
     assert mutate_count(p['backend'],['workspace','close'])==1
     assert len((p['state']/'herdr-recoveries.jsonl').read_text(encoding='utf-8').splitlines())==1
     assert p['open'](True).returncode==0 and p['open']().returncode==0
@@ -83,8 +85,10 @@ def test_lost_close_ack_does_not_duplicate_retirement_or_launch(stopped):
     result=p['open'](True);assert result.returncode==0,result.stderr
     assert mutate_count(p['backend'],['workspace','close'])==1 and mutate_count(p['backend'],['agent','start'])==2
 
-def test_restored_foreign_session_is_not_closed(stopped):
+@pytest.mark.parametrize('missing_history',[False,True])
+def test_restored_foreign_session_is_not_closed(stopped,missing_history):
     p=stopped;p['stop']()
+    if missing_history:p['log'].unlink()
     def foreign(s):
         for a in s['agents'].values():a['agent_session']['value']=str(uuid.uuid4())
     change(p['backend'],foreign)
@@ -104,8 +108,12 @@ def test_recovery_resumes_after_controller_dies_following_workspace_close(stoppe
 
 def test_missing_verified_history_is_not_replaced_by_a_fresh_session(stopped):
     p=stopped;p['stop']();p['log'].unlink()
-    result=p['open'](True);assert result.returncode!=0
-    assert not server(p['backend'])['server_running'] and mutate_count(p['backend'],['workspace','close'])==0
+    result=p['open'](True,ms=0);assert result.returncode==0,result.stderr
+    wait_for(lambda:cli('--state-root',p['runtime'],'ping').returncode==0,timeout=30)
+    actor=json.loads(cli('--state-root',p['runtime'],'agents').stdout)['agents'][0]
+    assert actor['activation']['reason']=='recovery_evidence_required'
+    assert not p['log'].exists()
+    assert mutate_count(p['backend'],['agent','start'])==1
 
 def test_extra_restored_pane_is_not_closed(stopped):
     p=stopped;p['stop']()

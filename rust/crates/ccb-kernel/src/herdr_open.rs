@@ -105,7 +105,9 @@ fn readiness(config: &Value, record: &Value) -> Value {
         let row = &record["agents"][name];
         let mounted = record["daemon_agents"].as_array().is_some_and(|agents| agents.contains(&json!(name)));
         let interface = if row["observed_lifecycle"] == "blocked" { "waiting_input" } else if row["interactive_ready"] == true { "ready" } else if row["sent"] != true { "not_started" } else { "starting" };
-        (name.clone(),json!({"provider":spec["provider"],"startup_state":row["status"],"backend_mounted":mounted,"interface_state":interface,"interactive_ready":row["interactive_ready"]==true}))
+        let error = record["initialization_errors"].get(name).or_else(||record["binding_errors"].get(name)).cloned().unwrap_or(Value::Null);
+        let verified = error.is_null() && if hosted(spec) { row["host_launch"]["thread_id"].is_string() } else { record["bindings"][name].is_object() };
+        (name.clone(),json!({"provider":spec["provider"],"startup_state":row["status"],"registered":mounted,"session_verified":verified,"initialization_error":error,"backend_mounted":mounted,"interface_state":interface,"interactive_ready":row["interactive_ready"]==true}))
     }).collect::<serde_json::Map<String,Value>>().into()
 }
 #[path = "herdr_recovery.rs"]
@@ -620,105 +622,19 @@ fn binding(
         },
     ))
 }
-fn restart_stopped_backend(
-    request: &Value,
-    bridges: &Value,
-    options: &Value,
-    root: &Path,
-    record: &mut Value,
-    wait: Duration,
-) -> Result<()> {
-    let specs = request["config"]["agents"].as_object().unwrap();
-    if !specs.values().any(hosted)
-        || record["daemon"].is_null()
-        || record["daemon"]["status"] != "running"
-        || !record["daemon_fingerprint"].is_string()
-        || record["bindings"].as_object().unwrap().len() != specs.len()
-    {
-        return Ok(());
-    }
-    let runtime = crate::config::state_root(Path::new(crate::records::string(
-        &request["config"],
-        "project_root",
-    )?))?;
-    let Some(lease) = read(&runtime, "lease.json")? else {
-        return Ok(());
-    };
-    if record["daemon"]["pid"] != lease["ccbd_pid"] {
-        return Ok(());
-    }
-    let pid = lease["ccbd_pid"]
-        .as_u64()
-        .filter(|p| *p > 0 && *p <= u32::MAX as u64)
-        .context("invalid previous daemon PID")? as u32;
-    let intent = read(&runtime, "kernel/native-start.json")?.unwrap_or(Value::Null);
-    let owner_alive = if intent["pid"] == pid
-        && intent["process"].is_object()
-        && intent["project_id"] == request["config"]["project_id"]
-    {
-        crate::startup::owner_alive(&intent)?
-    } else {
-        !crate::daemon::owner_stopped(pid)
-    };
-    if owner_alive {
-        return Ok(());
-    }
-    let daemon = daemon_configuration(request, record);
-    ensure!(
-        json!(crate::config::fingerprint(&daemon)?) == record["daemon_fingerprint"],
-        "backend restart configuration changed"
-    );
-    let pending = record["backend_restart"]["previous_pid"] == pid
-        && record["backend_restart"]["phase"] == "starting"
-        && record["backend_restart"]["config_fingerprint"] == record["daemon_fingerprint"];
-    if !pending {
-        let authority = recovery::quiet(&runtime, &request["config"])?;
-        let mut inspect = request.clone();
-        inspect["action"] = json!("inspect");
-        let agents = crate::herdr_agents::execute(&inspect)?["mount"].clone();
-        for (name, spec) in specs {
-            if hosted(spec) {
-                recovery::native_host_session(&runtime, spec, name, &agents)?;
-            } else {
-                let bound = binding(request, bridges, options, name, root, record, None)?
-                    .context("live terminal session is not ready for backend restart")?;
-                ensure!(
-                    record["bindings"][name] == bound,
-                    "live terminal binding changed during backend restart"
-                );
-            }
-        }
-        drop(authority);
-        record["backend_restart"] = json!({"operation_id":uuid::Uuid::new_v4().to_string(),
-            "previous_pid":pid,"phase":"starting","config_fingerprint":record["daemon_fingerprint"]});
-    }
-    record["phase"] = json!("daemon_restarting");
-    save(root, record)?;
-    record["daemon"] = crate::startup::start(&runtime, daemon, wait)?;
-    if record["daemon"]["status"] == "running" {
-        record["backend_restart"]["phase"] = json!("running");
-    }
-    save(root, record)
-}
 fn daemon_configuration(request: &Value, record: &Value) -> Value {
     let mut daemon = request["config"].clone();
     daemon["herdr"] = request.clone();
-    daemon["agents"]
-        .as_object_mut()
-        .unwrap()
-        .retain(|name, spec| hosted(spec) || !record["bindings"][name].is_null());
-    for (name, spec) in daemon["agents"].as_object_mut().unwrap() {
+    daemon["herdr_activation"] = json!({"namespace_owner":record["namespace_owner"],"workspace_id":record["workspace_id"],"blocked_agents":record["initialization_errors"]});
+    for spec in daemon["agents"].as_object_mut().unwrap().values_mut() {
         if hosted(spec) {
             continue;
         }
         spec["driver_kind"] = json!("herdr_tui");
         spec["profile_family"] = json!("protocol_turn");
-        spec["herdr_history"] = record["bindings"][name]["history"].clone();
-        if record["bindings"][name]["discovery"].is_object() {
-            spec["herdr_discovery"] = record["bindings"][name]["discovery"].clone();
-        }
-        if spec["provider"] == "pi" {
-            spec["pi_bridge_owner"] = record["bindings"][name]["pi_bridge_owner"].clone();
+        spec["herdr_binding_mode"] = json!("managed");
+        for key in ["herdr_history", "herdr_discovery", "pi_bridge_owner"] {
+            spec.as_object_mut().unwrap().remove(key);
         }
     }
     daemon
@@ -726,35 +642,12 @@ fn daemon_configuration(request: &Value, record: &Value) -> Value {
 
 fn sync_daemon(request: &Value, root: &Path, record: &mut Value, wait: Duration) -> Result<bool> {
     let daemon = daemon_configuration(request, record);
-    if record["daemon"].is_null()
-        && read(root, "herdr-recovery.json")?.is_some_and(|r| r["phase"] != "complete")
-    {
-        // Restore every previously mounted actor before transferring durable
-        // work. Agents which never mounted do not hold a restored host back.
-        let runtime =
-            crate::config::state_root(Path::new(crate::records::string(&daemon, "project_root")?))?;
-        let prior = crate::restart_config::load(&runtime)?;
-        if prior["agents"]
-            .as_object()
-            .unwrap()
-            .keys()
-            .any(|name| daemon["agents"].get(name).is_none())
-        {
-            // There is nothing to transfer in a quiet generation. Let hosted
-            // providers initialize now; recovered terminal bindings are added
-            // by the ordinary guarded reload without replacing the host.
-            if !recovery::partial_start_allowed(&runtime, &prior)? {
-                return Ok(false);
-            }
-        }
-    }
-    if daemon["agents"].as_object().unwrap().is_empty() {
-        return Ok(false);
-    }
     let runtime =
         crate::config::state_root(Path::new(crate::records::string(&daemon, "project_root")?))?;
     let desired = json!(crate::config::fingerprint(&daemon)?);
     if record["daemon"].is_null() {
+        // Configuration contains the entire roster. Session activation is a
+        // separate durable observation and never changes this configuration.
         record["daemon_agents"] = json!(daemon["agents"]
             .as_object()
             .unwrap()
@@ -763,71 +656,31 @@ fn sync_daemon(request: &Value, root: &Path, record: &mut Value, wait: Duration)
         record["daemon_fingerprint"] = desired.clone();
         save(root, record)?;
         recovery::authorize_start(&runtime, root, record, &daemon)?;
-        record["daemon"] =
-            crate::startup::start(&runtime, daemon, wait.min(Duration::from_millis(250)))?;
-        save(root, record)?;
-        return Ok(record["daemon"]["status"] == "running");
-    }
-    if record["daemon"]["status"] != "running" {
-        let mut pending = daemon.clone();
-        pending["agents"]
-            .as_object_mut()
-            .unwrap()
-            .retain(|name, _| {
-                record["daemon_agents"]
-                    .as_array()
-                    .is_some_and(|names| names.contains(&json!(name)))
-            });
-        record["daemon"] =
-            crate::startup::start(&runtime, pending, wait.min(Duration::from_millis(250)))?;
-        if record["daemon"]["status"] != "running" {
-            return Ok(false);
-        }
-    }
-    if record["daemon_fingerprint"] == desired {
-        record["daemon"] =
-            crate::startup::start(&runtime, daemon, wait.min(Duration::from_millis(250)))?;
-        return Ok(record["daemon"]["status"] == "running");
-    }
-    // Only add newly bound agents. Keep the existing host and its tasks intact.
-    if !record["binding_reload"].is_null() {
-        let state = crate::cli::request(&runtime, "reload-status", json!({}))?["reload"].clone();
-        ensure!(
-            state["operation_id"] == record["binding_reload"]["operation_id"],
-            "startup binding reload was superseded"
-        );
-        if state["status"] == "applied" {
-            record["daemon_fingerprint"] = state["desired_fingerprint"].clone();
-            record["daemon_agents"] = record["binding_reload"]["agent_names"].clone();
-            record["binding_reload"] = Value::Null;
-            save(root, record)?;
-        } else {
-            ensure!(
-                ["waiting_for_idle", "preparing", "retiring"]
-                    .contains(&state["status"].as_str().unwrap_or("")),
-                "startup binding reload failed: {}",
-                state["status"]
-            );
-            return Ok(false);
-        }
-    }
-    if record["daemon_fingerprint"] == desired {
-        return Ok(true);
-    }
-    let state = crate::cli::request(&runtime, "reload", json!({"config":daemon,"when_idle":true,"expected_fingerprint":record["daemon_fingerprint"]}))?["reload"].clone();
-    if state["status"] == "unchanged" {
-        record["daemon_fingerprint"] = desired;
     } else {
-        record["binding_reload"] = state;
-        record["binding_reload"]["agent_names"] = json!(daemon_configuration(request, record)
-            ["agents"]
-            .as_object()
-            .unwrap()
-            .keys()
-            .collect::<Vec<_>>());
+        ensure!(
+            record["daemon_fingerprint"] == desired,
+            "running startup configuration changed"
+        );
     }
+    record["daemon"] =
+        crate::startup::start(&runtime, daemon, wait.min(Duration::from_millis(250)))?;
     save(root, record)?;
-    Ok(false)
+    Ok(record["daemon"]["status"] == "running")
+}
+
+pub(crate) fn verify_activation(
+    root: &Path,
+    open: &Value,
+    spec: &Value,
+    binding: &Value,
+    agent: &str,
+) -> Result<()> {
+    let expected = recovery::expected_session(root, open, agent)?;
+    ensure!(
+        recovery::verify_session(expected.as_ref(), spec, binding, agent)?,
+        "recovered native session is not confirmed"
+    );
+    Ok(())
 }
 
 fn retain_inherited_paths(runtime: &Path, source: &Value, request: &mut Value) -> Result<()> {
@@ -1032,19 +885,12 @@ pub(crate) fn open(
             prepare["action"] = json!("prepare");
             let namespace = crate::herdr_namespace::execute(&prepare)?["namespace"].clone();
             record["workspace_id"] = namespace["workspace_id"].clone();
+            record["namespace_owner"] = namespace["owner_id"].clone();
             record["phase"] = json!("agents_starting");
             save(&root, &record)?;
             if namespace["status"] != "prepared" {
                 record["phase"] = json!("namespace_uncertain");
             } else {
-                restart_stopped_backend(
-                    &request,
-                    &bridges,
-                    options,
-                    &root,
-                    &mut record,
-                    deadline.saturating_duration_since(Instant::now()),
-                )?;
                 if cancelled(&root, &options["opener_instance"])? {
                     continue;
                 }
@@ -1065,6 +911,7 @@ pub(crate) fn open(
                     continue;
                 }
                 let mut mount = request.clone();
+                mount["startup_holds"] = record["initialization_errors"].clone();
                 mount["cancel_control"] = json!({"path":root.join("open-cancel.json"),"instance":options["opener_instance"]});
                 let mounted = crate::herdr_agents::execute(&mount)?["mount"].clone();
                 record["agents"] = mounted["agents"].clone();
@@ -1073,105 +920,111 @@ pub(crate) fn open(
                 } else {
                     "agents_starting"
                 });
-                if mounted["status"] == "ready"
-                    || has_host
-                    || record["bindings"].as_object().unwrap().len()
-                        == request["config"]["agents"].as_object().unwrap().len()
                 {
                     for name in request["config"]["agents"].as_object().unwrap().keys() {
                         if hosted(&request["config"]["agents"][name]) {
                             record["bindings"][name] = json!({"native_host":true});
                             continue;
                         }
-                        if has_host
-                            && mounted["agents"][name]["status"] != "ready"
+                        if mounted["agents"][name]["status"] != "ready"
                             && record["bindings"][name].is_null()
                         {
                             continue;
                         }
-                        let expected_session = recovery::expected_session(&root, &record, name)?;
-                        if record["bindings"][name].is_null()
-                            || expected_session.is_some()
-                                && record["bindings"][name]["discovery"].is_object()
-                        {
-                            record["bindings"].as_object_mut().unwrap().remove(name);
-                            if let Some(bound) = binding(
-                                &request,
-                                &bridges,
-                                options,
-                                name,
-                                &root,
-                                &mut record,
-                                Some(&mounted),
-                            )? {
-                                if recovery::verify_session(
-                                    expected_session.as_ref(),
-                                    &request["config"]["agents"][name],
-                                    &bound,
+                        let activation = (|| -> Result<()> {
+                            let expected_session =
+                                recovery::expected_session(&root, &record, name)?;
+                            if record["bindings"][name].is_null()
+                                || expected_session.is_some()
+                                    && record["bindings"][name]["discovery"].is_object()
+                            {
+                                record["bindings"].as_object_mut().unwrap().remove(name);
+                                if let Some(bound) = binding(
+                                    &request,
+                                    &bridges,
+                                    options,
                                     name,
+                                    &root,
+                                    &mut record,
+                                    Some(&mounted),
                                 )? {
-                                    record["bindings"][name] = bound;
+                                    if recovery::verify_session(
+                                        expected_session.as_ref(),
+                                        &request["config"]["agents"][name],
+                                        &bound,
+                                        name,
+                                    )? {
+                                        record["bindings"][name] = bound;
+                                    }
+                                    save(&root, &record)?;
                                 }
-                                save(&root, &record)?;
-                            }
-                        } else {
-                            let saved = &record["bindings"][name];
-                            ensure!(
-                                recovery::verify_session(
-                                    expected_session.as_ref(),
-                                    &request["config"]["agents"][name],
-                                    saved,
-                                    name
-                                )?,
-                                "recovered native session has not been confirmed"
-                            );
-                            let live = mounted_binding(&mounted, name)?;
-                            if request["config"]["agents"][name]["provider"] == "pi" {
-                                let configured: crate::terminal_history::Binding =
-                                    serde_json::from_value(saved["history"].clone())?;
-                                let (_, producer) = crate::pi_terminal::resolve(
-                                    &configured,
-                                    crate::records::string(saved, "pi_bridge_owner")?,
-                                    name,
-                                )?;
+                            } else {
+                                let saved = &record["bindings"][name];
                                 ensure!(
-                                    producer["process"] == live["identity"]["process"],
-                                    "cached Pi binding process changed"
+                                    recovery::verify_session(
+                                        expected_session.as_ref(),
+                                        &request["config"]["agents"][name],
+                                        saved,
+                                        name
+                                    )?,
+                                    "recovered native session has not been confirmed"
                                 );
-                                ensure!(
-                                    live["agent_session"]["agent"] == "pi"
-                                        && (live["agent_session"]["kind"] == "id"
-                                            && live["agent_session"]["value"]
-                                                == configured.session_id
-                                            || live["agent_session"]["kind"] == "path"
-                                                && crate::pi_terminal::same_session_path(
-                                                    &live["agent_session"]["value"],
-                                                    &producer["session_path"]
-                                                )),
-                                    "cached Pi session changed"
-                                );
-                            } else if saved["discovery"].is_object() {
-                                ensure!(
-                                    live["agent_session"].is_null()
-                                        || live["agent_session"]["agent"]
+                                let live = mounted_binding(&mounted, name)?;
+                                if request["config"]["agents"][name]["provider"] == "pi" {
+                                    let configured: crate::terminal_history::Binding =
+                                        serde_json::from_value(saved["history"].clone())?;
+                                    let (_, producer) = crate::pi_terminal::resolve(
+                                        &configured,
+                                        crate::records::string(saved, "pi_bridge_owner")?,
+                                        name,
+                                    )?;
+                                    ensure!(
+                                        producer["process"] == live["identity"]["process"],
+                                        "cached Pi binding process changed"
+                                    );
+                                    ensure!(
+                                        live["agent_session"]["agent"] == "pi"
+                                            && (live["agent_session"]["kind"] == "id"
+                                                && live["agent_session"]["value"]
+                                                    == configured.session_id
+                                                || live["agent_session"]["kind"] == "path"
+                                                    && crate::pi_terminal::same_session_path(
+                                                        &live["agent_session"]["value"],
+                                                        &producer["session_path"]
+                                                    )),
+                                        "cached Pi session changed"
+                                    );
+                                } else if saved["discovery"].is_object() {
+                                    ensure!(
+                                        live["agent_session"].is_null()
+                                            || live["agent_session"]["agent"]
+                                                == request["config"]["agents"][name]["provider"]
+                                                && live["agent_session"]["kind"] == "id"
+                                                && (saved["discovery"]["session_id"].is_null()
+                                                    || live["agent_session"]["value"]
+                                                        == saved["discovery"]["session_id"]),
+                                        "deferred Codex session scope changed"
+                                    );
+                                } else {
+                                    ensure!(
+                                        live["agent_session"]["agent"]
                                             == request["config"]["agents"][name]["provider"]
                                             && live["agent_session"]["kind"] == "id"
-                                            && (saved["discovery"]["session_id"].is_null()
-                                                || live["agent_session"]["value"]
-                                                    == saved["discovery"]["session_id"]),
-                                    "deferred Codex session scope changed"
-                                );
-                            } else {
-                                ensure!(
-                                    live["agent_session"]["agent"]
-                                        == request["config"]["agents"][name]["provider"]
-                                        && live["agent_session"]["kind"] == "id"
-                                        && live["agent_session"]["value"]
-                                            == saved["history"]["session_id"],
-                                    "cached Codex session changed"
-                                );
+                                            && live["agent_session"]["value"]
+                                                == saved["history"]["session_id"],
+                                        "cached Codex session changed"
+                                    );
+                                }
                             }
+                            Ok(())
+                        })();
+                        if let Err(error) = activation {
+                            record["bindings"].as_object_mut().unwrap().remove(name);
+                            record["binding_errors"][name] = json!(error.to_string());
+                        } else if let Some(errors) = record["binding_errors"].as_object_mut() {
+                            errors.remove(name);
                         }
+                        save(&root, &record)?;
                     }
                     if !cancelled(&root, &options["opener_instance"])? {
                         let started = sync_daemon(

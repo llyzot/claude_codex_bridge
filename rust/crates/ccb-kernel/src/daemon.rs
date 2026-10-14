@@ -137,6 +137,7 @@ pub struct Daemon {
     codex: HashMap<String, crate::codex_rpc::Session>,
     claude: HashMap<String, crate::claude_stream::Session>,
     herdr: HashMap<String, crate::herdr_worker::Worker>,
+    activation: crate::herdr_activation::State,
     faults: HashMap<String, Value>,
     pub stopping: bool,
     heartbeat: Instant,
@@ -295,6 +296,7 @@ impl Daemon {
                 }
             }
         }
+        let activation = crate::herdr_activation::State::new(&config);
         Ok(Self {
             kernel,
             config,
@@ -306,6 +308,7 @@ impl Daemon {
             codex: HashMap::new(),
             claude: HashMap::new(),
             herdr: HashMap::new(),
+            activation,
             faults,
             stopping: false,
             heartbeat: Instant::now(),
@@ -550,7 +553,7 @@ impl Daemon {
             "agents" => Ok(json!({"agents":self.names().iter().map(|name| {
                 let spec=&self.config["agents"][name];
                 json!({"agent_name":name,"provider":spec["provider"],"role":crate::roles::normalized(&spec["role"]).unwrap(),
-                    "dispatch_disabled":spec["dispatch_disabled"]==true})
+                    "dispatch_disabled":spec["dispatch_disabled"]==true,"activation":self.activation.view(name,spec)})
             }).collect::<Vec<_>>()})),
             "submit" => self.submit(p),
             "resubmit" => self.resubmit(p),
@@ -814,14 +817,20 @@ impl Daemon {
         )?;
         Ok(job)
     }
-    fn spec(&self, agent: &str) -> Result<Value> {
+    // Addressing a durable result requires registration, not permission to run
+    // another turn. Keep that lookup separate from new-work admission checks.
+    fn registered_spec(&self, agent: &str) -> Result<Value> {
         let spec = &self.config["agents"][agent];
         ensure!(spec.is_object(), "unknown target agent: {agent}");
+        Ok(self.activation.spec(agent, spec))
+    }
+    fn spec(&self, agent: &str) -> Result<Value> {
+        let spec = self.registered_spec(agent)?;
         ensure!(
             spec["dispatch_disabled"] != true,
             "agent {agent} is dispatch-disabled"
         );
-        Ok(spec.clone())
+        Ok(spec)
     }
     fn submit(&mut self, p: &Value) -> Result<Value> {
         Ok(self.admit_request(p, None, Value::Null)?["receipt"].clone())
@@ -1531,6 +1540,9 @@ impl Daemon {
             .is_null())
     }
     fn start(&mut self, agent: &str) -> Result<Value> {
+        if !self.activation.ready(agent, &self.config["agents"][agent]) {
+            return Ok(Value::Null);
+        }
         let slot = json!({"state_id":self.state,"target_kind":"agent","target_name":agent});
         if !self
             .kernel
@@ -1720,7 +1732,7 @@ impl Daemon {
     }
     fn complete(&mut self, current: &Value, decision: &Value) -> Result<Value> {
         let agent = records::string(current, "agent_name")?;
-        let spec = self.spec(agent)?;
+        let spec = self.registered_spec(agent)?;
         let timestamp = decision["finished_at"]
             .as_str()
             .filter(|s| !s.is_empty())
@@ -1831,7 +1843,7 @@ impl Daemon {
         timestamp: &str,
     ) -> Result<()> {
         let target = records::string(edge, "callback_target_agent")?;
-        let spec = self.spec(target)?;
+        let spec = self.registered_spec(target)?;
         let parent = self.get_job(records::string(edge, "parent_job_id")?)?;
         callback::enqueue(
             &mut self.kernel,
@@ -1840,6 +1852,8 @@ impl Daemon {
         Ok(())
     }
     pub fn tick(&mut self, endpoint: &Value, token_path: &std::path::Path) -> Result<()> {
+        self.activation
+            .refresh(self.kernel.store.root(), &self.config)?;
         self.tick_followups()?;
         self.tick_reload()?;
         if self.heartbeat.elapsed().as_secs() >= 2 {
@@ -1859,7 +1873,13 @@ impl Daemon {
             let id = slot[2]
                 .as_str()
                 .context("invalid active execution identity")?;
-            self.reconcile_execution(id)?;
+            let old_job = self.get_job(id)?;
+            if !self
+                .activation
+                .held(records::string(&old_job, "agent_name")?)
+            {
+                self.reconcile_execution(id)?;
+            }
         }
         let mut finished = Vec::new();
         for (id, running) in &mut self.running {
@@ -1940,7 +1960,7 @@ impl Daemon {
         }
         self.kernel.store.commit()?;
         for agent in self.names() {
-            if self.reload_frozen(&agent) {
+            if self.activation.held(&agent) || self.reload_frozen(&agent) {
                 continue;
             }
             if self.config["agents"][&agent]["dispatch_disabled"] == true {

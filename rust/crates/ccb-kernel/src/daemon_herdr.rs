@@ -128,6 +128,11 @@ impl Daemon {
         {
             return Ok(());
         }
+        // Collect already-running observations above, but never claim or
+        // reattach work until this generation has verified its target session.
+        if !self.activation.ready(agent, &self.config["agents"][agent]) {
+            return Ok(());
+        }
         let mut spec = self.spec(agent)?;
         if spec["herdr_discovery"].is_object() {
             spec["_herdr_history_cache"] = self

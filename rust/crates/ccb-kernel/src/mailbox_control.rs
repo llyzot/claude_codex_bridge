@@ -92,7 +92,7 @@ impl Daemon {
             })
     }
     pub(super) fn mailbox_observation(&mut self, agent: &str, detail: bool) -> Result<Value> {
-        self.spec(agent)?;
+        self.registered_spec(agent)?;
         let args = json!({"agent_name":agent});
         let events = self.kernel.dispatch("latest_events", &args)?;
         let rows = events.as_array().context("invalid inbox events")?;

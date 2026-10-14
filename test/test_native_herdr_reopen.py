@@ -46,7 +46,9 @@ def test_reopen_after_kill_preserves_exact_session_and_running_server(stopped):
     assert p['log'].read_bytes()==before
     rows=[json.loads(s) for s in (p['backend']/'calls.jsonl').read_text().splitlines()]
     launches=[r for r in rows if r[:2]==['agent','start']]
-    assert len(launches)==2 and launches[-1][-3:]==['--','--resume' if p['provider']=='claude' else 'resume',p['session']]
+    assert len(launches)==2
+    selector='--resume' if p['provider']=='claude' else 'resume'
+    assert launches[-1][launches[-1].index(selector)+1]==p['session']
     assert mutate_count(p['backend'],['workspace','close'])==1
     assert p['open']().returncode==0 and mutate_count(p['backend'],['agent','start'])==2
     recovery=read(p['state']/'herdr-recovery.json')
@@ -54,9 +56,11 @@ def test_reopen_after_kill_preserves_exact_session_and_running_server(stopped):
 
 def test_reopen_does_not_replace_missing_history_with_a_fresh_session(stopped):
     p=stopped;retire(p);p['log'].unlink()
-    result=p['open']()
-    assert result.returncode!=0
-    assert mutate_count(p['backend'],['workspace','create'])==1
+    result=p['open'](ms=0);assert result.returncode==0,result.stderr
+    wait_for(lambda:cli('--state-root',p['runtime'],'ping').returncode==0)
+    actor=json.loads(cli('--state-root',p['runtime'],'agents').stdout)['agents'][0]
+    assert actor['activation']['reason']=='recovery_evidence_required'
+    assert not p['log'].exists()
     assert mutate_count(p['backend'],['agent','start'])==1
 
 def test_reappeared_retired_workspace_is_not_closed_or_replaced(stopped):
@@ -80,21 +84,23 @@ def test_recovery_rejects_a_provider_that_resumed_the_wrong_native_session(stopp
     header={'type':'user','uuid':'foreign-user','sessionId':foreign,'cwd':str(p['project']),'message':{'role':'user','content':'foreign'}} if p['provider']=='claude' else {'type':'session_meta','payload':{'id':foreign,'cwd':str(p['project'])}}
     log.write_text(json.dumps(header)+'\n',encoding='utf-8')
     change(p['backend'],lambda s:s.update(provider_pids=[replacement.pid],agent_sessions={p['provider']:{'agent':p['provider'],'kind':'id','value':foreign,'source':'fixture'}}))
-    result=p['open']()
-    if result.returncode==0:
-        wait_for(lambda:read(p['state']/'herdr-open-start.json')['status']=='failed',timeout=30)
-        error=read(p['state']/'herdr-open-start.json')['error']
-    else:error=result.stderr
+    result=p['open'](ms=0);assert result.returncode==0,result.stderr
+    error=wait_for(lambda:(read(p['state']/'herdr-open.json').get('binding_errors',{}) or {}).get('worker'),timeout=20)
     assert 'recovered native session' in error
-    assert cli('--state-root',p['runtime'],'ping').returncode!=0
+    actor=json.loads(cli('--state-root',p['runtime'],'agents').stdout)['agents'][0]
+    assert actor['activation']['session_verified'] is False
+    assert cli('--state-root',p['runtime'],'ping').returncode==0
     assert read(p['state']/'herdr-recovery.json')['phase']=='reset'
 
-def test_recovery_waits_for_native_session_confirmation_before_starting_daemon(stopped):
+
+def test_recovery_gates_dispatch_but_not_daemon_start_on_session_confirmation(stopped):
     p=stopped;retire(p);replacement=p['helper']()
     change(p['backend'],lambda s:s.update(provider_pids=[replacement.pid],agent_sessions={}))
     assert p['open'](ms=0).returncode==0
     wait_for(lambda:read(p['state']/'herdr-open.json')['phase']=='binding_sessions')
-    assert cli('--state-root',p['runtime'],'ping').returncode!=0
+    assert cli('--state-root',p['runtime'],'ping').returncode==0
+    assert json.loads(cli('--state-root',p['runtime'],'agents').stdout)['agents'][0]['activation']['session_verified'] is False
+    assert mutate_count(p['backend'],['agent','prompt'])==0
     assert read(p['state']/'herdr-recovery.json')['phase']=='reset'
     def publish(s):
         for a in s['agents'].values():
@@ -179,7 +185,7 @@ def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,nat
         change(p['backend'],lambda s:s.update(provider_pids=[pi.pid,codex.pid]))
         assert p['open'](0).returncode==0
         wait_for(lambda:(p['native']/'herdr/herdr-recovery.json').exists() and read(p['native']/'herdr/herdr-recovery.json')['phase']=='reset',timeout=20)
-        if native_host and not pending_work:
+        if native_host:
             # Hold Pi's new bridge generation back. A quiet recovery must not
             # serialize Codex initialization behind this unrelated provider.
             def early_host():
@@ -190,27 +196,23 @@ def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,nat
             early=wait_for(early_host,timeout=15)
             record_property('codex_ready_while_pi_blocked_ms',round((time.monotonic()-started)*1000,2))
             assert early['state']['thread_id']==worker_before['state']['thread_id']
-            assert 'lead' not in [a['agent_name'] for a in json.loads(cli('--state-root',p['native'],'agents').stdout)['agents']]
-            assert cli('--state-root',p['native'],'ask','lead','must wait for verified binding').returncode!=0
-        elif pending_work:
-            # Allow several opener iterations. Unsent old work must keep the
-            # original all-session barrier, never boot a partial daemon.
-            time.sleep(2)
-            assert p['ready']() is None
-            assert read(p['native']/'providers/codex/worker/session.json')['runtime_instance_id']==worker_before['runtime_instance_id']
+            actors=json.loads(cli('--state-root',p['native'],'agents').stdout)['agents']
+            assert {a['agent_name'] for a in actors}=={'lead','worker'}
+            lead=next(a for a in actors if a['agent_name']=='lead')
+            assert lead['activation']['session_verified'] is False
+            # Existing unsent work remains durable while only the target's
+            # session verification prevents its execution.
+            if pending_work:
+                assert not any('preserve queued task' in r['body'] for r in p['prompts']())
+                assert json.loads(cli('--state-root',p['native'],'watch',queued_id).stdout)['status'] in ['queued','accepted','pending']
         gate.touch();assert json.loads(pi.stdout.readline())['ready']
         if fresh_pi:
-            rejected=p['open']()
-            if rejected.returncode==0:
-                wait_for(lambda:read(p['native']/'herdr/herdr-open-start.json')['status']=='failed',timeout=30)
-                error=read(p['native']/'herdr/herdr-open-start.json')['error']
-            else:error=rejected.stderr
+            error=wait_for(lambda:(read(p['native']/'herdr/herdr-open.json').get('binding_errors',{}) or {}).get('lead'),timeout=20)
             assert 'recovered native session' in error
-            if native_host:
-                assert 'lead' not in [a['agent_name'] for a in json.loads(cli('--state-root',p['native'],'agents').stdout)['agents']]
-                assert not p['prompts']()
-            else:
-                assert p['ready']() is None
+            actors=json.loads(cli('--state-root',p['native'],'agents').stdout)['agents']
+            lead=next(a for a in actors if a['agent_name']=='lead')
+            assert lead['activation']['session_verified'] is False
+            assert not p['prompts']()
             return
         # Include real no-model Codex host initialization under the product's
         # unchanged 60-second startup budget, rather than a 20-second fixture cap.
@@ -258,13 +260,10 @@ def test_unwritten_pi_session_reopens_only_with_positive_empty_evidence(project,
     assert result.returncode==0 and json.loads(result.stdout)['status']=='closed',result.stderr
     for proc in [p['pi'],p['codex']]:proc.kill();proc.wait(timeout=5)
     if activity:
-        result=p['open']()
-        if result.returncode==0:
-            wait_for(lambda:read(p['native']/'herdr/herdr-open-start.json')['status']=='failed',timeout=30)
-            error=read(p['native']/'herdr/herdr-open-start.json')['error']
-        else:error=result.stderr
+        assert p['open'](0).returncode==0
+        error=wait_for(lambda:(read(p['native']/'herdr/herdr-open.json').get('initialization_errors',{}) or {}).get('lead'),timeout=20)
         assert 'Pi recovery history is unavailable' in error
-        assert mutate_count(p['backend'],['agent','start'])==2
+        assert not Path(original['native_session_path']).exists()
         return
     gate=p['root']/'empty-reopen-ready';original.update(start_gate=str(gate),session_id='new-unused-pi',native_session_path=str(p['root']/'new-unused.jsonl'))
     change(p['backend'],lambda s:s['agent_sessions']['pi'].update(value=original['native_session_path']))

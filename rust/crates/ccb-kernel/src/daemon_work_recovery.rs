@@ -20,7 +20,12 @@ impl Daemon {
             &format!("recovery-{}", uuid::Uuid::new_v4()),
         )?;
         ensure!(
-            daemon.faults.is_empty(),
+            daemon
+                .faults
+                .keys()
+                .all(
+                    |agent| daemon.config["herdr_activation"]["blocked_agents"][agent].is_string()
+                ),
             "unfinished recovery requires explicit provider fault repair"
         );
         let mut rows = Vec::new();
@@ -44,7 +49,10 @@ impl Daemon {
                 "recovery job belongs to another project"
             );
             let agent = records::string(job, "agent_name")?;
-            let spec = daemon.spec(agent)?;
+            if daemon.config["herdr_activation"]["blocked_agents"][agent].is_string() {
+                continue;
+            }
+            let spec = daemon.registered_spec(agent)?;
             if job["status"] == "running" {
                 if spec["driver_kind"] == "herdr_tui" {
                     plans.push((

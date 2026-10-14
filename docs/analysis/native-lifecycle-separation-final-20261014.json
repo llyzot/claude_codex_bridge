@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-14",
+  "source_base": "6650d5f0",
+  "purpose": "Separate full-roster registration, concurrent provider initialization, session activation, task claiming, and durable result delivery.",
+  "architecture": {
+    "registration": "Every configured actor is committed at controller startup, including actors whose native session is not ready.",
+    "initialization": "Controller and native Codex protocol host no longer wait for all terminal session bindings. Quiet-generation special casing and all-terminal backend-restart preflight were removed.",
+    "activation": "herdr_activation.rs validates project/namespace generation, process lifetime and expected recovered session before opening each terminal's execution gate. Runtime evidence is separate from logical configuration; activation does not reload or replace providers.",
+    "execution": "Queue admission is durable while a target is not ready. Task claiming and reattaching terminal work require that target's verified binding. Unknown prior launch effects are not automatically resent.",
+    "delivery": "Result addressing and inbox observation use registration rather than dispatch permission. Results remain durable for offline or disabled recipients; normal mailbox processing wakes an eligible recipient.",
+    "recovery": "Missing native evidence holds that actor and preserves its work. Prior confirmed identity remains usable for workspace ownership checks, without authorizing execution or creating fresh history."
+  },
+  "changes_removed": [
+    "partial_start_allowed",
+    "quiet_generation",
+    "partial_quiet_start",
+    "restart_stopped_backend",
+    "binding-driven subset registration and startup reload"
+  ],
+  "validation": {
+    "original_red": {
+      "report": "native-lifecycle-separation-red-20261014.xml",
+      "meaning": "Previous quiet-only implementation did not start Codex while a recovering Pi with queued work remained unready."
+    },
+    "broad_startup": {
+      "report": "native-lifecycle-separation-final-startup-20261014.xml",
+      "passed": 58,
+      "failed": 1,
+      "resolution": "The ACK-loss fixture now waits for both parallel launches to take effect before killing the opener. Corrected case passed in final acceptance; uncertain unsent launch remains non-replayable."
+    },
+    "broad_recovery": {
+      "report": "native-lifecycle-separation-final-recovery-20261014.xml",
+      "passed": 46,
+      "failed": 4,
+      "resolutions": [
+        "Two wrong-session fixtures stopped on null error-field polling; corrected refusal tests passed in native-lifecycle-separation-final-session-fences-20261014.xml.",
+        "Missing-history recovery now preserves last known identity for ownership while retaining an execution hold; passed final acceptance.",
+        "Migration fixture changed executable directory and therefore injected PATH. Corrected in-place replacement passed without weakening configuration comparison."
+      ]
+    },
+    "session_fences": {
+      "report": "native-lifecycle-separation-final-session-fences-20261014.xml",
+      "passed": 3
+    },
+    "final_release": {
+      "report": "native-lifecycle-separation-final-acceptance-20261014.xml",
+      "passed": 22,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        "disabled recipient retains result across restart",
+        "FIFO acknowledgement replay and lost ACK deduplication",
+        "plain reply waits for offline lead and then automatically delivers",
+        "in-place previous-release checkpoint migration preserves native history",
+        "foreign restored session refused with and without native history",
+        "missing native history is not replaced by a fresh session",
+        "opener crash after confirmed launch effects does not relaunch agents",
+        "real Codex app-server resumes while Pi still has pending work",
+        "worker FIFO proceeds while lead is offline; daemon restart preserves one callback",
+        "deferred native history discovery preserves automatic continuation"
+      ]
+    },
+    "clippy": "cargo clippy -p ccb-kernel --all-targets -- -D warnings: passed",
+    "release_build": "passed",
+    "model_calls": 0,
+    "limits": "Controlled Windows process/IPC fault-injection tests, fixture Herdr/Pi/Claude terminals, and real installed Codex app-server initialization with private unauthenticated homes. No new live three-model business workflow or production startup benchmark was run."
+  },
+  "delivery": {
+    "binary_sha256": "84dface997242c548baa6c65e90d9444c5a94d826ac20abe68b426b984124974",
+    "installed_binary_sha256": "5d157dd7ab91444f4b6135fdf5b436d5018c7e6158c0e0c0f2c86e23e5c6fdc4",
+    "installed": false,
+    "reason": "Existing sample-project-3 installation processes are still active; no approval to stop and restore that project has been received.",
+    "formal_project_restarted": false,
+    "herdr_panes_read": false,
+    "provider_settings_changed": false
+  },
+  "remaining_limits": [
+    "Mixed-version Codex model-catalog cache churn is unchanged.",
+    "Ambiguous launch outcome or missing/corrupt session evidence remains an explicit per-actor hold, never a silent reset or blind task replay."
+  ]
+}

@@ -1,5 +1,6 @@
-//! A stopped generation may carry work only to the same configuration and
-//! verified native sessions. This receipt cannot authorize arbitrary reloads.
+//! Ownership transfer preserves the full logical configuration and durable work.
+//! Native session verification gates each actor's execution separately; this
+//! receipt never authorizes arbitrary configuration changes or task replay.
 use super::{read, STATE};
 use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
@@ -37,6 +38,9 @@ pub(super) fn recoverable(kernel: &mut crate::Kernel, config: &Value) -> Result<
                     .is_some_and(|spec| spec["provider"] == job["provider"]),
             "recovery job configuration changed"
         );
+        if config["herdr_activation"]["blocked_agents"][agent].is_string() {
+            continue;
+        }
         if !["completed", "failed", "incomplete", "cancelled"]
             .contains(&job["status"].as_str().unwrap_or(""))
         {
@@ -52,7 +56,10 @@ pub(super) fn recoverable(kernel: &mut crate::Kernel, config: &Value) -> Result<
     ensure!(
         crate::daemon::recovery_blockers(kernel, &names)?
             .iter()
-            .all(|b| b["reason"] != "provider_fault"),
+            .all(|b| b["reason"] != "provider_fault"
+                || config["herdr_activation"]["blocked_agents"]
+                    [b["agent_name"].as_str().unwrap_or("")]
+                .is_string()),
         "recovery requires explicit provider fault repair"
     );
     Ok(())
@@ -64,12 +71,18 @@ fn normalized(config: &Value, resume: &Value) -> Result<Value> {
         .as_object_mut()
         .context("invalid recovery configuration")?
         .remove("startup_id");
+    result.as_object_mut().unwrap().remove("herdr_activation");
     for spec in result["agents"]
         .as_object_mut()
         .context("recovery agents missing")?
         .values_mut()
     {
-        for key in ["herdr_history", "herdr_discovery", "pi_bridge_owner"] {
+        for key in [
+            "herdr_history",
+            "herdr_discovery",
+            "pi_bridge_owner",
+            "herdr_binding_mode",
+        ] {
             spec.as_object_mut()
                 .context("invalid recovery agent")?
                 .remove(key);
@@ -87,21 +100,6 @@ fn normalized(config: &Value, resume: &Value) -> Result<Value> {
         }
     }
     Ok(result)
-}
-
-fn quiet_generation(kernel: &mut crate::Kernel, prior: &Value) -> Result<bool> {
-    let names = prior["agents"]
-        .as_object()
-        .context("recovery agents missing")?
-        .keys()
-        .cloned()
-        .collect::<Vec<_>>();
-    Ok(crate::daemon::recovery_blockers(kernel, &names)?.is_empty())
-}
-
-pub(in crate::herdr_open) fn partial_start_allowed(runtime: &Path, prior: &Value) -> Result<bool> {
-    crate::daemon::verify_owner(runtime)?;
-    quiet_generation(&mut crate::Kernel::open(runtime)?, prior)
 }
 
 fn validate(
@@ -131,54 +129,15 @@ fn validate(
         "native work handoff old generation changed"
     );
     let prior = crate::restart_config::restore(&committed)?;
-    let partial = prior["agents"]
-        .as_object()
-        .context("recovery agents missing")?
-        .keys()
-        .any(|name| desired["agents"].get(name).is_none());
-    if partial {
-        // Recheck under the writer used to authorize this generation. A queued
-        // job, pending reply or callback must still take the full handoff path.
-        ensure!(
-            quiet_generation(kernel, &prior)?,
-            "partial recovery would strand unfinished work"
-        );
-    }
-    let mut resume = json!({});
-    for (name, saved) in recovery["sessions"]
+    let resume: Value = recovery["sessions"]
         .as_object()
         .context("recovery sessions missing")?
-    {
-        resume[name] = saved["args"].clone();
-        let spec = &desired["agents"][name];
-        if partial && spec.is_null() {
-            continue;
-        }
-        if !super::super::hosted(spec) {
-            ensure!(
-                super::verify_session(
-                    if saved["fresh"] == true {
-                        None
-                    } else {
-                        Some(saved)
-                    },
-                    spec,
-                    &open["bindings"][name],
-                    name
-                )?,
-                "native work handoff session unconfirmed"
-            );
-        }
-    }
-    let mut expected = normalized(&prior, &recovery["previous_open"]["resume_args"])?;
-    if partial {
-        expected["agents"]
-            .as_object_mut()
-            .unwrap()
-            .retain(|name, _| desired["agents"].get(name).is_some());
-    }
+        .iter()
+        .map(|(name, saved)| (name.clone(), saved["args"].clone()))
+        .collect();
     ensure!(
-        expected == normalized(desired, &resume)?,
+        normalized(&prior, &recovery["previous_open"]["resume_args"])?
+            == normalized(desired, &resume)?,
         "native work handoff substantive configuration changed"
     );
     ensure!(
@@ -187,35 +146,26 @@ fn validate(
         "native work handoff bindings changed"
     );
     let namespace = read(root, "namespace.json")?.context("recovery namespace missing")?;
-    let agents = read(root, "herdr-agents.json")?.unwrap_or(Value::Null);
     ensure!(
         namespace["status"] == "prepared"
             && namespace["owner_id"] != recovery["namespace"]["owner_id"]
-            && namespace["workspace_id"] == open["workspace_id"],
+            && namespace["workspace_id"] == open["workspace_id"]
+            && namespace["owner_id"] == desired["herdr_activation"]["namespace_owner"],
         "native work handoff namespace changed"
     );
-    if agents.is_null() {
-        ensure!(
-            partial
-                && desired["agents"]
-                    .as_object()
-                    .is_some_and(|a| !a.is_empty() && a.values().all(super::super::hosted)),
-            "recovery mounted agents missing"
-        );
-    } else {
-        ensure!(
-            agents["namespace_owner"] == namespace["owner_id"]
-                && agents["workspace_id"] == namespace["workspace_id"]
-                && agents["plan"]["namespace_plan_hash"] == namespace["plan_hash"],
-            "native work handoff namespace changed"
-        );
-    }
-    recoverable(kernel, if partial { &prior } else { desired })?;
+    ensure!(
+        desired["herdr_activation"]["blocked_agents"]
+            == crate::herdr_activation::blocked_sessions(&recovery["sessions"]),
+        "recovery execution holds changed"
+    );
+    // This authorizes ownership of already-reconciled durable queues, not
+    // execution. Each terminal's native session is verified at activation.
+    recoverable(kernel, desired)?;
     Ok(
         json!({"schema_version":1,"operation_id":recovery["operation_id"],
         "prior_config_fingerprint":committed["config_fingerprint"],
-        "desired_config_fingerprint":crate::config::fingerprint(desired)?,"partial_quiet_start":partial,
-        "namespace_owner":namespace["owner_id"],"workspace_id":namespace["workspace_id"],"plan_hash":namespace["plan_hash"],"agents_plan_hash":agents["plan_hash"]}),
+        "desired_config_fingerprint":crate::config::fingerprint(desired)?,
+        "namespace_owner":namespace["owner_id"],"workspace_id":namespace["workspace_id"],"plan_hash":namespace["plan_hash"]}),
     )
 }
 

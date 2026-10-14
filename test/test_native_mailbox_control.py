@@ -16,6 +16,28 @@ def mailbox_files(server):
     return {str(p): p.read_bytes() for p in (server.root / 'mailboxes').rglob('*') if p.is_file()}
 
 
+def test_result_persists_for_disabled_recipient_across_controller_restart(tmp_path):
+    root=tmp_path/'state'
+    agents={'worker':spec(),'lead':dict(spec(),dispatch_disabled=True)}
+    server=Server(root,agents)
+    try:
+        task=submit(server,actor='lead')
+        finish(server,server.rpc('work',{'agent_name':'worker'})['job'])
+        assert server.rpc('watch',{'target':task['job_id']})['status']=='completed'
+        inbox=server.rpc('inbox',{'agent_name':'lead','detail':True})
+        assert inbox['item_count']==1 and inbox['head']['reply']=='worker result'
+        event=inbox['head']['inbound_event_id']
+        with pytest.raises(AssertionError,match='dispatch-disabled'):
+            server.rpc('work',{'agent_name':'lead'})
+    finally:server.close()
+    restored=Server(root,agents)
+    try:
+        inbox=restored.rpc('inbox',{'agent_name':'lead','detail':True})
+        assert inbox['item_count']==1 and inbox['head']['inbound_event_id']==event
+        assert inbox['head']['reply']=='worker result'
+    finally:restored.close()
+
+
 def test_fifo_ack_replay_survives_restart_and_does_not_consume_next(tmp_path):
     root = tmp_path / 'state'
     agents = {'worker': spec(), 'lead': spec()}

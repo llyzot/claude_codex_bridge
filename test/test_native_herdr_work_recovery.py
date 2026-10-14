@@ -31,7 +31,7 @@ def finish_worker(p, prompt, reply, turn):
             out.write(json.dumps(dict(type='event_msg', payload=payload))+'\n')
 
 
-@pytest.mark.parametrize('durable_result,crash,deferred', [(True,False,False),(False,False,False),(True,True,False),(True,False,True),(False,False,True),(True,False,'stale_cache')], ids=['completed','interrupted','opener_crash','deferred_completed','deferred_interrupted','deferred_stale_cache'])
+@pytest.mark.parametrize('durable_result,crash,deferred', [(True,False,False),(False,False,False),(True,True,False),(True,False,True),(False,False,True),(True,False,'stale_cache'),(True,'late_daemon',False)], ids=['completed','interrupted','opener_crash','deferred_completed','deferred_interrupted','deferred_stale_cache','late_lead_daemon_crash'])
 def test_reopen_delivers_child_once_and_preserves_unsent_fifo(project, durable_result, crash, deferred):
     p = project
     original = json.loads(p['pi'].args[2])
@@ -39,6 +39,7 @@ def test_reopen_delivers_child_once_and_preserves_unsent_fifo(project, durable_r
     history.write_text(json.dumps({'type':'session', 'id':original['session_id'], 'cwd':str(p['root'])})+'\n', encoding='utf-8')
     if deferred:change(p['backend'],lambda s:s['agent_sessions'].pop('codex'))
     assert p['open']().returncode == 0
+    wait_for(p['ready'],timeout=30)
     parent = cli('--state-root', p['native'], 'ask', 'lead', 'delegate before retirement')
     assert parent.returncode == 0, parent.stderr
     parent_id = json.loads(parent.stdout)['job_id']
@@ -78,15 +79,42 @@ def test_reopen_delivers_child_once_and_preserves_unsent_fifo(project, durable_r
     try:
         change(p['backend'], lambda s:s.update(provider_pids=[pi.pid, codex.pid]))
         if deferred:change(p['backend'],lambda s:s['agent_sessions'].update(codex=dict(agent='codex',kind='id',value=p['session'],source='fixture')))
-        if crash:fault(p['backend'],['agent','start'],'hang-after')
+        if crash is True:fault(p['backend'],['agent','start'],'hang-after')
         assert p['open'](0).returncode == 0
         wait_for(lambda:(p['native']/'herdr/herdr-recovery.json').exists() and
                  read(p['native']/'herdr/herdr-recovery.json')['phase'] == 'reset', timeout=20)
-        if crash:
+        if crash is True:
             wait_for(lambda:(p['backend']/'mutation-finished').exists())
+            # Crash after both independent launches took effect, while an ACK
+            # is withheld. A merely persisted but unsent launch stays uncertain
+            # and must not be replayed automatically (covered by agent tests).
+            wait_for(lambda:mutate_count(p['backend'],['agent','start'])==4)
             identity=read(p['native']/'herdr/herdr-open-start.json')['process']
             owned_stop(identity)
             wait_for(lambda:cli('process-identity',identity['pid']).returncode!=0)
+        if crash == 'late_daemon':
+            # Lead is deliberately absent. The full roster and durable reply
+            # route already exist, so Worker can finish unrelated FIFO work.
+            wait_for(p['controller_ready'], timeout=20)
+            wait_for(lambda:job(p,'worker',child_id)['status']=='completed')
+            a=wait_for(lambda:next((r for r in p['prompts']()[2:] if 'fifo A' in r['body']),None),timeout=20)
+            assert not any('fifo B' in r['body'] for r in p['prompts']()[2:])
+            finish_worker(p,a['body'],'A result','new-A');p['idle']('worker')
+            b=wait_for(lambda:next((r for r in p['prompts']()[2:] if 'fifo B' in r['body']),None))
+            finish_worker(p,b['body'],'B result','new-B');p['idle']('worker')
+            wait_for(lambda:job(p,'worker',queued[-1])['status']=='completed')
+            actors=json.loads(cli('--state-root',p['native'],'agents').stdout)['agents']
+            assert {r['agent_name'] for r in actors}=={'lead','worker'}
+            assert next(r for r in actors if r['agent_name']=='lead')['activation']['session_verified'] is False
+            edge=json.loads((p['native']/'callbacks/edges.jsonl').read_text().splitlines()[-1])
+            continuation_id=edge['continuation_job_id']
+            assert not any(r['body'].startswith('CCB_REQ_ID: '+continuation_id+':') for r in p['prompts']()[2:])
+            # Kill only the fixture daemon. Its keeper restores the full roster,
+            # and pending delivery must survive without rerunning the child.
+            previous=read(p['native']/'lease.json')['process']
+            owned_stop(previous)
+            wait_for(lambda:(lambda v:v and v['pid']!=previous['pid'])(p['controller_ready']()),timeout=20)
+            assert not any(r['body'].startswith('CCB_REQ_ID: '+continuation_id+':') for r in p['prompts']()[2:])
         gate.touch()
         assert json.loads(pi.stdout.readline())['ready']
         result = p['open']()
@@ -94,9 +122,8 @@ def test_reopen_delivers_child_once_and_preserves_unsent_fifo(project, durable_r
         wait_for(p['ready'], timeout=20)
         expected_status = 'completed' if durable_result else 'incomplete'
         assert job(p, 'worker', child_id)['status'] == expected_status
-        prompts = wait_for(lambda:p['prompts']() if len(p['prompts']()) >= 4 else None)
         latest_edge = json.loads((p['native']/'callbacks/edges.jsonl').read_text(encoding='utf-8').splitlines()[-1])
-        continuation = next(row for row in prompts[2:] if row['body'].startswith('CCB_REQ_ID: '+latest_edge['continuation_job_id']+':'))
+        continuation = wait_for(lambda:next((row for row in p['prompts']()[2:] if row['body'].startswith('CCB_REQ_ID: '+latest_edge['continuation_job_id']+':')),None),timeout=20)
         assert job(p, 'worker', child_id)['terminal_decision']['diagnostics']['recovery_no_replay'] is True
         assert ('durable old worker result' if durable_result else 'without a confirmed terminal result') in continuation['body']
         pi.stdin.write(json.dumps(dict(action='prompt', prompt=continuation['body'], reply='review after recovery'))+'\n')
@@ -106,12 +133,14 @@ def test_reopen_delivers_child_once_and_preserves_unsent_fifo(project, durable_r
         final = cli('--state-root', p['native'], 'watch', parent_id, '--wait', '--timeout-ms', '5000')
         assert final.returncode == 0 and json.loads(final.stdout)['reply'] == 'review after recovery', final.stderr
         # Worker queued jobs resume in original mailbox order, each only once.
-        a = next(row for row in p['prompts']()[2:] if 'fifo A' in row['body'])
-        assert not any('fifo B' in row['body'] for row in p['prompts']()[2:])
-        finish_worker(p, a['body'], 'A result', 'new-A'); p['idle']('worker')
-        b = wait_for(lambda:next((row for row in p['prompts']()[2:] if 'fifo B' in row['body']), None))
-        finish_worker(p, b['body'], 'B result', 'new-B'); p['idle']('worker')
-        wait_for(lambda:job(p, 'worker', queued[-1])['status'] == 'completed')
+        if crash != 'late_daemon':
+            a = wait_for(lambda:next((row for row in p['prompts']()[2:] if 'fifo A' in row['body']),None))
+            assert not any('fifo B' in row['body'] for row in p['prompts']()[2:])
+            finish_worker(p, a['body'], 'A result', 'new-A'); p['idle']('worker')
+            b = wait_for(lambda:next((row for row in p['prompts']()[2:] if 'fifo B' in row['body']), None))
+            finish_worker(p, b['body'], 'B result', 'new-B'); p['idle']('worker')
+            wait_for(lambda:job(p, 'worker', queued[-1])['status'] == 'completed')
+        assert sum(r['body']==continuation['body'] for r in p['prompts']())==1
         assert sum(row['body'] == worker['body'] for row in p['prompts']()) == 1
         assert sum('fifo A' in row['body'] for row in p['prompts']()) == 1
         assert sum('fifo B' in row['body'] for row in p['prompts']()) == 1
@@ -237,6 +266,7 @@ def test_deferred_recovery_refuses_unknown_or_ambiguous_session_without_launch(p
     Path(original['native_session_path']).write_text(json.dumps(dict(type='session',id=original['session_id'],cwd=str(p['root'])))+'\n',encoding='utf-8')
     change(p['backend'],lambda s:s['agent_sessions'].pop('codex'))
     assert p['open']().returncode==0
+    wait_for(p['ready'],timeout=30)
     submitted=cli('--state-root',p['native'],'ask','worker','deferred identity test')
     assert submitted.returncode==0,submitted.stderr
     prompt=wait_for(lambda:p['prompts']())[-1]
@@ -249,8 +279,21 @@ def test_deferred_recovery_refuses_unknown_or_ambiguous_session_without_launch(p
             other=str(uuid.uuid4());duplicate=p['log'].parent/f'rollout-{other}.jsonl'
             rows=p['log'].read_text(encoding='utf-8').splitlines();header=json.loads(rows[0]);header['payload']['id']=other
             duplicate.write_text('\n'.join([json.dumps(header),*rows[1:]])+'\n',encoding='utf-8')
-    reopened=p['open']()
-    assert reopened.returncode!=0
-    assert mutate_count(p['backend'],['agent','start'])==2
-    assert mutate_count(p['backend'],['agent','prompt'])==1
-    assert job(p,'worker',json.loads(submitted.stdout)['job_id'])['status']=='running'
+    gate=p['root']/'held-worker-lead-ready';original['start_gate']=str(gate)
+    pi=subprocess.Popen([NODE,str(HOST),json.dumps(original)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+                        text=True,encoding='utf-8',creationflags=0x08000000)
+    try:
+        change(p['backend'],lambda s:s.update(provider_pids=[pi.pid]))
+        assert p['open'](0).returncode==0
+        wait_for(lambda:(p['native']/'herdr/herdr-recovery.json').exists() and read(p['native']/'herdr/herdr-recovery.json')['phase']=='reset',timeout=20)
+        gate.touch();assert json.loads(pi.stdout.readline())['ready']
+        wait_for(p['controller_ready'],timeout=20)
+        worker=next(a for a in json.loads(cli('--state-root',p['native'],'agents').stdout)['agents'] if a['agent_name']=='worker')
+        assert worker['activation']['reason']=='recovery_evidence_required'
+        calls=[json.loads(line) for line in (p['backend']/'calls.jsonl').read_text().splitlines()]
+        assert sum(c[:2]==['agent','start'] and c[c.index('--kind')+1]=='codex' for c in calls if '--kind' in c)==1
+        assert mutate_count(p['backend'],['agent','prompt'])==1
+        assert job(p,'worker',json.loads(submitted.stdout)['job_id'])['status']=='running'
+    finally:
+        if pi.poll() is None:pi.kill()
+        pi.wait(timeout=5)

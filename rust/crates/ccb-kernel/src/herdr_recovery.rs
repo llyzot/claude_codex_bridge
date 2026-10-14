@@ -11,7 +11,7 @@ use std::{
 const STATE: &str = "herdr-recovery.json";
 #[path = "herdr_work_handoff.rs"]
 mod work_handoff;
-pub(super) use work_handoff::{authorize_start, handoff_allowed, partial_start_allowed};
+pub(super) use work_handoff::{authorize_start, handoff_allowed};
 pub(super) fn expected_session(root: &Path, open: &Value, agent: &str) -> Result<Option<Value>> {
     let Some(recovery) = read(root, STATE)? else {
         return Ok(None);
@@ -107,19 +107,6 @@ fn ended(identity: &Value) -> Result<()> {
         ),
     }
     Ok(())
-}
-pub(super) fn quiet(runtime: &Path, config: &Value) -> Result<crate::Kernel> {
-    crate::daemon::verify_owner(runtime)?;
-    let mut kernel = crate::Kernel::open(runtime)?;
-    let names = config["agents"]
-        .as_object()
-        .context("missing recovery agents")?
-        .keys()
-        .cloned()
-        .collect::<Vec<_>>();
-    let blockers = crate::daemon::recovery_blockers(&mut kernel, &names)?;
-    ensure!(blockers.is_empty(),"stopped-server recovery refuses unfinished jobs, mailboxes, callbacks, replies or provider faults");
-    Ok(kernel)
 }
 fn native_header(path: &Path) -> Result<Value> {
     ensure!(
@@ -222,101 +209,136 @@ fn resumes(
                 .all(|r| r["request"]["project_id"] == config["project_id"]),
             "recovery history belongs to another project"
         );
-        if spec["provider"] == "pi" {
-            let bridge = read(root, &format!("providers/pi/{name}/terminal-bridge.json"))?
-                .context("Pi recovery bridge is missing")?;
-            let events = PathBuf::from(crate::records::string(&bridge, "event_root")?);
-            let state =
-                read(&events, "current.json")?.context("Pi native session evidence is missing")?;
-            crate::pi_terminal::validate_producer(&state["bridge"])?;
-            ensure!(
-                state["owner"] == bridge["owner"]
-                    && state["bridge"]["owner"] == bridge["owner"]
-                    && state["agent_name"] == *name
-                    && state["bridge"]["process"] == agents["agents"][name]["binding"]["process"],
-                "Pi recovery producer does not match the recorded process"
-            );
-            let path = PathBuf::from(crate::records::string(&state["bridge"], "session_path")?);
-            if matches!(fs::symlink_metadata(&path),Err(ref e) if e.kind()==std::io::ErrorKind::NotFound)
-                && unused_pi_session(&state, &events, &rows)?
-            {
-                result[name] = json!({"provider":"pi","fresh":true,"args":[],"reason":"unused_native_session_never_persisted"});
-                continue;
-            }
-            let header = native_header(&path).with_context(||format!("Pi recovery history is unavailable: {}. A used or unverified session will not be replaced with a fresh one",path.display()))?;
-            ensure!(
-                header["type"] == "session"
-                    && header["id"] == state["session_id"]
-                    && crate::pi_terminal::same_session_path(
-                        &header["cwd"],
-                        &spec["workspace_path"]
-                    ),
-                "Pi recovery history/session/workspace mismatch"
-            );
-            result[name] = json!({"provider":"pi","session_id":state["session_id"],"path":path,"args":["--session",path]});
-        } else if super::hosted(spec) {
-            result[name] = native_host_session(runtime, spec, name, agents)?;
-        } else {
-            let provider = crate::records::string(spec, "provider")?;
-            let cache = read(
+        let session = (|| -> Result<()> {
+            if read(
                 runtime,
-                &format!("providers/{provider}/{name}/herdr-history.json"),
+                &crate::provider_fault::path(crate::records::string(spec, "provider")?, name),
             )?
-            .unwrap_or(Value::Null);
-            let mut history = if cache.is_object() {
+            .is_some_and(|fault| fault["status"] == "blocked")
+            {
+                anyhow::bail!("provider fault requires explicit recovery");
+            }
+            if spec["provider"] == "pi" {
+                let bridge = read(root, &format!("providers/pi/{name}/terminal-bridge.json"))?
+                    .context("Pi recovery bridge is missing")?;
+                let events = PathBuf::from(crate::records::string(&bridge, "event_root")?);
+                let state = read(&events, "current.json")?
+                    .context("Pi native session evidence is missing")?;
+                crate::pi_terminal::validate_producer(&state["bridge"])?;
                 ensure!(
-                    cache["identity"]["process"] == agents["agents"][name]["binding"]["process"],
-                    "Codex recovery cache belongs to another process"
+                    state["owner"] == bridge["owner"]
+                        && state["bridge"]["owner"] == bridge["owner"]
+                        && state["agent_name"] == *name
+                        && state["bridge"]["process"]
+                            == agents["agents"][name]["binding"]["process"],
+                    "Pi recovery producer does not match the recorded process"
                 );
-                cache["history"].clone()
+                let path = PathBuf::from(crate::records::string(&state["bridge"], "session_path")?);
+                if matches!(fs::symlink_metadata(&path),Err(ref e) if e.kind()==std::io::ErrorKind::NotFound)
+                    && unused_pi_session(&state, &events, &rows)?
+                {
+                    result[name] = json!({"provider":"pi","fresh":true,"args":[],"reason":"unused_native_session_never_persisted"});
+                    return Ok(());
+                }
+                let header = native_header(&path).with_context(||format!("Pi recovery history is unavailable: {}. A used or unverified session will not be replaced with a fresh one",path.display()))?;
+                ensure!(
+                    header["type"] == "session"
+                        && header["id"] == state["session_id"]
+                        && crate::pi_terminal::same_session_path(
+                            &header["cwd"],
+                            &spec["workspace_path"]
+                        ),
+                    "Pi recovery history/session/workspace mismatch"
+                );
+                result[name] = json!({"provider":"pi","session_id":state["session_id"],"path":path,"args":["--session",path]});
+            } else if super::hosted(spec) {
+                result[name] = native_host_session(runtime, spec, name, agents)?;
             } else {
-                open["bindings"][name]["history"].clone()
-            };
-            if prior["agents"][name]["herdr_discovery"].is_object() {
-                let running = rows
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .filter(|row| row["status"] == "running")
-                    .collect::<Vec<_>>();
-                ensure!(
-                    running.len() <= 1,
-                    "multiple unfinished deferred executions for one agent"
-                );
-                if let Some(job) = running.first() {
-                    let recovered = crate::herdr_discovery::recover(
-                        &prior["agents"][name],
-                        job,
-                        &crate::herdr_agents::recorded_identity(agents, name),
-                    )?
-                    .context(
-                        "unfinished deferred execution has no uniquely verified native session",
-                    )?;
-                    history = json!(recovered.binding);
-                    kernel.store.save(&format!("providers/{provider}/{name}/herdr-history.json"),
+                let provider = crate::records::string(spec, "provider")?;
+                let cache = read(
+                    runtime,
+                    &format!("providers/{provider}/{name}/herdr-history.json"),
+                )?
+                .unwrap_or(Value::Null);
+                let mut history = if cache.is_object() {
+                    ensure!(
+                        cache["identity"]["process"]
+                            == agents["agents"][name]["binding"]["process"],
+                        "Codex recovery cache belongs to another process"
+                    );
+                    cache["history"].clone()
+                } else {
+                    open["bindings"][name]["history"].clone()
+                };
+                if prior["agents"][name]["herdr_discovery"].is_object() {
+                    let running = rows
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter(|row| row["status"] == "running")
+                        .collect::<Vec<_>>();
+                    ensure!(
+                        running.len() <= 1,
+                        "multiple unfinished deferred executions for one agent"
+                    );
+                    if let Some(job) = running.first() {
+                        let recovered = crate::herdr_discovery::recover(
+                            &prior["agents"][name],
+                            job,
+                            &crate::herdr_agents::recorded_identity(agents, name),
+                        )?
+                        .context(
+                            "unfinished deferred execution has no uniquely verified native session",
+                        )?;
+                        history = json!(recovered.binding);
+                        kernel.store.save(&format!("providers/{provider}/{name}/herdr-history.json"),
                             &json!({"schema_version":1,"identity":crate::herdr_agents::recorded_identity(agents,name),
                             "discovery":prior["agents"][name]["herdr_discovery"],"history":history}))?;
+                    }
+                }
+                if history.is_null() {
+                    ensure!(
+                        rows.as_array().unwrap().is_empty(),
+                        "Codex has task history but no verified native session binding"
+                    );
+                    result[name] = json!({"provider":provider,"fresh":true,"args":[]});
+                } else {
+                    let binding: crate::terminal_history::Binding =
+                        serde_json::from_value(history)?;
+                    ensure!(
+                        crate::pi_terminal::same_session_path(
+                            &json!(binding.cwd),
+                            &spec["workspace_path"]
+                        ),
+                        "Codex recovery workspace changed"
+                    );
+                    crate::terminal_history::provider_baseline(provider, &binding, true)?;
+                    uuid::Uuid::parse_str(&binding.session_id)?;
+                    result[name] = json!({"provider":provider,"session_id":binding.session_id,"path":binding.path,"args":[if provider=="claude"{"--resume"}else{"resume"},binding.session_id]});
                 }
             }
-            if history.is_null() {
-                ensure!(
-                    rows.as_array().unwrap().is_empty(),
-                    "Codex has task history but no verified native session binding"
-                );
-                result[name] = json!({"provider":provider,"fresh":true,"args":[]});
+            Ok(())
+        })();
+        if let Err(error) = session {
+            // Retain the last confirmed identity for ownership checks. Missing
+            // execution evidence prevents activation, not recognition of an
+            // already-owned restored pane. Never infer an id from a filename.
+            let row = &agents["agents"][name];
+            let reference = &row["agent_session"];
+            let id = if super::hosted(spec) {
+                row["host_launch"]["thread_id"].clone()
+            } else if reference["kind"] == "id" {
+                reference["value"].clone()
             } else {
-                let binding: crate::terminal_history::Binding = serde_json::from_value(history)?;
-                ensure!(
-                    crate::pi_terminal::same_session_path(
-                        &json!(binding.cwd),
-                        &spec["workspace_path"]
-                    ),
-                    "Codex recovery workspace changed"
-                );
-                crate::terminal_history::provider_baseline(provider, &binding, true)?;
-                uuid::Uuid::parse_str(&binding.session_id)?;
-                result[name] = json!({"provider":provider,"session_id":binding.session_id,"path":binding.path,"args":[if provider=="claude"{"--resume"}else{"resume"},binding.session_id]});
-            }
+                open["bindings"][name]["history"]["session_id"].clone()
+            };
+            let path = if reference["kind"] == "path" {
+                reference["value"].clone()
+            } else {
+                open["bindings"][name]["history"]["path"].clone()
+            };
+            result[name] = json!({"provider":spec["provider"],"args":[],"session_id":id,"path":path,
+                "blocked_reason":error.to_string()});
         }
     }
     Ok(result)
@@ -363,6 +385,9 @@ pub(super) fn native_host_session(
 fn matches_session(agent: &Value, saved: &Value) -> bool {
     agent["agent"] == saved["provider"]
         && (agent["agent_session"]["kind"] == "id"
+            && saved["session_id"]
+                .as_str()
+                .is_some_and(|id| !id.is_empty())
             && agent["agent_session"]["value"] == saved["session_id"]
             || agent["agent_session"]["kind"] == "path"
                 && crate::pi_terminal::same_session_path(
@@ -504,6 +529,13 @@ pub(super) fn step(
 ) -> Result<bool> {
     let runtime = crate::config::state_root(project)?;
     let mut recovery = read(root, STATE)?.unwrap_or(Value::Null);
+    if recovery["phase"] == "reset"
+        && read(root, "namespace.json")?.is_some_and(|n| n["status"] == "retired")
+    {
+        // A registered generation can be stopped before all sessions activate.
+        // Its next open is a new recovery operation, not a replay of the old one.
+        recovery = Value::Null;
+    }
     if recovery.is_null() || recovery["phase"] == "complete" {
         let namespace = read(root, "namespace.json")?.unwrap_or(Value::Null);
         let retired = namespace["status"] == "retired";
@@ -549,7 +581,14 @@ pub(super) fn step(
                 open["phase"] = json!("waiting_for_retired_processes");
                 return Ok(false);
             }
-            ended(&row["binding"]["process"])?;
+            if row["binding"]["process"].is_object() {
+                ended(&row["binding"]["process"])?;
+            } else {
+                ensure!(
+                    row["sent"] == false,
+                    "unconfirmed provider launch cannot be retired"
+                );
+            }
         }
         crate::daemon::verify_owner(&runtime)?;
         let mut kernel = crate::Kernel::open(&runtime)?;
@@ -571,10 +610,24 @@ pub(super) fn step(
             prior["herdr"] == *request,
             "recovery source configuration changed"
         );
-        let sessions = resumes(root, &runtime, config, open, &agents, &mut kernel, &prior)?;
+        let mut historical = crate::herdr_activation::historical(&prior, &open["bindings"]);
+        let sessions = resumes(
+            root,
+            &runtime,
+            config,
+            open,
+            &agents,
+            &mut kernel,
+            &historical,
+        )?;
+        historical["herdr_activation"]["blocked_agents"] =
+            crate::herdr_activation::blocked_sessions(&sessions);
         let (mut offline, work) =
-            crate::daemon::Daemon::recover_closed_work(kernel, prior, &agents)?;
-        work_handoff::recoverable(&mut offline.kernel, config)?;
+            crate::daemon::Daemon::recover_closed_work(kernel, historical, &agents)?;
+        let mut recovery_config = config.clone();
+        recovery_config["herdr_activation"]["blocked_agents"] =
+            crate::herdr_activation::blocked_sessions(&sessions);
+        work_handoff::recoverable(&mut offline.kernel, &recovery_config)?;
         recovery = json!({"schema_version":1,"operation_id":uuid::Uuid::new_v4().to_string(),"project_id":config["project_id"],"session":request["session"],
             "kind":if retired {"retired_namespace"} else {"stopped_server"},
             "phase":"starting_server","source_hash":open["request_hash"],"previous_open":open,"namespace":namespace,"agents":agents,"sessions":sessions,"close_permitted":false,
@@ -606,7 +659,10 @@ pub(super) fn step(
     );
     crate::daemon::verify_owner(&runtime)?;
     let mut authority = crate::Kernel::open(&runtime)?;
-    work_handoff::recoverable(&mut authority, config)?;
+    let mut recovery_config = config.clone();
+    recovery_config["herdr_activation"]["blocked_agents"] =
+        crate::herdr_activation::blocked_sessions(&recovery["sessions"]);
+    work_handoff::recoverable(&mut authority, &recovery_config)?;
     if !server(request, root, open)? {
         return Ok(false);
     }
@@ -662,6 +718,7 @@ pub(super) fn step(
     ]))?;
     let next_open = json!({"schema_version":1,"project_id":config["project_id"],"session":request["session"],"request_hash":next_hash,
         "server_start_permitted":true,"server_process":open["server_process"],"phase":"opening","bindings":{},"resume_args":resume,
+        "initialization_errors":crate::herdr_activation::blocked_sessions(&recovery["sessions"]),
         "last_recovery_id":recovery["operation_id"],"observer_instance":options["opener_instance"]});
     recovery["phase"] = json!("reset");
     let mut store = crate::store::Store::open(root)?;

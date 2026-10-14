@@ -100,15 +100,43 @@ pub(crate) fn record_preparation(store: &mut crate::store::Store, request: &Valu
 fn hosted(spec: &Value) -> bool {
     spec["provider"] == "codex" && !spec["tui_host_root"].is_null()
 }
-fn readiness(config: &Value, record: &Value) -> Value {
+fn readiness(config: &Value, record: &Value, live: &Value) -> Value {
     config["agents"].as_object().unwrap().iter().map(|(name, spec)| {
         let row = &record["agents"][name];
         let mounted = record["daemon_agents"].as_array().is_some_and(|agents| agents.contains(&json!(name)));
-        let interface = if row["observed_lifecycle"] == "blocked" { "waiting_input" } else if row["interactive_ready"] == true { "ready" } else if row["sent"] != true { "not_started" } else { "starting" };
-        let error = record["initialization_errors"].get(name).or_else(||record["binding_errors"].get(name)).cloned().unwrap_or(Value::Null);
-        let verified = error.is_null() && if hosted(spec) { row["host_launch"]["thread_id"].is_string() } else { record["bindings"][name].is_object() };
-        (name.clone(),json!({"provider":spec["provider"],"startup_state":row["status"],"registered":mounted,"session_verified":verified,"initialization_error":error,"backend_mounted":mounted,"interface_state":interface,"interactive_ready":row["interactive_ready"]==true}))
+        // A lost display is never interactive, whatever its last observation said.
+        let lost = row["status"] == "lost";
+        let interface = if lost { "lost" } else if row["observed_lifecycle"] == "blocked" { "waiting_input" } else if row["interactive_ready"] == true { "ready" } else if row["sent"] != true { "not_started" } else { "starting" };
+        let mut error = record["initialization_errors"].get(name).or_else(||record["binding_errors"].get(name)).cloned().unwrap_or(Value::Null);
+        // A native host's session belongs to the authority, not to the Herdr record.
+        let host = &live[name];
+        let verified = error.is_null() && if hosted(spec) { row["host_launch"]["thread_id"].is_string() && (host.is_null() || host["session_verified"] == true) } else { record["bindings"][name].is_object() };
+        if hosted(spec) && error.is_null() && host["session_verified"] == false {
+            error = host["error"].clone();
+        }
+        (name.clone(),json!({"provider":spec["provider"],"startup_state":row["status"],"registered":mounted,"session_verified":verified,"initialization_error":error,"backend_mounted":mounted,"interface_state":interface,"interactive_ready":!lost && row["interactive_ready"]==true}))
     }).collect::<serde_json::Map<String,Value>>().into()
+}
+/// Best-effort activation of native hosts from a running authority.
+fn host_activation(runtime: &Path, config: &Value, record: &Value) -> Value {
+    if record["daemon"].is_null() || !config["agents"].as_object().unwrap().values().any(hosted) {
+        return Value::Null;
+    }
+    crate::cli::request(runtime, "agents", json!({}))
+        .ok()
+        .and_then(|r| r["agents"].as_array().cloned())
+        .map(|rows| {
+            rows.iter()
+                .filter_map(|a| {
+                    Some((
+                        a["agent_name"].as_str()?.to_owned(),
+                        a["activation"].clone(),
+                    ))
+                })
+                .collect::<serde_json::Map<String, Value>>()
+                .into()
+        })
+        .unwrap_or(Value::Null)
 }
 #[path = "herdr_recovery.rs"]
 mod recovery;
@@ -1094,7 +1122,7 @@ pub(crate) fn open(
         save(&root, &record)?;
     }
     Ok(
-        json!({"status":record["phase"],"last_startup_phase":record["last_startup_phase"],"agents":readiness(&config,&record),"project_id":record["project_id"],"session":record["session"],"workspace_id":record["workspace_id"],"state_root":runtime,"daemon":record["daemon"],"observation_expired":record["phase"]!="running"}),
+        json!({"status":record["phase"],"last_startup_phase":record["last_startup_phase"],"agents":readiness(&config,&record,&host_activation(&runtime,&config,&record)),"project_id":record["project_id"],"session":record["session"],"workspace_id":record["workspace_id"],"state_root":runtime,"daemon":record["daemon"],"observation_expired":record["phase"]!="running"}),
     )
 }
 pub(crate) fn launch(
@@ -1253,7 +1281,7 @@ pub(crate) fn launch(
                 .filter(|r| r["observer_instance"] == intent["instance"])
                 .unwrap_or(Value::Null);
             return Ok(
-                json!({"status":record["phase"].as_str().unwrap_or("opening"),"agents":readiness(&config,&record),"daemon":record["daemon"],"session":record["session"],"workspace_id":record["workspace_id"],"state_root":runtime,"opener":intent["process"],"observation_expired":true}),
+                json!({"status":record["phase"].as_str().unwrap_or("opening"),"agents":readiness(&config,&record,&host_activation(&runtime,&config,&record)),"daemon":record["daemon"],"session":record["session"],"workspace_id":record["workspace_id"],"state_root":runtime,"opener":intent["process"],"observation_expired":true}),
             );
         }
         if crate::daemon::owner_stopped(intent["process"]["pid"].as_u64().unwrap() as u32) {

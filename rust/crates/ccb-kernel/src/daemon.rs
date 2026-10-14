@@ -427,6 +427,25 @@ impl Daemon {
         }
         results
     }
+    /// Herdr terminals report verified session evidence. Native Codex hosts
+    /// report their owned app-server session and any recorded provider fault.
+    pub(crate) fn agent_activation(&self, name: &str, spec: &Value) -> Value {
+        let view = self.activation.view(name, spec);
+        if !view.is_null() || spec["provider"] != "codex" || spec["tui_host_root"].is_null() {
+            return view;
+        }
+        if let Some(fault) = self.faults.get(name) {
+            return json!({"registered":true,"session_verified":false,"session_gate_open":false,
+                "reason":"provider_fault","error":fault["reason"],"fault_id":fault["fault_id"]});
+        }
+        let verified = self
+            .codex
+            .get(name)
+            .is_some_and(|s| s.state["thread_id"].is_string());
+        json!({"registered":true,"session_verified":verified,
+            "session_gate_open":verified && spec["dispatch_disabled"] != true,
+            "reason":if verified {"native_host_session_verified"} else {"awaiting_native_host_session"},"error":null})
+    }
     fn names(&self) -> Vec<String> {
         self.config["agents"]
             .as_object()
@@ -553,7 +572,7 @@ impl Daemon {
             "agents" => Ok(json!({"agents":self.names().iter().map(|name| {
                 let spec=&self.config["agents"][name];
                 json!({"agent_name":name,"provider":spec["provider"],"role":crate::roles::normalized(&spec["role"]).unwrap(),
-                    "dispatch_disabled":spec["dispatch_disabled"]==true,"activation":self.activation.view(name,spec)})
+                    "dispatch_disabled":spec["dispatch_disabled"]==true,"activation":self.agent_activation(name,spec)})
             }).collect::<Vec<_>>()})),
             "submit" => self.submit(p),
             "resubmit" => self.resubmit(p),

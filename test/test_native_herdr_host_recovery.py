@@ -107,6 +107,20 @@ def test_background_restart_never_replaces_missing_native_history(hosted):
     assert json.loads(result.stdout)['status']!='running' and not p['ready']()
     assert mutate_count(p['backend'],['pane','run'])==1 and not Path(s['state']['path']).exists()
     assert read(p['native']/'providers/codex/worker/session.json')['state']['thread_id']==s['state']['thread_id']
+    activation=held_activation(p['native'],'worker')
+    assert activation['reason']=='provider_fault' and activation['error'] and not activation['session_verified']
+    worker=json.loads(p['open']().stdout)['agents']['worker']
+    assert not worker['session_verified'] and worker['initialization_error']==activation['error']
+    assert worker['interface_state']=='lost' and not worker['interactive_ready']
+    assert mutate_count(p['backend'],['pane','run'])==1
+
+def test_verified_native_host_reports_its_authority_session(hosted):
+    p=hosted
+    agents=json.loads(cli('--state-root',p['native'],'agents').stdout)['agents']
+    activation=next(a for a in agents if a['agent_name']=='worker')['activation']
+    assert activation['reason']=='native_host_session_verified' and activation['session_gate_open']
+    worker=json.loads(p['open']().stdout)['agents']['worker']
+    assert worker['session_verified'] and worker['initialization_error'] is None and worker['interface_state']=='ready'
 
 def test_background_restart_does_not_replay_unfinished_lead_job(hosted):
     p=hosted;asked=cli('--state-root',p['native'],'ask','lead','hold this request');assert asked.returncode==0,asked.stderr

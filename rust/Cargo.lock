@@ -149,7 +149,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "ccb-kernel"
-version = "0.1.0"
+version = "10.0.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -167,7 +167,7 @@ dependencies = [
 
 [[package]]
 name = "ccb-runtime-accelerator"
-version = "7.7.0"
+version = "10.0.0-rc.1"
 dependencies = [
  "anyhow",
  "clap",

@@ -1,6 +1,8 @@
 """Native role roots must be registered and verified before Codex task input."""
 import json
 from pathlib import Path
+# Captured at import: test fixtures isolate HOME/USERPROFILE per test.
+REAL_HOME = Path.home()
 import time
 import os
 import queue
@@ -206,7 +208,7 @@ def test_preview_adapter_preserves_order_and_clears_filtered_skills(tmp_path):
 
 @pytest.mark.skipif(os.name!='nt',reason='Installed Windows Codex protocol probe')
 def test_installed_codex_skill_catalog_reloads_and_removes_live_roots_without_model(tmp_path):
-    exe=Path('C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe')
+    exe=(REAL_HOME/'scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe')
     if not exe.is_file():pytest.skip('Installed Codex not present')
     role,skill,trace,behavior,agent=setup(tmp_path)
     home=tmp_path/'probe-home';home.mkdir()

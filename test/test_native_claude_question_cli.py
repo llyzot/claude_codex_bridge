@@ -2,6 +2,8 @@
 import json
 import os
 from pathlib import Path
+# Captured at import: test fixtures isolate HOME/USERPROFILE per test.
+REAL_HOME = Path.home()
 import time
 import pytest
 from stubs.anthropic_context_backend import Backend
@@ -9,7 +11,7 @@ from test_native_real_models import private_claude_context_config
 from test_native_daemon import Server,submit,await_watch
 from test_native_claude_requests import answer,pending
 
-@pytest.mark.skipif(os.name!='nt' or not Path('C:/Users/user/.local/bin/claude.exe').is_file(),reason='Installed Windows Claude')
+@pytest.mark.skipif(os.name!='nt' or not (REAL_HOME/'.local/bin/claude.exe').is_file(),reason='Installed Windows Claude')
 @pytest.mark.parametrize('mode',['single','multi','response','deny','cancel','canonical-cwd'])
 def test_installed_cli_question_roundtrip_without_account_or_remote_model(tmp_path,mode):
     backend=Backend(question='multi' if mode=='multi' else True);server=None

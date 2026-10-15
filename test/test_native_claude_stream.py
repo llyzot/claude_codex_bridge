@@ -1,5 +1,7 @@
 import json
 from pathlib import Path
+# Captured at import: test fixtures isolate HOME/USERPROFILE per test.
+REAL_HOME = Path.home()
 import sys
 import time
 import os
@@ -66,7 +68,7 @@ def test_claude_clean_restart_resumes_only_saved_session(tmp_path):
 
 @pytest.mark.skipif(os.name!='nt',reason='Installed Windows Claude wire check')
 def test_installed_unauthenticated_claude_reports_failure_without_daemon_exit(tmp_path):
-    executable=Path('C:/Users/user/.local/bin/claude.exe')
+    executable=(REAL_HOME/'.local/bin/claude.exe')
     if not executable.is_file():pytest.skip('Claude not installed')
     home=tmp_path/'claude-home';home.mkdir()
     config=dict(provider='claude',driver_kind='claude_stream',profile_family='structured_result',workspace_path=str(tmp_path),

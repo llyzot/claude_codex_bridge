@@ -2,6 +2,8 @@
 import json
 import os
 from pathlib import Path
+# Captured at import: test fixtures isolate HOME/USERPROFILE per test.
+REAL_HOME = Path.home()
 import sys
 import time
 
@@ -111,8 +113,8 @@ def test_pi_deadline_requests_abort_and_waits_for_settled_evidence(tmp_path):
 
 @pytest.mark.skipif(os.name!='nt',reason='Uses the installed Windows Pi package discovered in this workspace')
 def test_installed_pi_read_only_rpc_handshake_in_private_home(tmp_path):
-    node=Path('C:/Users/user/scoop/apps/nodejs-lts/current/node.exe')
-    cli=Path('C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')
+    node=(REAL_HOME/'scoop/apps/nodejs-lts/current/node.exe')
+    cli=(REAL_HOME/'scoop/apps/nodejs-lts/current/bin/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')
     if not node.is_file() or not cli.is_file():pytest.skip('Installed Pi/Node not present')
     home=tmp_path/'pi-home';home.mkdir()
     record=dict(provider='pi',driver_kind='pi_rpc',profile_family='protocol_turn',workspace_path=str(tmp_path),

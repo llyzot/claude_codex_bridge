@@ -10,6 +10,8 @@ import json
 import os
 import re
 from pathlib import Path
+# Captured at import: test fixtures isolate HOME/USERPROFILE per test.
+REAL_HOME = Path.home()
 import subprocess
 import tempfile
 import time
@@ -18,10 +20,10 @@ import uuid
 
 ROOT=Path(__file__).resolve().parents[1]
 NATIVE=Path(os.environ.get('CCB_TEST_NATIVE_BIN') or ROOT/'rust/target/release/ccb-native.exe')
-NODE=Path('C:/Users/user/scoop/apps/nodejs-lts/current/node.exe')
-PI=Path('C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')
-CODEX=Path('C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe')
-CLAUDE=Path.home()/'.local/bin/claude.exe'
+NODE=(REAL_HOME/'scoop/apps/nodejs-lts/current/node.exe')
+PI=(REAL_HOME/'scoop/apps/nodejs-lts/current/bin/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')
+CODEX=(REAL_HOME/'scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe')
+CLAUDE=REAL_HOME/'.local/bin/claude.exe'
 
 def cli(*args,ok=True):
     r=subprocess.run([str(NATIVE),*map(str,args)],capture_output=True,text=True,encoding='utf-8',timeout=25)

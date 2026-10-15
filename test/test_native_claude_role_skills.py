@@ -1,6 +1,8 @@
 """Owned, copy-free discovery views and correlated Claude skill reloads."""
 import json
 from pathlib import Path
+# Captured at import: test fixtures isolate HOME/USERPROFILE per test.
+REAL_HOME = Path.home()
 import time
 import os
 import queue
@@ -206,7 +208,7 @@ def test_user_only_skill_metadata_is_not_inserted_into_task_text(tmp_path):
 @pytest.mark.skipif(os.name!='nt',reason='Installed Windows Claude probe')
 @pytest.mark.parametrize('bare',[False,True])
 def test_installed_claude_refreshes_rust_created_links_without_inference(tmp_path,bare):
-    exe=Path('C:/Users/user/.local/bin/claude.exe')
+    exe=(REAL_HOME/'.local/bin/claude.exe')
     if not exe.is_file():pytest.skip('Claude not installed')
     role,skill,trace,behavior,agent=setup(tmp_path)
     # Bound ancestor discovery to this private fixture repository.

@@ -2,6 +2,8 @@
 import json
 import os
 from pathlib import Path
+# Captured at import: test fixtures isolate HOME/USERPROFILE per test.
+REAL_HOME = Path.home()
 import sys
 import time
 
@@ -68,7 +70,7 @@ def test_persistent_pi_lead_receives_native_codex_worker_result(tmp_path):
 
 @pytest.mark.skipif(os.name!='nt',reason='Installed Windows Codex probe')
 def test_installed_codex_creates_owned_ephemeral_thread_without_model_call(tmp_path):
-    executable=Path('C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe')
+    executable=(REAL_HOME/'scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe')
     if not executable.is_file():pytest.skip('Installed Codex not present')
     home=tmp_path/'codex-home';home.mkdir()
     spec=dict(provider='codex',driver_kind='codex_app_server',profile_family='protocol_turn',workspace_path=str(tmp_path),

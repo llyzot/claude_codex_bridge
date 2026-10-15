@@ -2,6 +2,8 @@
 import json
 import os
 from pathlib import Path
+# Captured at import: test fixtures isolate HOME/USERPROFILE per test.
+REAL_HOME = Path.home()
 import queue
 import subprocess
 import threading
@@ -11,7 +13,7 @@ import pytest
 from test_native_cli_security import BIN
 from test_native_daemon import Server
 
-CODEX = Path('C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe')
+CODEX = (REAL_HOME/'scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe')
 pytestmark = pytest.mark.skipif(os.name != 'nt' or not CODEX.is_file(), reason='Installed Windows Codex')
 
 def wait_for(fn, timeout=20):
@@ -150,8 +152,8 @@ def test_real_host_preserves_global_instructions_for_interactive_attachment(tmp_
     finally:server.close()
 
 def test_installed_pi_accepts_canonical_windows_workspace(tmp_path):
-    node=Path('C:/Users/user/scoop/apps/nodejs-lts/current/node.exe')
-    pi=Path('C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')
+    node=(REAL_HOME/'scoop/apps/nodejs-lts/current/node.exe')
+    pi=(REAL_HOME/'scoop/apps/nodejs-lts/current/bin/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')
     if not node.exists() or not pi.exists():pytest.skip('Installed Pi unavailable')
     home=tmp_path/'pi-home';home.mkdir()
     spec=dict(provider='pi',driver_kind='pi_rpc',profile_family='protocol_turn',

@@ -2,6 +2,8 @@
 import json
 import os
 from pathlib import Path
+# Captured at import: test fixtures isolate HOME/USERPROFILE per test.
+REAL_HOME = Path.home()
 import subprocess
 import time
 
@@ -10,9 +12,9 @@ from test_native_daemon import Server,submit
 
 ROOT=Path(__file__).resolve().parents[1]
 NATIVE=Path(os.environ.get('CCB_TEST_NATIVE_BIN') or ROOT/'rust'/'target'/'debug'/'ccb-native.exe')
-CODEX=Path('C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe')
-NODE=Path('C:/Users/user/scoop/apps/nodejs-lts/current/node.exe')
-PI=Path('C:/Users/user/scoop/apps/nodejs-lts/current/bin/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')
+CODEX=(REAL_HOME/'scoop/apps/nodejs-lts/current/bin/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe')
+NODE=(REAL_HOME/'scoop/apps/nodejs-lts/current/node.exe')
+PI=(REAL_HOME/'scoop/apps/nodejs-lts/current/bin/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')
 pytestmark=pytest.mark.skipif(os.environ.get('CCB_RUN_REAL_MODELS')!='1',reason='Explicit real-model opt-in required')
 
 
@@ -20,7 +22,7 @@ def private_claude_context_config(tmp_path,base_url=None):
     workspace=tmp_path/'workspace';workspace.mkdir()
     home=tmp_path/'claude-home';home.mkdir()
     return dict(provider='claude',driver_kind='claude_stream',profile_family='protocol_turn',workspace_path=str(workspace),
-        command=['C:/Users/user/.local/bin/claude.exe','-p','--input-format','stream-json','--output-format','stream-json',
+        command=[str(REAL_HOME/'.local/bin/claude.exe'),'-p','--input-format','stream-json','--output-format','stream-json',
                  '--verbose','--replay-user-messages','--bare','--setting-sources','','--strict-mcp-config','--mcp-config','{"mcpServers":{}}','--tools',''],
         env={'CLAUDE_CONFIG_DIR':str(home),'ANTHROPIC_API_KEY':'local-test-key' if base_url else '',
              'ANTHROPIC_AUTH_TOKEN':'','CLAUDE_CODE_OAUTH_TOKEN':'',
@@ -125,17 +127,17 @@ def protected_copy(source,destination):
 def configs(tmp_path):
     workspace=tmp_path/'workspace';workspace.mkdir()
     codex_home=tmp_path/'codex-home';codex_home.mkdir()
-    protected_copy(Path('C:/Users/user/.codex/auth.json'),codex_home/'auth.json')
+    protected_copy((REAL_HOME/'.codex/auth.json'),codex_home/'auth.json')
     worker=dict(provider='codex',driver_kind='codex_app_server',profile_family='protocol_turn',workspace_path=str(workspace),
         command=[str(CODEX),'app-server','--stdio'],env={'CODEX_HOME':str(codex_home)},
         thread_options={'model':'gpt-6.1-sol','approvalPolicy':'never','sandbox':'read-only'},turn_options={'effort':'low'})
     pi_home=tmp_path/'pi-home';pi_home.mkdir()
-    shell=Path('C:/Users/user/scoop/apps/git/current/usr/bin/bash.exe')
+    shell=(REAL_HOME/'scoop/apps/git/current/usr/bin/bash.exe')
     assert shell.is_file(),'Existing Git Bash required for the Pi bash tool'
     (pi_home/'settings.json').write_text(json.dumps({'shellPath':str(shell)}),encoding='utf-8')
-    protected_copy(Path('C:/Users/user/.pi/agent/auth.json'),pi_home/'auth.json')
+    protected_copy((Path.home()/'.pi/agent/auth.json'),pi_home/'auth.json')
     for name in ['models.json']:
-        source=Path('C:/Users/user/.pi/agent')/name
+        source=(Path.home()/'.pi/agent')/name
         if source.exists():protected_copy(source,pi_home/name)
     lead=dict(provider='pi',driver_kind='pi_rpc',profile_family='protocol_turn',workspace_path=str(workspace),
         command=[str(NODE),str(PI),'--mode','rpc','--provider','openai','--model','gpt-6-astra','--thinking','low',
@@ -217,7 +219,7 @@ def test_real_codex_role_skill_reads_updated_body_in_same_thread(tmp_path):
     import uuid
     workspace=tmp_path/'workspace';workspace.mkdir()
     home=tmp_path/'codex-home';home.mkdir()
-    protected_copy(Path('C:/Users/user/.codex/auth.json'),home/'auth.json')
+    protected_copy((REAL_HOME/'.codex/auth.json'),home/'auth.json')
     role=workspace/'roles/installed/agentroles.verify/current'
     skill=role/'skills/ccb-role-probe';skill.mkdir(parents=True)
     (role/'role.toml').write_text('schema="rolepack/v1"\nid="agentroles.verify"\n'
@@ -254,8 +256,8 @@ def test_real_pi_role_skill_reads_updated_body_in_same_session(tmp_path):
     import uuid
     workspace=tmp_path/'workspace';workspace.mkdir()
     home=tmp_path/'pi-home';home.mkdir()
-    protected_copy(Path('C:/Users/user/.pi/agent/auth.json'),home/'auth.json')
-    models=Path('C:/Users/user/.pi/agent/models.json')
+    protected_copy((Path.home()/'.pi/agent/auth.json'),home/'auth.json')
+    models=(Path.home()/'.pi/agent/models.json')
     if models.exists():protected_copy(models,home/'models.json')
     role=workspace/'roles/installed/agentroles.verify/current'
     skill=role/'skills/ccb-role-probe';skill.mkdir(parents=True)

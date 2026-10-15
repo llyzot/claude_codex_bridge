@@ -1,6 +1,8 @@
 """Stopped-prefix swaps, retained versions and recovery; never an account install."""
 import concurrent.futures,hashlib,json,os,subprocess,uuid
 from pathlib import Path
+# Captured at import: test fixtures isolate HOME/USERPROFILE per test.
+REAL_HOME = Path.home()
 import pytest
 from test_native_cli_security import cli
 from test_native_installation import install,call
@@ -190,7 +192,7 @@ def test_concurrent_upgrades_publish_one_replacement_and_keep_one_backup(tmp_pat
 
 def test_powershell_explicit_upgrade_uses_native_transaction(tmp_path):
     from test_native_installation import ROOT
-    pwsh='C:/Users/user/scoop/shims/pwsh.exe'
+    pwsh=str(REAL_HOME/'scoop/shims/pwsh.exe')
     prefix=tmp_path/'native';previous(prefix);before=hashes(prefix)
     args=['-NoProfile','-File',ROOT/'install.ps1','install','-Runtime','rust','-InstallPrefix',prefix,'-Upgrade']
     preview=call(pwsh,*args,'-DryRun')

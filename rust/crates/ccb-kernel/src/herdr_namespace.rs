@@ -492,6 +492,13 @@ impl Controller<'_> {
             .as_object()
             .context("invalid namespace bindings")?
         {
+            // A prepared slot whose pane the user closed is lost, not foreign.
+            if self.record["status"] == "prepared"
+                && binding["tagged"] == true
+                && !panes.iter().any(|p| p["pane_id"] == binding["pane_id"])
+            {
+                continue;
+            }
             ensure!(
                 self.binding_in_inventory(&panes, slot, binding["tagged"] == true),
                 "namespace pane changed or disappeared"
@@ -517,11 +524,11 @@ impl Controller<'_> {
             self.validate_bound()?;
             let panes = self.panes()?;
             let bindings = self.record["bindings"].as_object().unwrap();
+            // Closed tracked panes are allowed; untracked or foreign ones are not.
             ensure!(
-                panes.len() == bindings.len()
-                    && panes.iter().all(|p| bindings
-                        .iter()
-                        .any(|(slot, b)| p["pane_id"] == b["pane_id"] && self.owns(p, Some(slot)))),
+                panes.iter().all(|p| bindings
+                    .iter()
+                    .any(|(slot, b)| p["pane_id"] == b["pane_id"] && self.owns(p, Some(slot)))),
                 "namespace contains untracked or foreign panes"
             );
         }

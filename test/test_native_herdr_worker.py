@@ -312,3 +312,15 @@ def test_restart_between_completion_and_readiness_keeps_next_request_waiting(run
     prompt=wait_for(lambda:r['prompts']() if len(r['prompts']())==2 else None)[-1]
     r['finish'](prompt,turn='after-restart')
     assert await_watch(resumed,second['job_id'],lambda row:row['terminal'])['status']=='completed'
+
+def test_closing_a_peer_pane_does_not_block_a_running_result(runtime):
+    r=runtime;s=r['start']();receipt=r['submit'](s);prompt=wait_for(lambda:r['prompts']())[-1]
+    ledger=json.loads((r['project']/'.ccb/ccbd/herdr/herdr-agents.json').read_text(encoding='utf-8'))
+    lead=ledger['agents']['lead']
+    def closed(state):
+        state['panes'].pop(lead['pane_id']);state['agents'].pop(lead['herdr_name'],None)
+    change(r['backend'],closed)
+    time.sleep(1.5);r['finish'](prompt)
+    row=await_watch(s,receipt['job_id'],lambda row:row['terminal'])
+    assert row['status']=='completed' and row['reply']=='terminal worker result'
+    assert not (s.root/'providers/codex/worker/fault.json').exists()

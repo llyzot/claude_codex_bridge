@@ -596,15 +596,18 @@ fn safe_to_retire(request: &Value, snapshot: &Value, recovery: &Value) -> Result
     let bindings = old["bindings"]
         .as_object()
         .context("missing prior pane bindings")?;
+    // A pane closed before the stop is simply absent; extra panes are not.
     ensure!(
-        panes.len() == bindings.len(),
+        panes.len() <= bindings.len()
+            && panes
+                .iter()
+                .all(|p| bindings.values().any(|b| b["pane_id"] == p["pane_id"])),
         "restored workspace contains extra or missing panes"
     );
     for (name, binding) in bindings {
-        let pane = panes
-            .iter()
-            .find(|p| p["pane_id"] == binding["pane_id"])
-            .context("restored pane IDs changed")?;
+        let Some(pane) = panes.iter().find(|p| p["pane_id"] == binding["pane_id"]) else {
+            continue;
+        };
         ensure!(
             pane["tokens"]["ccb_native_owner"].is_null()
                 || pane["tokens"]["ccb_native_owner"] == old["owner_id"],

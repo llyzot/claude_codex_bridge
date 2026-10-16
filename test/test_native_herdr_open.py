@@ -456,3 +456,26 @@ def test_invalid_options_are_rejected_without_starting_background_work(setup,dat
     options=root/'options.json';options.write_text(json.dumps(data),encoding='utf-8')
     result=cli('--project',root,'herdr','open','--options',options,'--no-attach')
     assert result.returncode!=0 and not (root/'.ccb/ccbd').exists() and not (backend/'calls.jsonl').exists()
+
+def test_closed_agent_pane_loses_only_that_agent_and_reopen_serves_peers(project):
+    p=project;assert p['open']().returncode==0;wait_for(p['ready'],timeout=30)
+    daemon=p['ready']()['pid']
+    ledger=read(p['native']/'herdr/herdr-agents.json');lead=ledger['agents']['lead']
+    p['pi'].kill();p['pi'].wait(timeout=5)
+    def closed(s):
+        s['panes'].pop(lead['pane_id']);s['agents'].pop(lead['herdr_name'],None)
+    change(p['backend'],closed)
+    cli('--state-root',p['native'],'stop');wait_for(lambda:cli('process-identity',daemon).returncode!=0)
+    result=p['open']();assert result.returncode==0,result.stderr
+    agents=json.loads(result.stdout)['agents']
+    assert agents['lead']['interface_state']=='lost' and not agents['lead']['session_verified']
+    wait_for(p['controller_ready'],timeout=30)
+    def activation():
+        rows={a['agent_name']:a['activation'] for a in json.loads(cli('--state-root',p['native'],'agents').stdout)['agents']}
+        return rows if rows['worker'] and rows['worker']['session_verified'] else None
+    rows=wait_for(activation,timeout=30)
+    assert not (rows['lead'] or {}).get('session_verified')
+    p['idle']('worker')
+    asked=cli('--state-root',p['native'],'ask','worker','after lead pane closed');assert asked.returncode==0,asked.stderr
+    wait_for(lambda:any('after lead pane closed' in r['body'] for r in p['prompts']()),timeout=20)
+    killed=cli('--project',p['root'],'kill',timeout=60);assert killed.returncode==0,killed.stderr

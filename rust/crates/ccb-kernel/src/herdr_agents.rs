@@ -157,6 +157,8 @@ impl Manager<'_> {
         }
         store.commit()
     }
+    /// A pane the user closed only loses its own agent (observed as lost); it
+    /// must not block peers. A pane that remains but changed ownership fails.
     fn snapshot(&self) -> Result<Value> {
         let snapshot =
             rpc(self.request, vec!["api".into(), "snapshot".into()])?["snapshot"].clone();
@@ -184,6 +186,9 @@ impl Manager<'_> {
                         && p["workspace_id"] == self.namespace["workspace_id"]
                 })
                 .collect::<Vec<_>>();
+            if panes.is_empty() && binding["tagged"] == true {
+                continue;
+            }
             ensure!(
                 panes.len() == 1 && self.owns(panes[0], Some(name)),
                 "Herdr pane ownership changed"
@@ -274,6 +279,10 @@ impl Manager<'_> {
     }
     fn observe(&self, snapshot: &Value, name: &str) -> Result<Value> {
         let row = &self.record["agents"][name];
+        if self.pane(snapshot, name).is_err() {
+            // Its pane was closed: the agent is gone, never relaunched here.
+            return Ok(json!({"status":"lost","pane_closed":true}));
+        }
         let pane = self.pane(snapshot, name)?;
         ensure!(
             pane["terminal_id"] == row["terminal_id"],

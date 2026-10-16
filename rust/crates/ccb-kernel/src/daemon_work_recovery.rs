@@ -152,6 +152,17 @@ impl Daemon {
         );
         let execution = records::string(&job["provider_options"], "native_execution_instance")?;
         uuid::Uuid::parse_str(execution)?;
+        if job["provider_options"]["native_context_control"].is_object() {
+            // A stopped context command is never resent; its effect is unknown.
+            return Ok(
+                json!({"schema_version":2,"record_type":"completion_decision","terminal":true,
+                "status":"incomplete","reason":"herdr_context_interrupted","confidence":"degraded",
+                "reply":"","anchor_seen":false,"reply_started":false,"reply_stable":false,
+                "provider_turn_ref":null,"source_cursor":null,"finished_at":now(),
+                "diagnostics":{"automatic_replay":false,"recovery_no_replay":true,
+                    "provider_prompt_permitted":!permit.is_null()}}),
+            );
+        }
         let operator = &self.config["herdr_activation"]["operator_fresh_session"][agent];
         if operator.is_string() {
             // The operator accepted that this session's evidence is unavailable.

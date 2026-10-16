@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 import pytest
 from test_native_herdr_namespace import setup, run as namespace_run, server as state, mutate_count
 from test_native_herdr_agents import run as mount, change
@@ -215,3 +216,32 @@ def test_installed_pi_loads_bridge_and_session_switch_rotates_log_without_a_mode
         assert before['bridge']['process']==after['bridge']['process'] and Path(before['path']).exists()
         auth=home/'auth.json';assert not auth.exists() or json.loads(auth.read_text())=={}
     finally:instance.close()
+
+def context(s,action,agent):
+    op=s.rpc(action,{'operation_id':str(uuid.uuid4()),'agent_names':[agent]})['context'];assert op['status']=='pending',op
+    return op['operation_id']
+
+def await_context(s,operation):
+    return wait_for(lambda:(v if (v:=s.rpc('context-status',{'operation_id':operation})['context'])['status']!='pending' else None),timeout=20)
+
+def test_terminal_clear_starts_new_pi_session_and_next_task_uses_it(terminal):
+    r=terminal;s=r['start']();op=context(s,'clear','lead')
+    assert prompt(r)['body']=='/new'
+    r['command'](action='switch',session_id='pi-cleared-session')
+    path=bridge_state(r)['bridge']['session_path']
+    change(r['backend'],lambda st:st['agents'][r['rows']['lead']['herdr_name']].update(agent_session={'agent':'pi','kind':'path','value':path,'source':'fixture'}))
+    r['idle']()
+    done=await_context(s,op)
+    assert done['status']=='completed' and done['results'][0]['completion_reason']=='herdr_context_cleared'
+    rotation=json.loads((s.root/'providers/pi/lead/herdr-rotation.json').read_text(encoding='utf-8'))
+    assert rotation['from_session']=='pi-test-session' and rotation['to_session']=='pi-cleared-session'
+    receipt=r['submit'](s);second=prompt(r,2)
+    assert second['body'].startswith('CCB_REQ_ID:')
+    time.sleep(1);assert s.rpc('watch',{'target':receipt['job_id']})['status']=='running'
+
+def test_terminal_compact_keeps_the_pi_session(terminal):
+    r=terminal;s=r['start']();op=context(s,'compact','lead')
+    assert prompt(r)['body']=='/compact'
+    r['idle']();done=await_context(s,op)
+    assert done['status']=='completed' and done['results'][0]['completion_reason']=='herdr_context_compacted'
+    assert not (s.root/'providers/pi/lead/herdr-rotation.json').exists()

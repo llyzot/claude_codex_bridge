@@ -33,7 +33,7 @@ for await (const line of createInterface({input:process.stdin})) {
     console.log(JSON.stringify({systemPrompt:result?.systemPrompt||'USER_SYSTEM_SENTINEL'}));continue;
   }
   if (command.action === 'reload') {await emit('session_shutdown');await load();}
-  else if (command.action === 'switch') {currentSession=command.session_id;await emit('session_switch');}
+  else if (command.action === 'switch') {currentSession=command.session_id;if (command.session_path) {config.native_session_path=command.session_path;branch=[];}await emit('session_switch');}
   else if (command.action === 'event') {await emit(command.event,command.payload);}
   else if (command.action === 'prompt') {
     const prompt = command.prompt;

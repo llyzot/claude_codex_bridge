@@ -212,3 +212,111 @@ def test_public_open_mounts_original_claude_and_reconnects_without_relaunch(setu
         cli('--state-root',root,'stop')
         if child.poll() is None:child.kill()
         child.wait(timeout=5)
+
+def context(s,action,*agents):
+    return s.rpc(action,{'operation_id':str(uuid.uuid4()),'agent_names':list(agents)})['context']
+
+def await_context(s,operation,timeout=20):
+    return wait_for(lambda:(v if (v:=s.rpc('context-status',{'operation_id':operation})['context'])['status']!='pending' else None),timeout=timeout)
+
+def test_terminal_clear_sends_native_command_and_rotates_to_the_new_session(runtime):
+    r=runtime;s=r['start']()
+    op=context(s,'clear','worker');assert op['status']=='pending'
+    prompt=wait_for(lambda:r['prompts']())[-1];assert prompt['body']=='/clear'
+    fresh=str(uuid.uuid4());new=r['path'].parent/f'{fresh}.jsonl'
+    new.write_text(json.dumps(dict(type='user',uuid='clear-caveat',parentUuid=None,sessionId=fresh,cwd=str(r['project']),isSidechain=False,isMeta=True,
+        message=dict(role='user',content='<command-name>/clear</command-name>')))+'\n',encoding='utf-8')
+    change(r['backend'],lambda st:st['agents'][r['name']].update(agent_session=dict(agent='claude',kind='id',value=fresh,source='fixture'),agent_status='idle',interactive_ready=True))
+    done=await_context(s,op['operation_id'])
+    assert done['status']=='completed' and done['results'][0]['completion_reason']=='herdr_context_cleared'
+    rotation=json.loads((s.root/'providers/claude/worker/herdr-rotation.json').read_text(encoding='utf-8'))
+    assert rotation['from_session']==r['session'] and rotation['to_session']==fresh
+    task=r['submit'](s,body='after clear');prompt=wait_for(lambda:r['prompts']() if len(r['prompts']())==2 else None)[-1]
+    assert prompt['body'].startswith('CCB_REQ_ID:') and 'after clear' in prompt['body']
+    ident=str(uuid.uuid4())
+    with new.open('a',encoding='utf-8') as f:
+        f.write(json.dumps(dict(type='user',uuid=ident,parentUuid='clear-caveat',sessionId=fresh,cwd=str(r['project']),isSidechain=False,message=dict(role='user',content=prompt['body'])))+'\n')
+        f.write(json.dumps(dict(type='assistant',uuid=ident+'-r',parentUuid=ident,sessionId=fresh,cwd=str(r['project']),isSidechain=False,
+            message=dict(role='assistant',id='msg-'+ident,content=[{'type':'text','text':'fresh session reply'}],stop_reason='end_turn')))+'\n')
+    r['idle']()
+    assert await_watch(s,task['job_id'],lambda v:v['terminal'],timeout=15)['reply']=='fresh session reply'
+    assert len(r['prompts']())==2
+
+def test_terminal_compact_keeps_session_and_waits_for_idle(runtime):
+    r=runtime;s=r['start']()
+    op=context(s,'compact','worker');prompt=wait_for(lambda:r['prompts']())[-1];assert prompt['body']=='/compact'
+    time.sleep(1);assert s.rpc('context-status',{'operation_id':op['operation_id']})['context']['status']=='pending'
+    r['idle']();done=await_context(s,op['operation_id'])
+    assert done['status']=='completed' and done['results'][0]['completion_reason']=='herdr_context_compacted'
+    assert not (s.root/'providers/claude/worker/herdr-rotation.json').exists()
+
+def test_terminal_context_control_is_blocked_while_the_agent_is_busy(runtime):
+    r=runtime;s=r['start']();r['submit'](s);wait_for(lambda:r['prompts']())
+    blocked=s.rpc('clear',{'operation_id':str(uuid.uuid4()),'agent_names':['worker']})['context']
+    assert blocked['status']=='blocked' and len(r['prompts']())==1
+
+def test_terminal_clear_rotation_survives_daemon_restart(runtime):
+    r=runtime;s=r['start']()
+    op=context(s,'clear','worker');wait_for(lambda:r['prompts']())
+    fresh=str(uuid.uuid4());new=r['path'].parent/f'{fresh}.jsonl'
+    new.write_text(json.dumps(dict(type='user',uuid='clear-caveat',parentUuid=None,sessionId=fresh,cwd=str(r['project']),isSidechain=False,isMeta=True,
+        message=dict(role='user',content='<command-name>/clear</command-name>')))+'\n',encoding='utf-8')
+    change(r['backend'],lambda st:st['agents'][r['name']].update(agent_session=dict(agent='claude',kind='id',value=fresh,source='fixture'),agent_status='idle',interactive_ready=True))
+    assert await_context(s,op['operation_id'])['status']=='completed'
+    s.close();resumed=r['start']()
+    task=r['submit'](resumed,body='after restart');prompt=wait_for(lambda:r['prompts']() if len(r['prompts']())==2 else None)[-1]
+    ident=str(uuid.uuid4())
+    with new.open('a',encoding='utf-8') as f:
+        f.write(json.dumps(dict(type='user',uuid=ident,parentUuid='clear-caveat',sessionId=fresh,cwd=str(r['project']),isSidechain=False,message=dict(role='user',content=prompt['body'])))+'\n')
+        f.write(json.dumps(dict(type='assistant',uuid=ident+'-r',parentUuid=ident,sessionId=fresh,cwd=str(r['project']),isSidechain=False,
+            message=dict(role='assistant',id='msg-'+ident,content=[{'type':'text','text':'restarted fresh reply'}],stop_reason='end_turn')))+'\n')
+    r['idle']()
+    assert await_watch(resumed,task['job_id'],lambda v:v['terminal'],timeout=15)['reply']=='restarted fresh reply'
+
+def fresh_transcript(r,fresh,complete=True):
+    new=r['path'].parent/f'{fresh}.jsonl'
+    rows=[dict(type='mode',mode='normal',sessionId=fresh)]
+    if complete:rows.append(dict(type='user',uuid='clear-caveat',parentUuid=None,sessionId=fresh,cwd=str(r['project']),isSidechain=False,isMeta=True,
+        message=dict(role='user',content='<command-name>/clear</command-name>')))
+    new.write_text(''.join(json.dumps(x)+'\n' for x in rows),encoding='utf-8');return new
+
+def test_terminal_clear_waits_for_the_new_transcript_to_be_written(runtime):
+    r=runtime;s=r['start']();op=context(s,'clear','worker');wait_for(lambda:r['prompts']())
+    fresh=str(uuid.uuid4());fresh_transcript(r,fresh,complete=False)
+    change(r['backend'],lambda st:st['agents'][r['name']].update(agent_session=dict(agent='claude',kind='id',value=fresh,source='fixture'),agent_status='idle',interactive_ready=True))
+    time.sleep(3)
+    assert s.rpc('context-status',{'operation_id':op['operation_id']})['context']['status']=='pending'
+    assert not (s.root/'providers/claude/worker/fault.json').exists()
+    fresh_transcript(r,fresh)
+    assert await_context(s,op['operation_id'])['status']=='completed'
+    assert json.loads((s.root/'providers/claude/worker/herdr-rotation.json').read_text(encoding='utf-8'))['to_session']==fresh
+
+def test_terminal_clear_interrupted_by_daemon_death_rotates_without_resending(runtime):
+    r=runtime;s=r['start']();op=context(s,'clear','worker');wait_for(lambda:r['prompts']())
+    s.expected_exit=True;s.proc.kill();s.proc.wait(timeout=5)
+    fresh=str(uuid.uuid4());fresh_transcript(r,fresh)
+    change(r['backend'],lambda st:st['agents'][r['name']].update(agent_session=dict(agent='claude',kind='id',value=fresh,source='fixture'),agent_status='idle',interactive_ready=True))
+    resumed=r['start']()
+    done=await_context(resumed,op['operation_id'])
+    assert done['status']=='completed' and done['results'][0]['completion_reason']=='herdr_context_cleared'
+    assert len(r['prompts']())==1
+    assert json.loads((resumed.root/'providers/claude/worker/herdr-rotation.json').read_text(encoding='utf-8'))['to_session']==fresh
+
+def test_terminal_clear_with_discovery_binding_serves_the_next_task(runtime):
+    r=runtime;r['defer']()
+    r['append'](r['row']('user','old',content='historical input'))
+    change(r['backend'],lambda st:st['agents'][r['name']].update(agent_session=dict(agent='claude',kind='id',value=r['session'],source='fixture')))
+    s=r['start']();op=context(s,'clear','worker');wait_for(lambda:r['prompts']())
+    fresh=str(uuid.uuid4());new=fresh_transcript(r,fresh)
+    change(r['backend'],lambda st:st['agents'][r['name']].update(agent_session=dict(agent='claude',kind='id',value=fresh,source='fixture'),agent_status='idle',interactive_ready=True))
+    assert await_context(s,op['operation_id'])['status']=='completed'
+    cache=json.loads((s.root/'providers/claude/worker/herdr-history.json').read_text(encoding='utf-8'))
+    assert cache['history']['session_id']==fresh and cache['history']['root']==r['worker']['herdr_discovery']['root']
+    task=r['submit'](s,body='after discovery clear');prompt=wait_for(lambda:r['prompts']() if len(r['prompts']())==2 else None)[-1]
+    ident=str(uuid.uuid4())
+    with new.open('a',encoding='utf-8') as f:
+        f.write(json.dumps(dict(type='user',uuid=ident,parentUuid='clear-caveat',sessionId=fresh,cwd=str(r['project']),isSidechain=False,message=dict(role='user',content=prompt['body'])))+'\n')
+        f.write(json.dumps(dict(type='assistant',uuid=ident+'-r',parentUuid=ident,sessionId=fresh,cwd=str(r['project']),isSidechain=False,
+            message=dict(role='assistant',id='msg-'+ident,content=[{'type':'text','text':'discovery fresh reply'}],stop_reason='end_turn')))+'\n')
+    r['idle']()
+    assert await_watch(s,task['job_id'],lambda v:v['terminal'],timeout=15)['reply']=='discovery fresh reply'

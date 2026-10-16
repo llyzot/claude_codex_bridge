@@ -5,6 +5,8 @@
 - Start the fork's own version line for the native Rust runtime (Windows + Herdr, Pi/Codex/Claude).
 - Cancel Herdr terminal tasks, recover providers that die mid-turn without replay, add `ccb herdr repair --fresh-session`, and report provider faults accurately.
 - 启用 fork 独立版本线；支持终端模式取消，provider 中途退出后可无重放恢复，新增 `ccb herdr repair --fresh-session`，修正 fault 状态显示。
+- Terminal `ccb clear`/`ccb compact` for Pi and Claude with session rotation, `ccb skills status|install`, and closed panes no longer break peer agents.
+- 终端模式 Pi/Claude 支持 clear/compact（会话轮换），新增 `ccb skills`，关闭面板不再影响其他 agent。
 - [Full bilingual notes](docs/releases/v10.0.0-rc.1.md).
 
 ## v8.7.10 (2026-10-10)

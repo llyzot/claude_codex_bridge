@@ -24,6 +24,52 @@ pub(crate) fn effective(spec: &Value, binding: &Value) -> Value {
     result
 }
 
+/// The native session a binding identifies.
+pub(crate) fn session_of(binding: &Value) -> Value {
+    if binding["history"]["session_id"].is_string() {
+        binding["history"]["session_id"].clone()
+    } else {
+        binding["discovery"]["session_id"].clone()
+    }
+}
+/// The binding a non-managed terminal spec declares directly in configuration.
+pub(crate) fn configured_binding(spec: &Value) -> Value {
+    if spec["herdr_history"].is_object() {
+        json!({"history":spec["herdr_history"],"pi_bridge_owner":spec["pi_bridge_owner"]})
+    } else if spec["herdr_discovery"].is_object() {
+        json!({"discovery":spec["herdr_discovery"]})
+    } else {
+        Value::Null
+    }
+}
+pub(crate) fn rotation_path(provider: &str, agent: &str) -> String {
+    format!("providers/{provider}/{agent}/herdr-rotation.json")
+}
+/// A context clear records its successor session against the opener's
+/// binding. The rotation applies only while that exact binding is current.
+pub(crate) fn rotated(
+    runtime: &Path,
+    provider: &str,
+    agent: &str,
+    binding: &Value,
+) -> Result<Value> {
+    if !binding.is_object() || !["pi", "claude"].contains(&provider) {
+        return Ok(binding.clone());
+    }
+    let Some(rotation) = crate::startup::load(&runtime.join(rotation_path(provider, agent)))?
+    else {
+        return Ok(binding.clone());
+    };
+    let from = session_of(binding);
+    Ok(
+        if rotation["schema_version"] == 1 && from.is_string() && rotation["from_session"] == from {
+            rotation["binding"].clone()
+        } else {
+            binding.clone()
+        },
+    )
+}
+
 pub(crate) fn historical(config: &Value, bindings: &Value) -> Value {
     let mut result = config.clone();
     for (name, spec) in result["agents"].as_object_mut().unwrap() {
@@ -53,6 +99,7 @@ pub(crate) fn blocked_sessions(sessions: &Value) -> Value {
 
 pub(crate) struct State {
     bindings: HashMap<String, Value>,
+    rotations: HashMap<String, Value>,
     held: HashMap<String, String>,
     errors: HashMap<String, String>,
     next_poll: Instant,
@@ -61,6 +108,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             bindings: HashMap::new(),
+            rotations: HashMap::new(),
             held: HashMap::new(),
             errors: HashMap::new(),
             next_poll: Instant::now(),
@@ -90,9 +138,26 @@ impl State {
     }
     pub(crate) fn spec(&self, name: &str, spec: &Value) -> Value {
         match self.bindings.get(name) {
-            Some(binding) if managed(spec) => effective(spec, binding),
+            Some(binding) if managed(spec) => {
+                effective(spec, self.rotations.get(name).unwrap_or(binding))
+            }
+            _ if spec["driver_kind"] == "herdr_tui" && self.rotations.contains_key(name) => {
+                effective(spec, &self.rotations[name])
+            }
             _ => spec.clone(),
         }
+    }
+    /// The opener's verified binding (or a non-managed spec's configured
+    /// one), before any context rotation.
+    pub(crate) fn opener_binding(&self, name: &str, spec: &Value) -> Value {
+        if managed(spec) {
+            self.bindings.get(name).cloned().unwrap_or(Value::Null)
+        } else {
+            configured_binding(spec)
+        }
+    }
+    pub(crate) fn rotate(&mut self, name: &str, binding: Value) {
+        self.rotations.insert(name.into(), binding);
     }
     pub(crate) fn view(&self, name: &str, spec: &Value) -> Value {
         if let Some(reason) = self.held.get(name) {
@@ -119,6 +184,18 @@ impl State {
                     .collect()
             })
             .unwrap_or_default();
+        for (name, spec) in config["agents"].as_object().unwrap() {
+            if spec["driver_kind"] == "herdr_tui" && !managed(spec) {
+                let declared = configured_binding(spec);
+                let provider = spec["provider"].as_str().unwrap_or("");
+                let current = rotated(runtime, provider, name, &declared)?;
+                if current == declared {
+                    self.rotations.remove(name);
+                } else {
+                    self.rotations.insert(name.clone(), current);
+                }
+            }
+        }
         let names: Vec<_> = config["agents"]
             .as_object()
             .unwrap()
@@ -146,6 +223,7 @@ impl State {
                 && agents["namespace_owner"] == namespace["owner_id"];
             if !scope_ok || !binding.is_object() {
                 self.bindings.remove(&name);
+                self.rotations.remove(&name);
                 if let Some(error) = open["binding_errors"][&name].as_str() {
                     self.errors.insert(name, error.into());
                 }
@@ -172,9 +250,17 @@ impl State {
                 Ok(()) => {
                     self.bindings.insert(name.clone(), binding.clone());
                     self.errors.remove(&name);
+                    let provider = spec["provider"].as_str().unwrap_or("");
+                    let current = rotated(runtime, provider, &name, binding)?;
+                    if current == *binding {
+                        self.rotations.remove(&name);
+                    } else {
+                        self.rotations.insert(name.clone(), current);
+                    }
                 }
                 Err(error) => {
                     self.bindings.remove(&name);
+                    self.rotations.remove(&name);
                     self.errors.insert(name, error.to_string());
                 }
             }

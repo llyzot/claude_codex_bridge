@@ -102,18 +102,25 @@ impl Daemon {
         for name in &names {
             let spec = &self.config["agents"][name];
             let owned = self.owned_view(name);
+            // Herdr terminals run the provider's own slash command (herdr_context).
+            let terminal = spec["driver_kind"] == "herdr_tui";
             if !["pi_rpc", "codex_app_server", "claude_stream"]
                 .contains(&spec["driver_kind"].as_str().unwrap_or(""))
+                && !(terminal
+                    && ["pi", "claude"].contains(&spec["provider"].as_str().unwrap_or("")))
             {
                 blockers.push(
                     json!({"agent_name":name,"reason":"native_context_protocol_unsupported"}),
                 );
             }
-            if self.reload_frozen(name)
-                || spec["dispatch_disabled"] == true
-                || owned["ready"] != true
-                || owned["closed"] == true
-            {
+            let available = if terminal {
+                self.activation.ready(name, spec)
+                    && !self.faults.contains_key(name)
+                    && self.herdr.get(name).is_none_or(|w| w.view["ready"] == true)
+            } else {
+                owned["ready"] == true && owned["closed"] != true
+            };
+            if self.reload_frozen(name) || spec["dispatch_disabled"] == true || !available {
                 blockers.push(json!({"agent_name":name,"reason":"provider_not_available"}));
             }
             runtimes[name] = owned["runtime_instance_id"].clone();

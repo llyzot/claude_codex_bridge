@@ -204,8 +204,18 @@ fn native_header(path: &Path) -> Result<Value> {
     Ok(serde_json::from_slice(&bytes)?)
 }
 fn unused_pi_session(state: &Value, events: &Path, rows: &Value) -> Result<bool> {
+    // Earlier sessions may have work (a clear starts a new one); only a
+    // dispatch into this exact session or bridge generation makes it used.
+    let dispatched = |row: &Value| {
+        let permit = &row["provider_options"]["herdr_dispatch"];
+        permit["history_binding"]["session_id"] == state["session_id"]
+            || permit["resolved_history_binding"]["session_id"] == state["session_id"]
+            || permit["baseline"]["producer"]["instance"] == state["bridge"]["instance"]
+    };
     if state["native_unwritten_empty"] != true
-        || !rows.as_array().is_some_and(|rows| rows.is_empty())
+        || rows
+            .as_array()
+            .is_none_or(|rows| rows.iter().any(dispatched))
     {
         return Ok(false);
     }
@@ -800,6 +810,15 @@ pub(super) fn step(
             } else if held["history"].is_object() {
                 carried["bindings"][name] = json!({"history":held["history"]});
             }
+        }
+        for (name, spec) in config["agents"].as_object().unwrap() {
+            let provider = spec["provider"].as_str().unwrap_or("");
+            carried["bindings"][name] = crate::herdr_activation::rotated(
+                &runtime,
+                provider,
+                name,
+                &carried["bindings"][name],
+            )?;
         }
         let mut historical = crate::herdr_activation::historical(&prior, &carried["bindings"]);
         let sessions = resumes(

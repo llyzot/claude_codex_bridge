@@ -249,13 +249,21 @@ def test_pi_and_codex_reopen_preserves_sessions_and_callback_routing(project,nat
             proc.wait(timeout=5)
 
 
-@pytest.mark.parametrize('activity',[False,True],ids=['unused','activity_without_history'])
+@pytest.mark.parametrize('activity',[False,True,'earlier_session'],ids=['unused','activity_without_history','cleared_after_earlier_work'])
 def test_unwritten_pi_session_reopens_only_with_positive_empty_evidence(project,activity):
     from test_native_pi_terminal import HOST
     p=project;assert p['open']().returncode==0
     wait_for(lambda:read(p['native']/'herdr/herdr-open.json')['phase']=='running',timeout=60)
     original=json.loads(p['pi'].args[2]);assert not Path(original['native_session_path']).exists()
-    if activity:p['command'](action='event',event='agent_start')
+    if activity=='earlier_session':
+        # Work in the first session, then a clear (/new) into an unwritten one.
+        asked=cli('--state-root',p['native'],'ask','lead','earlier work');assert asked.returncode==0,asked.stderr
+        body=wait_for(lambda:p['prompts']())[-1]['body']
+        p['command'](action='prompt',prompt=body,reply='earlier result');p['idle']('lead')
+        wait_for(lambda:json.loads(cli('--state-root',p['native'],'watch',json.loads(asked.stdout)['job_id']).stdout)['terminal'],timeout=20)
+        p['command'](action='switch',session_id='cleared-unused-pi',session_path=str(p['root']/'cleared-unused.jsonl'))
+        activity=False
+    elif activity:p['command'](action='event',event='agent_start')
     result=cli('--state-root',p['native'],'kill',timeout=25)
     assert result.returncode==0 and json.loads(result.stdout)['status']=='closed',result.stderr
     for proc in [p['pi'],p['codex']]:proc.kill();proc.wait(timeout=5)

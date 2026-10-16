@@ -17,6 +17,8 @@ use std::{
 pub(crate) enum Event {
     Prepared(Value),
     Bound(Value),
+    /// A context clear started a new provider session.
+    Rotated(Value),
     Completed(Value),
     Ready,
     Fault,
@@ -60,6 +62,56 @@ pub(crate) struct Worker {
     interrupt: Arc<AtomicBool>,
 }
 impl Worker {
+    /// Run one native context control (clear/compact) in the terminal.
+    pub fn spawn_context(request: Value, agent: String, spec: Value, job: &Value) -> Result<Self> {
+        let job_id = crate::records::string(job, "job_id")?.to_owned();
+        let execution =
+            crate::records::string(&job["provider_options"], "native_execution_instance")?
+                .to_owned();
+        let action =
+            crate::records::string(&job["provider_options"]["native_context_control"], "action")?
+                .to_owned();
+        crate::herdr_context::command(crate::records::string(&spec, "provider")?, &action)?;
+        let saved = job["provider_options"]["herdr_dispatch"].clone();
+        let (send, events) = mpsc::channel();
+        let (grant, granted) = mpsc::channel();
+        let alive = Arc::new(AtomicBool::new(true));
+        let thread_alive = Arc::clone(&alive);
+        let task = job_id.clone();
+        std::thread::Builder::new()
+            .name(format!("herdr-context-{agent}"))
+            .spawn(move || {
+                let mut permitted = !saved.is_null();
+                let result = crate::herdr_context::run(
+                    &request,
+                    &agent,
+                    &spec,
+                    &task,
+                    &execution,
+                    &action,
+                    &saved,
+                    &send,
+                    &granted,
+                    &thread_alive,
+                    &mut permitted,
+                );
+                if result.is_err() {
+                    let _ = send.send(if permitted {
+                        Event::Fault
+                    } else {
+                        Event::Unsent
+                    });
+                }
+            })?;
+        Ok(Self {
+            events,
+            grant,
+            job: job_id,
+            alive,
+            interrupt: Arc::new(AtomicBool::new(false)),
+            view: json!({"external":true,"closed":false,"ready":false,"pid":null,"runtime_instance_id":null}),
+        })
+    }
     /// Ask the observer to end the provider's current turn once.
     pub(crate) fn interrupt(&self) {
         self.interrupt.store(true, Ordering::Release);

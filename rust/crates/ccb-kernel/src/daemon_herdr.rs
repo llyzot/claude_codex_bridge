@@ -80,9 +80,11 @@ impl Daemon {
                             decision["status"] = json!("cancelled");
                         }
                     }
-                    // An idle-confirmed interruption carries no transcript result to preserve.
+                    // Only an anchored transcript result is preserved; interruptions
+                    // and context controls carry no reply to recover.
                     if job["provider"] == "claude"
-                        && decision["diagnostics"]["completion_authority"] != "herdr_interrupt_idle"
+                        && decision["diagnostics"]["completion_authority"]
+                            == "herdr_idle_and_anchored_transcript"
                     {
                         // Preserve independently observed idle before callback /
                         // finalization. A dead owner can recover this exact result.
@@ -110,6 +112,48 @@ impl Daemon {
                         return Err(error);
                     }
                     self.kernel.store.commit()?;
+                }
+                Event::Rotated(next) => {
+                    ensure!(
+                        job["status"] == "running"
+                            && job["provider_options"]["native_context_control"]["action"]
+                                .is_string(),
+                        "session rotation without a running context control"
+                    );
+                    let provider = job["provider"].as_str().unwrap().to_owned();
+                    let opener = self
+                        .activation
+                        .opener_binding(agent, &self.config["agents"][agent]);
+                    let from = crate::herdr_activation::session_of(&opener);
+                    // A deferred discovery binding names no session: only its
+                    // cache moves to the successor transcript.
+                    if from.is_string() {
+                        let rotation = json!({"schema_version":1,"from_session":from,"to_session":next["to_session"],
+                            "binding":next["binding"],"job_id":id,
+                            "operation_id":job["provider_options"]["native_context_control"]["operation_id"],
+                            "rotated_at":super::now()});
+                        self.kernel.store.save(
+                            &crate::herdr_activation::rotation_path(&provider, agent),
+                            &rotation,
+                        )?;
+                    }
+                    if next["cache"].is_object() {
+                        self.kernel.store.save(
+                            &format!("providers/{provider}/{agent}/herdr-history.json"),
+                            &next["cache"],
+                        )?;
+                    }
+                    admission::event(
+                        &mut self.kernel,
+                        &job,
+                        "herdr_session_rotated",
+                        json!({"to_session":next["to_session"]}),
+                        &now(),
+                    )?;
+                    self.kernel.store.commit()?;
+                    if from.is_string() {
+                        self.activation.rotate(agent, next["binding"].clone());
+                    }
                 }
                 Event::Ready => {
                     self.herdr.get_mut(agent).unwrap().view["ready"] = json!(true);
@@ -179,6 +223,12 @@ impl Daemon {
             }
         };
         if job.is_null() {
+            return Ok(());
+        }
+        if job["provider_options"]["native_context_control"].is_object() {
+            let worker =
+                Worker::spawn_context(self.config["herdr"].clone(), agent.into(), spec, &job)?;
+            self.herdr.insert(agent.into(), worker);
             return Ok(());
         }
         let prompt = if job["provider_options"]["herdr_dispatch"].is_null() {

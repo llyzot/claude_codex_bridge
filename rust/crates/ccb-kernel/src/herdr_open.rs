@@ -998,7 +998,15 @@ pub(crate) fn open(
                                     save(&root, &record)?;
                                 }
                             } else {
-                                let saved = &record["bindings"][name];
+                                // A context clear may have rotated this session.
+                                let saved = &crate::herdr_activation::rotated(
+                                    &runtime,
+                                    request["config"]["agents"][name]["provider"]
+                                        .as_str()
+                                        .unwrap_or(""),
+                                    name,
+                                    &record["bindings"][name],
+                                )?;
                                 ensure!(
                                     recovery::verify_session(
                                         expected_session.as_ref(),

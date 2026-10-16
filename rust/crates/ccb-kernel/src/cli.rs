@@ -254,6 +254,28 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         );
         return Ok(());
     }
+    if args.first().is_some_and(|s| s == "skills") {
+        let action = args.get(1).and_then(|s| s.to_str()).unwrap_or("status");
+        let (mut providers, mut dry_run, mut replace) = (Vec::new(), false, false);
+        let mut i = 2;
+        while i < args.len() {
+            match arg(&args, i)? {
+                "--provider" => {
+                    i += 1;
+                    providers.push(arg(&args, i)?.to_string());
+                }
+                "--dry-run" => dry_run = true,
+                "--replace-unmanaged" => replace = true,
+                other => bail!("unknown skills option: {other}"),
+            }
+            i += 1;
+        }
+        println!(
+            "{}",
+            crate::skill_install::run(action, &providers, dry_run, replace)?
+        );
+        return Ok(());
+    }
     crate::installation::check_command_installation()?;
     if args.first().is_some_and(|s| s == "--keeper-worker") {
         ensure!(args.len() == 1, "invalid Keeper worker arguments");

@@ -263,7 +263,13 @@ impl Reader {
         if kind == "queue-operation" {
             return Ok(());
         } // Enqueued is not activated.
+        // Claude Code reports a finished background command as a system-sourced
+        // user row that resumes the same conversation; it continues this turn
+        // like a tool result and is never a new request.
+        let notification = row["origin"]["kind"] == "task-notification"
+            || row["turnOrigin"] == "task_notification";
         let user = kind == "user"
+            && !notification
             && row["isMeta"] != true
             && row["toolUseResult"].is_null()
             && !row["message"]["content"]
@@ -600,6 +606,62 @@ mod tests {
                 "user",
                 "new",
                 Some("second"),
+                json!({"role":"user","content":"unrelated input"}),
+            )],
+        );
+        assert!(r.poll().is_err());
+    }
+    #[test]
+    fn background_task_notification_continues_the_same_turn() {
+        let notification = |b: &Binding, id: &str, parent: &str| {
+            let mut row = row(
+                b,
+                "user",
+                id,
+                Some(parent),
+                json!({"role":"user","content":"<task-notification>\n<task-id>bg</task-id>\n<status>completed</status>\n</task-notification>"}),
+            );
+            row["origin"] = json!({"kind":"task-notification","producer":"session-task"});
+            row["turnOrigin"] = json!("task_notification");
+            row["promptSource"] = json!("system");
+            row
+        };
+        let duration = |b: &Binding, id: &str, parent: &str| {
+            let mut row = row(b, "system", id, Some(parent), Value::Null);
+            row["subtype"] = json!("turn_duration");
+            row
+        };
+        let (_d, b) = setup();
+        let mut r = reader(&b);
+        append(
+            &b,
+            &[
+                user(&b),
+                assistant(&b, "first", "request", json!("end_turn"), "submitted"),
+                duration(&b, "d1", "first"),
+            ],
+        );
+        assert_eq!(r.poll().unwrap().unwrap()["reply"], "submitted");
+        append(&b, &[notification(&b, "notice", "d1")]);
+        assert!(r.poll().unwrap().is_none());
+        append(
+            &b,
+            &[
+                assistant(&b, "second", "notice", json!("end_turn"), "accepted"),
+                duration(&b, "d2", "second"),
+            ],
+        );
+        let decision = r.poll().unwrap().unwrap();
+        assert_eq!(decision["status"], "completed");
+        assert_eq!(decision["reply"], "accepted");
+        // A typed message is still a new request that supersedes the turn.
+        append(
+            &b,
+            &[row(
+                &b,
+                "user",
+                "typed",
+                Some("d2"),
                 json!({"role":"user","content":"unrelated input"}),
             )],
         );

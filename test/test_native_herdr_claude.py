@@ -185,6 +185,19 @@ def test_claude_working_in_a_workspace_subdirectory_still_completes(runtime,defe
     result=await_watch(s,task['job_id'],lambda v:v['visible_reply_source']=='message_bureau_reply',timeout=15)
     assert result['reply']=='persistent Pi reviewed result' and len(r['prompts']())==1
 
+def test_claude_background_task_notification_does_not_fault_the_turn(runtime):
+    # Claude Code resumes a turn with a system-sourced row when a background
+    # command finishes, e.g. an ask submitted with run_in_background.
+    r=runtime;s=r['start']();task=r['submit'](s);prompt=wait_for(lambda:r['prompts']())[-1]
+    ident=str(uuid.uuid4());notice=r['row']('user',ident+'-notice',ident+'-first',content='<task-notification>\n<status>completed</status>\n</task-notification>')
+    notice.update(origin={'kind':'task-notification','producer':'session-task'},turnOrigin='task_notification',promptSource='system')
+    r['append'](r['row']('user',ident,content=prompt['body']),r['row']('assistant',ident+'-first',ident,[{'type':'text','text':'submitted'}],'end_turn'),
+                notice,r['row']('assistant',ident+'-second',ident+'-notice',[{'type':'text','text':'accepted by codex'}],'end_turn'))
+    r['idle']()
+    result=await_watch(s,task['job_id'],lambda v:v['terminal'],timeout=15)
+    assert result['status']=='completed' and result['reply']=='accepted by codex'
+    assert not (s.root/'providers/claude/worker/fault.json').exists() and len(r['prompts']())==1
+
 @pytest.mark.parametrize('bound',[False,True])
 def test_public_open_mounts_original_claude_and_reconnects_without_relaunch(setup,bound):
     from test_native_herdr_open import cli

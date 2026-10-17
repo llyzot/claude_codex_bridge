@@ -172,6 +172,19 @@ def test_native_claude_pasted_prompt_completes_bound_and_first_sessions(runtime,
     assert await_watch(s,task['job_id'],lambda v:v['terminal'],timeout=15)['reply']=='Claude terminal result'
     assert len(r['prompts']())==1
 
+@pytest.mark.parametrize('deferred',[False,True])
+def test_claude_working_in_a_workspace_subdirectory_still_completes(runtime,deferred):
+    r=runtime
+    if deferred:r['defer']()
+    s=r['start']();task=r['submit'](s,'lead');prompt=wait_for(lambda:r['prompts']())[-1]
+    sub=r['project']/'.trellis'/'spec';sub.mkdir(parents=True)
+    ident=str(uuid.uuid4());rows=[r['row']('user',ident,content=prompt['body']),r['row']('assistant',ident+'-tool',ident,[{'type':'text','text':'reading spec'}],'tool_use'),
+        r['row']('assistant',ident+'-reply',ident+'-tool',[{'type':'text','text':'Claude terminal result'}],'end_turn')]
+    for row in rows:row['cwd']=str(sub)
+    r['append'](*rows);r['idle']()
+    result=await_watch(s,task['job_id'],lambda v:v['visible_reply_source']=='message_bureau_reply',timeout=15)
+    assert result['reply']=='persistent Pi reviewed result' and len(r['prompts']())==1
+
 @pytest.mark.parametrize('bound',[False,True])
 def test_public_open_mounts_original_claude_and_reconnects_without_relaunch(setup,bound):
     from test_native_herdr_open import cli

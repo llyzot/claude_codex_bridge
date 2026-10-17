@@ -8,10 +8,41 @@ use std::{
     collections::HashMap,
     fs::File,
     io::{BufReader, Read, Seek, SeekFrom},
+    path::Path,
 };
 
 fn fingerprint(row: &Value) -> String {
     format!("{:x}", Sha256::digest(row.to_string().as_bytes()))
+}
+
+/// Claude records its shell's current directory on every row; a `cd` into a
+/// subdirectory during a task stays inside the same workspace.
+fn within_workspace(cwd: &Value, workspace: &Path) -> bool {
+    let Some(cwd) = cwd.as_str().map(Path::new).filter(|p| p.is_absolute()) else {
+        return false;
+    };
+    if crate::pi_terminal::same_session_path(&json!(cwd), &json!(workspace)) {
+        return true;
+    }
+    if let (Ok(cwd), Ok(root)) = (cwd.canonicalize(), workspace.canonicalize()) {
+        return cwd.starts_with(root);
+    }
+    let normalized = |p: &Path| {
+        let path = p.to_string_lossy().replace('\\', "/");
+        let path = path
+            .strip_prefix("//?/")
+            .unwrap_or(&path)
+            .trim_end_matches('/')
+            .to_owned();
+        if cfg!(windows) {
+            path.to_lowercase()
+        } else {
+            path
+        }
+    };
+    let (cwd, root) = (normalized(cwd), normalized(workspace));
+    cwd.strip_prefix(&root)
+        .is_some_and(|rest| rest.starts_with('/'))
 }
 
 fn scope(binding: &Binding, row: &Value) -> Result<()> {
@@ -23,7 +54,7 @@ fn scope(binding: &Binding, row: &Value) -> Result<()> {
     }
     if !row["cwd"].is_null() {
         ensure!(
-            crate::pi_terminal::same_session_path(&row["cwd"], &json!(binding.cwd)),
+            within_workspace(&row["cwd"], &binding.cwd),
             "Claude transcript workspace changed"
         );
     }
@@ -420,6 +451,25 @@ mod tests {
             "job:execution".into(),
         )
         .unwrap()
+    }
+    #[test]
+    fn subdirectory_cwd_stays_in_workspace_but_siblings_do_not() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("project");
+        std::fs::create_dir_all(root.join("spec")).unwrap();
+        std::fs::create_dir_all(dir.path().join("project2")).unwrap();
+        assert!(within_workspace(&json!(root), &root));
+        assert!(within_workspace(&json!(root.join("spec")), &root));
+        assert!(within_workspace(
+            &json!(root.join("gone").join("deeper")),
+            &root
+        ));
+        assert!(!within_workspace(
+            &json!(dir.path().join("project2")),
+            &root
+        ));
+        assert!(!within_workspace(&json!(dir.path()), &root));
+        assert!(!within_workspace(&json!("relative/spec"), &root));
     }
     #[test]
     fn interruption_marker_cancels_only_its_own_turn() {

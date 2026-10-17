@@ -61,6 +61,40 @@ fn guidance(body: String, compact: bool, silence: bool, mode: &str) -> String {
         if silence { "silent" } else { "compact" }
     )
 }
+const STDIN_LIMIT: usize = 512 * 1024;
+const STDIN_IDLE_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// Reads an ask message from stdin until EOF. A stdin that stops producing
+/// data without closing is refused instead of blocking the caller forever.
+fn read_message_stdin<R: Read + Send + 'static>(mut input: R, idle: Duration) -> Result<Vec<u8>> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut chunk = [0u8; 8192];
+        loop {
+            let read = input.read(&mut chunk).map(|n| chunk[..n].to_vec());
+            let done = !matches!(&read, Ok(data) if !data.is_empty());
+            if tx.send(read).is_err() || done {
+                return;
+            }
+        }
+    });
+    let mut bytes = Vec::new();
+    loop {
+        match rx.recv_timeout(idle) {
+            Ok(Ok(data)) if data.is_empty() => return Ok(bytes),
+            Ok(Ok(data)) => {
+                bytes.extend_from_slice(&data);
+                ensure!(bytes.len() <= STDIN_LIMIT, "ask stdin exceeds 512 KiB");
+            }
+            Ok(Err(error)) => return Err(error).context("ask could not read stdin"),
+            Err(_) => bail!(
+                "ask stdin stayed open without input for {}s; pass the message as arguments after --, or close stdin (for example with a heredoc)",
+                idle.as_secs()
+            ),
+        }
+    }
+}
+
 pub fn ask(args: &[OsString]) -> Result<Value> {
     let args = args
         .iter()
@@ -130,25 +164,19 @@ pub fn ask(args: &[OsString]) -> Result<Value> {
         !(artifact && inline),
         "--artifact-request and --inline-request cannot be combined"
     );
-    let mut body = body.join(" ");
-    if !std::io::stdin().is_terminal() {
-        let mut bytes = Vec::new();
-        std::io::stdin()
-            .take(512 * 1024 + 1)
-            .read_to_end(&mut bytes)?;
-        ensure!(bytes.len() <= 512 * 1024, "ask stdin exceeds 512 KiB");
+    // A message given as arguments is the whole message. Agent shells (Claude
+    // Code's Bash tool, IDE terminals, piped scripts) hand children a stdin
+    // that may never reach EOF or that carries unrelated text, so stdin is
+    // read only when no message argument was given.
+    let mut body = body.join(" ").trim().to_owned();
+    if body.is_empty() && !std::io::stdin().is_terminal() {
+        let bytes = read_message_stdin(std::io::stdin(), STDIN_IDLE_TIMEOUT)?;
         let bytes = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(&bytes);
-        let text = std::str::from_utf8(bytes)
+        body = std::str::from_utf8(bytes)
             .context("ask stdin must be UTF-8")?
-            .trim();
-        if !text.is_empty() {
-            if !body.is_empty() {
-                body.push(' ');
-            }
-            body.push_str(text);
-        }
+            .trim()
+            .to_owned();
     }
-    let body = body.trim().to_owned();
     ensure!(!body.is_empty(), "ask requires a nonempty message or stdin");
     let body = guidance(body, compact, silence, &mode);
     let mut route = json!({});
@@ -219,5 +247,66 @@ pub fn watch(root: &Path, args: &[OsString]) -> Result<()> {
             Duration::from_millis(100)
                 .min(Duration::from_millis(timeout).saturating_sub(start.elapsed())),
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    /// Yields its chunks with a delay, then blocks forever without EOF.
+    struct Stalled(Vec<&'static [u8]>, Duration);
+    impl Read for Stalled {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            if self.0.is_empty() {
+                std::thread::sleep(Duration::from_secs(3600));
+                return Ok(0);
+            }
+            std::thread::sleep(self.1);
+            let chunk = self.0.remove(0);
+            buf[..chunk.len()].copy_from_slice(chunk);
+            Ok(chunk.len())
+        }
+    }
+    /// Yields its chunks with a delay between them, then reports EOF.
+    struct Slow(Vec<&'static [u8]>, Duration);
+    impl Read for Slow {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            std::thread::sleep(self.1);
+            if self.0.is_empty() {
+                return Ok(0);
+            }
+            let chunk = self.0.remove(0);
+            buf[..chunk.len()].copy_from_slice(chunk);
+            Ok(chunk.len())
+        }
+    }
+
+    #[test]
+    fn closed_stdin_is_read_to_the_end() {
+        let text = "第一行\nsecond line\n".repeat(2000);
+        let read = read_message_stdin(Cursor::new(text.clone().into_bytes()), Duration::from_secs(5));
+        assert_eq!(read.unwrap(), text.into_bytes());
+    }
+    #[test]
+    fn stdin_that_never_closes_is_refused_after_the_idle_timeout() {
+        let start = Instant::now();
+        let error = read_message_stdin(Stalled(vec![b"partial"], Duration::ZERO), Duration::from_millis(300))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("stayed open without input"), "{error}");
+        assert!(start.elapsed() < Duration::from_secs(5));
+        assert!(read_message_stdin(Stalled(vec![], Duration::ZERO), Duration::from_millis(300)).is_err());
+    }
+    #[test]
+    fn slow_producer_within_the_idle_timeout_still_completes() {
+        let read = read_message_stdin(Slow(vec![b"a", b"b", b"c"], Duration::from_millis(150)), Duration::from_millis(600));
+        assert_eq!(read.unwrap(), b"abc");
+    }
+    #[test]
+    fn oversized_stdin_is_refused() {
+        let read = read_message_stdin(Cursor::new(vec![b'x'; STDIN_LIMIT + 1]), Duration::from_secs(5));
+        assert!(read.unwrap_err().to_string().contains("exceeds 512 KiB"));
     }
 }

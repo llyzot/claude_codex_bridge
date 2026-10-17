@@ -30,11 +30,15 @@ def test_ask_prefix_options_stdin_sender_and_message_boundary(tmp_path):
         request = row['request']
         assert request['task_id'] == 'task-1' and request['reply_to'] == 'root-1'
         assert request['from_actor'] == 'user'
-        assert 'review --chain literally' in request['body'] and '中文输入' in request['body']
+        # A message given as arguments is the whole message; stdin is not read.
+        assert 'review --chain literally' in request['body'] and '中文输入' not in request['body']
         assert request['body'].endswith('CCB_REPLY_MODE: compact')
         assert request['route_options'].get('mode') is None
         inspected = result(invoke(server, 'ask', 'get', receipt['job_id']))
         assert inspected['job_id'] == receipt['job_id']
+        piped = result(invoke(server, 'ask', 'worker', 'from', 'user', input='\n中文输入\n'))
+        rows = {r['job_id']: r for r in latest(server)}
+        assert rows[piped['job_id']]['request']['body'] == '中文输入'
     finally: server.close()
 
 @pytest.mark.parametrize('flag', ['--artifact-request', '--artifact-io', None])

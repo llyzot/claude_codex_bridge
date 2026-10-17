@@ -78,6 +78,45 @@ def test_cli_starts_connects_and_stops_daemon_without_python_core(tmp_path):
     finally:
         if process.poll() is None:process.kill();process.wait(timeout=3)
 
+def test_ask_with_message_arguments_ignores_a_stdin_that_never_closes(tmp_path):
+    # Agent shells such as Claude Code's Bash tool hand children an open pipe.
+    root=tmp_path/'state';root.mkdir()
+    config=root/'native.json'
+    config.write_text(json.dumps(dict(schema_version=2,project_id='native-cli',agents={'worker':spec()})),encoding='utf-8')
+    process=subprocess.Popen([str(BIN),'--state-root',str(root),'daemon','--config',str(config)],
+                             stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8',
+                             creationflags=0x08000000 if os.name=='nt' else 0)
+    asks=[]
+    try:
+        assert process.stdout.readline(),process.stderr.read()
+        def ask(*args,stdin_text=None,close=False):
+            child=subprocess.Popen([str(BIN),'--state-root',str(root),'ask','worker','--project','native-cli',*args],
+                                   stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8')
+            asks.append(child)
+            if stdin_text is not None:child.stdin.write(stdin_text);child.stdin.flush()
+            if close:child.stdin.close()
+            started=time.monotonic();child.wait(timeout=8)
+            return child,time.monotonic()-started
+        held,elapsed=ask('--','argument','message',stdin_text='unrelated script text\n')
+        assert held.returncode==0,held.stderr.read()
+        assert elapsed<5
+        piped,_=ask(stdin_text='﻿heredoc 消息\n',close=True)
+        assert piped.returncode==0,piped.stderr.read()
+        ids=[json.loads(c.stdout.read())['job_id'] for c in (held,piped)]
+        bodies={}
+        for line in (p for f in tmp_path.rglob('jobs.jsonl') for p in f.read_text(encoding='utf-8').splitlines()):
+            row=json.loads(line);bodies[row['job_id']]=row['request']['body']
+        assert bodies[ids[0]]=='argument message'
+        assert bodies[ids[1]]=='heredoc 消息'
+    finally:
+        for child in asks:
+            if child.poll() is None:child.kill()
+            child.wait(timeout=3)
+        cli('--state-root',root,'stop')
+        try:process.wait(timeout=4)
+        finally:
+            if process.poll() is None:process.kill();process.wait(timeout=3)
+
 @pytest.mark.skipif(os.name!='nt',reason='Windows job-object lifetime contract')
 def test_daemon_death_stops_owned_descendants(tmp_path):
     pid_file=tmp_path/'descendant.pid'

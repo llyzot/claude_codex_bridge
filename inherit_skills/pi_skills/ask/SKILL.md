@@ -34,9 +34,9 @@ example `ask --chain --artifact-reply --from ...`. If no coordination block is
 present, use plain `ask '<TARGET>' -- '<MESSAGE>'`.
 
 For a very long message, prefer `--artifact-request` with repo paths the target
-can read. Do not pipe the message through stdin unless stdin is closed after
-the message: `ask` reads stdin until end of input whenever it is not a
-terminal.
+can read. A message given as arguments is the whole message; `ask` reads stdin
+only when no message argument is given, and refuses a stdin that stays open
+without input for 15 seconds.
 
 ## Decision card
 

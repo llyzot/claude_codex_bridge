@@ -68,9 +68,9 @@ Before every ask, decide:
   `--artifact-reply`.
 - If the current task is a CCB result-chain continuation or reply delivery,
   answer it directly; do not `ask` the original caller to receive the result.
-- Preserve the user's complete goal and remaining stages in the handoff.
-  A `completed` job only means the provider finished; review the returned
-  report before continuing.
+- Give the receiver only its stage: task, inputs, constraints, expected
+  reply. A `completed` job only means the provider finished; report its status
+  and verification.
 - Correct an active job only with `ccb followup <job_id> --message "..."` when
   the target supports it; on `rejected`, `too_late` or `terminal`, cancel and
   resubmit the complete task.

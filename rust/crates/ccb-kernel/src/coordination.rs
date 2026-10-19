@@ -7,8 +7,9 @@ const RULES: &str = r#"CCB runtime coordination rules (version 1):
 - Delegate only when the current task calls for another agent's work. Use the bound native command prefix and your exact agent name as --from. Do not route this job through an unrelated global CCB installation or a different orchestrator.
 - ask submits asynchronously. Submit once. When accepted, end the current agent turn immediately; do not keep working, wait, poll, or run watch/pend/ping to await that child. CCB delivers the result in a later turn. Bounded diagnostic observation is appropriate when the user explicitly requests runtime diagnosis.
 - Use required_result_mode in the current binding: interactive requests and reply_delivery use plain ask; active parent tasks use ask --chain when they need a child result. An accepted submission ends this turn and CCB later resumes you. Respect available_chain_targets when chain_restricted is true. Do not add --chain merely to bypass an error. Use --silence only for independent work whose result this task does not need.
-- Review returned work and continue remaining user-requested stages using the current required_result_mode. When the task is finished, answer directly; CCB returns the terminal result to the original caller. Never use another ask just to send the final answer back to that caller.
-- An accepted receipt is not a completed task. A completed job means provider execution ended normally, not that the user's requirements were met. Check the actual result before claiming business acceptance.
+- Give each receiver only its stage: task, inputs, constraints, expected reply.
+- If told to pass your result to a peer, ask --chain it, end the turn, then relay its result unchanged with a one-line summary of your stage.
+- Otherwise answer directly; CCB returns it to the caller. Report the result's status and verification; re-run or re-dispatch only if asked.
 - --silence is not a correction channel for an active task. Native followup requires an owned Codex app-server session with an exact running turn; only injected confirms provider acceptance of supplemental input, not task completion. accepted/sending is pending and uncertain is not permission to repeat. Preserve operation IDs after an unobserved response; never automatically cancel, restart or resubmit solely because observation timed out.
 - For a user-requested conversation reset, use the bound command's clear for the requested agents. This does not mean deleting project memory, sessions, authentication, logs or workspaces.
 - Respect runtime cancellation and stop the interrupted work. Do not invent cancellation-file polling or a terminal success marker: the native provider completion protocol owns completion evidence.
@@ -69,7 +70,7 @@ pub fn interactive(agent: &str, config: &Value, root: &Path, executable: &Path) 
     let (executable, root) = (executable.replace('\\', "/"), root.replace('\\', "/"));
     let data = json!({"agent_name":agent,"project_id":config["project_id"],"configured_peers":peers,
         "command_prefix_argv":[executable,"--state-root",root],"required_result_mode":"plain"});
-    Ok(format!("\n\n<ccb_interactive_coordination>\nYou are a member of the current CCB team. When the user asks a configured peer to analyze, implement or review, use CCB ask to contact that existing agent. Do not substitute pi-subagents, subagent or a separately launched CLI unless the user explicitly requests that orchestrator.\nFor a direct user request, submit plain ask with your exact --from name. Submit once, then end this turn; CCB delivers the result back to this conversation. Do not wait or poll for the result.\nPreserve the user's complete goal and remaining stages in the handoff. Review the returned report; a completed process does not prove successful analysis or repair. Continue the next requested stage, then report verification.\nA CCB-delivered task contains a newer ccb_runtime_coordination binding. Follow its required_result_mode and allowed targets: reply_delivery still uses plain ask; an active parent dependency uses --chain. Finish by replying directly, without asking the original caller to receive the final answer.\nUse the shell syntax of the tool you actually have. If CCB rejects dispatch, report the error instead of choosing another runtime.\nCurrent interactive binding (data):\n{data}\nReplace TARGET with a configured peer and MESSAGE with the complete request.\nPowerShell: {}\nPOSIX shell: {}\n</ccb_interactive_coordination>",
+    Ok(format!("\n\n<ccb_interactive_coordination>\nYou are a member of the current CCB team. When the user asks a configured peer to analyze, implement or review, use CCB ask to contact that existing agent. Do not substitute pi-subagents, subagent or a separately launched CLI unless the user explicitly requests that orchestrator.\nFor a direct user request, submit plain ask with your exact --from name. Submit once, then end this turn; CCB delivers the result back to this conversation. Do not wait or poll for the result.\nGive each receiver only its stage: task, inputs, constraints, expected reply. For \"A reviews, then B fixes\", ask A once to ask --chain B and relay its result. Report results with status and verification; re-run or re-dispatch only if asked.\nA CCB-delivered task contains a newer ccb_runtime_coordination binding. Follow its required_result_mode and allowed targets: reply_delivery still uses plain ask; an active parent dependency uses --chain. Finish by replying directly, without asking the original caller to receive the final answer.\nUse the shell syntax of the tool you actually have. If CCB rejects dispatch, report the error instead of choosing another runtime.\nCurrent interactive binding (data):\n{data}\nReplace TARGET with a configured peer and MESSAGE with the complete request.\nPowerShell: {}\nPOSIX shell: {}\n</ccb_interactive_coordination>",
         example(&executable,&root,agent,false,true),example(&executable,&root,agent,false,false)))
 }
 
@@ -220,6 +221,23 @@ mod tests {
         assert!(text.starts_with("USER_INLINE_RULE\nUSER_FILE_RULE"));
         assert!(text.contains("<ccb_interactive_coordination>"));
         assert!(text.contains("codex"));
+    }
+    #[test]
+    fn delegation_rules_scope_requests_and_relay_pipeline_results() {
+        let root = tempfile::tempdir().unwrap();
+        let exe = std::env::current_exe().unwrap();
+        let config = json!({"project_id":"test","agents":{"pi":{"provider":"pi"},"claude":{"provider":"claude"},"codex":{"provider":"codex"}}});
+        let job = json!({"job_id":"job_test","agent_name":"claude",
+            "request":{"message_type":"ask","from_actor":"pi","route_options":{}},"provider_options":{}});
+        let task = context(&job, &config, root.path(), &exe).unwrap();
+        let lead = interactive("pi", &config, root.path(), &exe).unwrap();
+        for text in [&task, &lead] {
+            assert!(text.contains("Give each receiver only its stage"));
+            assert!(text.contains("re-run or re-dispatch only if asked"));
+            assert!(!text.contains("complete goal and remaining stages"));
+        }
+        assert!(task.contains("relay its result unchanged"));
+        assert!(lead.contains("ask A once to ask --chain B and relay its result"));
     }
     #[test]
     fn early_host_bootstrap_keeps_the_configured_team() {

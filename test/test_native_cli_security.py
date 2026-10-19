@@ -102,12 +102,19 @@ def test_ask_with_message_arguments_ignores_a_stdin_that_never_closes(tmp_path):
         assert elapsed<5
         piped,_=ask(stdin_text='﻿heredoc 消息\n',close=True)
         assert piped.returncode==0,piped.stderr.read()
-        ids=[json.loads(c.stdout.read())['job_id'] for c in (held,piped)]
+        redirect=tmp_path/'stdin.txt';redirect.write_text('extra text',encoding='utf-8')
+        with redirect.open('rb') as handle:
+            filed=subprocess.run([str(BIN),'--state-root',str(root),'ask','worker','--project','native-cli','--','file','message'],
+                                 stdin=handle,capture_output=True,text=True,encoding='utf-8',timeout=8)
+        assert filed.returncode==0,filed.stderr
+        assert 'stdin ignored because the message was given as arguments' in filed.stderr
+        ids=[json.loads(c.stdout.read())['job_id'] for c in (held,piped)]+[json.loads(filed.stdout)['job_id']]
         bodies={}
         for line in (p for f in tmp_path.rglob('jobs.jsonl') for p in f.read_text(encoding='utf-8').splitlines()):
             row=json.loads(line);bodies[row['job_id']]=row['request']['body']
         assert bodies[ids[0]]=='argument message'
         assert bodies[ids[1]]=='heredoc 消息'
+        assert bodies[ids[2]]=='file message'
     finally:
         for child in asks:
             if child.poll() is None:child.kill()

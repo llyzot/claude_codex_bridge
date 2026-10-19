@@ -177,6 +177,8 @@ pub(crate) struct Reader {
     seen: HashMap<String, String>,
     message: String,
     reply: String,
+    /// Answers given before a background-task notification resumed the turn.
+    carried: String,
     last_assistant: String,
     stop: String,
     tool: bool,
@@ -204,6 +206,7 @@ impl Reader {
             seen: HashMap::new(),
             message: String::new(),
             reply: String::new(),
+            carried: String::new(),
             last_assistant: String::new(),
             stop: String::new(),
             tool: false,
@@ -355,7 +358,7 @@ impl Reader {
             }
             self.reply.push_str(&text(&row["message"]["content"]));
             ensure!(
-                self.reply.len() <= 4 * 1024 * 1024,
+                self.carried.len() + self.reply.len() <= 4 * 1024 * 1024,
                 "Claude reply exceeds limit"
             );
             self.tool |= row["message"]["content"]
@@ -378,6 +381,18 @@ impl Reader {
             }
         } else if kind == "user" {
             self.terminal = None;
+            if notification && !self.reply.trim().is_empty() {
+                // The notification turn usually only acknowledges the background
+                // command; keep the answer it would otherwise replace.
+                if !self.carried.is_empty() {
+                    self.carried.push_str("
+
+");
+                }
+                self.carried.push_str(self.reply.trim());
+                self.reply.clear();
+                self.message.clear();
+            }
             // Hook feedback/tool results reopen work; an older duration record
             // cannot revalidate the assistant that preceded this input.
             self.last_assistant.clear();
@@ -385,10 +400,17 @@ impl Reader {
         Ok(())
     }
     fn finish(&mut self, status: &str, reason: &str) {
+        let reply = match (self.carried.is_empty(), self.reply.trim().is_empty()) {
+            (true, _) => self.reply.clone(),
+            (false, true) => self.carried.clone(),
+            (false, false) => format!("{}
+
+{}", self.carried, self.reply.trim()),
+        };
         self.terminal = Some(
             json!({"schema_version":2,"record_type":"completion_decision","terminal":true,"status":status,"reason":reason,
-            "confidence":"exact","anchor_seen":true,"reply_started":!self.reply.is_empty(),"reply_stable":true,
-            "reply":if status=="completed"{&self.reply}else{""},"provider_turn_ref":self.anchor,"source_cursor":null,"finished_at":crate::daemon::now(),
+            "confidence":"exact","anchor_seen":true,"reply_started":!reply.is_empty(),"reply_stable":true,
+            "reply":if status=="completed"{reply.as_str()}else{""},"provider_turn_ref":self.anchor,"source_cursor":null,"finished_at":crate::daemon::now(),
             "diagnostics":{"completion_authority":"claude_transcript_candidate","session_id":self.binding.session_id,"request_anchor":self.request,"assistant_uuid":self.last_assistant}}),
         );
     }
@@ -653,7 +675,29 @@ mod tests {
         );
         let decision = r.poll().unwrap().unwrap();
         assert_eq!(decision["status"], "completed");
-        assert_eq!(decision["reply"], "accepted");
+        // The answer given before the notification is kept, not replaced.
+        assert_eq!(decision["reply"], "submitted
+
+accepted");
+        // A second notification (for example a background command left over
+        // from an earlier task) appends its acknowledgement as well.
+        append(&b, &[notification(&b, "notice2", "d2")]);
+        assert!(r.poll().unwrap().is_none());
+        append(
+            &b,
+            &[
+                assistant(&b, "third", "notice2", json!("end_turn"), "old build finished"),
+                duration(&b, "d3", "third"),
+            ],
+        );
+        assert_eq!(
+            r.poll().unwrap().unwrap()["reply"],
+            "submitted
+
+accepted
+
+old build finished"
+        );
         // A typed message is still a new request that supersedes the turn.
         append(
             &b,
@@ -661,7 +705,7 @@ mod tests {
                 &b,
                 "user",
                 "typed",
-                Some("d2"),
+                Some("d3"),
                 json!({"role":"user","content":"unrelated input"}),
             )],
         );

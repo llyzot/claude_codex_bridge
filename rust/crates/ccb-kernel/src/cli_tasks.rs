@@ -62,7 +62,7 @@ fn guidance(body: String, compact: bool, silence: bool, mode: &str) -> String {
     )
 }
 const STDIN_LIMIT: usize = 512 * 1024;
-const STDIN_IDLE_TIMEOUT: Duration = Duration::from_secs(15);
+const STDIN_IDLE_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Reads an ask message from stdin until EOF. A stdin that stops producing
 /// data without closing is refused instead of blocking the caller forever.
@@ -92,6 +92,49 @@ fn read_message_stdin<R: Read + Send + 'static>(mut input: R, idle: Duration) ->
                 idle.as_secs()
             ),
         }
+    }
+}
+
+/// Reports whether stdin already holds unread data, without blocking. Only a
+/// pipe or a non-empty redirected file can be checked; anything else is
+/// reported as empty.
+fn stdin_has_pending_data() -> bool {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Storage::FileSystem::{
+            GetFileSizeEx, GetFileType, FILE_TYPE_DISK, FILE_TYPE_PIPE,
+        };
+        use windows_sys::Win32::System::Console::{GetStdHandle, STD_INPUT_HANDLE};
+        use windows_sys::Win32::System::Pipes::PeekNamedPipe;
+        let handle = unsafe { GetStdHandle(STD_INPUT_HANDLE) };
+        if handle.is_null() || handle == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
+            return false;
+        }
+        match unsafe { GetFileType(handle) } {
+            FILE_TYPE_PIPE => {
+                let mut available = 0u32;
+                let peeked = unsafe {
+                    PeekNamedPipe(
+                        handle,
+                        std::ptr::null_mut(),
+                        0,
+                        std::ptr::null_mut(),
+                        &mut available,
+                        std::ptr::null_mut(),
+                    )
+                };
+                peeked != 0 && available > 0
+            }
+            FILE_TYPE_DISK => {
+                let mut size = 0i64;
+                unsafe { GetFileSizeEx(handle, &mut size) != 0 && size > 0 }
+            }
+            _ => false,
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        false
     }
 }
 
@@ -169,6 +212,9 @@ pub fn ask(args: &[OsString]) -> Result<Value> {
     // that may never reach EOF or that carries unrelated text, so stdin is
     // read only when no message argument was given.
     let mut body = body.join(" ").trim().to_owned();
+    if !body.is_empty() && !std::io::stdin().is_terminal() && stdin_has_pending_data() {
+        eprintln!("ccb ask: stdin ignored because the message was given as arguments");
+    }
     if body.is_empty() && !std::io::stdin().is_terminal() {
         let bytes = read_message_stdin(std::io::stdin(), STDIN_IDLE_TIMEOUT)?;
         let bytes = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(&bytes);

@@ -195,7 +195,7 @@ def test_claude_background_task_notification_does_not_fault_the_turn(runtime):
                 notice,r['row']('assistant',ident+'-second',ident+'-notice',[{'type':'text','text':'accepted by codex'}],'end_turn'))
     r['idle']()
     result=await_watch(s,task['job_id'],lambda v:v['terminal'],timeout=15)
-    assert result['status']=='completed' and result['reply']=='accepted by codex'
+    assert result['status']=='completed' and result['reply']=='submitted\n\naccepted by codex'
     assert not (s.root/'providers/claude/worker/fault.json').exists() and len(r['prompts']())==1
 
 @pytest.mark.parametrize('bound',[False,True])

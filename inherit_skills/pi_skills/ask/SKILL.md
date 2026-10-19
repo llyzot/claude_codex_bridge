@@ -36,7 +36,7 @@ present, use plain `ask '<TARGET>' -- '<MESSAGE>'`.
 For a very long message, prefer `--artifact-request` with repo paths the target
 can read. A message given as arguments is the whole message; `ask` reads stdin
 only when no message argument is given, and refuses a stdin that stays open
-without input for 15 seconds.
+without input for 60 seconds.
 
 ## Decision card
 

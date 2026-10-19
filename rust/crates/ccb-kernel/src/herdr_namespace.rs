@@ -32,6 +32,26 @@ pub(crate) fn unlinked(path: &Path) -> Result<()> {
     }
     Ok(())
 }
+/// Herdr shows the workspace label in its sidebar, so it leads with the project
+/// directory name. The owner suffix keeps it distinct from Herdr's own default
+/// workspace (labelled with the bare directory name) and from earlier owners.
+pub(crate) fn workspace_label(plan: &Value, owner: &str) -> String {
+    let cwd = plan["root_slot"]
+        .as_str()
+        .and_then(|slot| plan["slots"][slot]["cwd"].as_str())
+        .unwrap_or("");
+    let name: String = Path::new(cwd.trim_end_matches(['/', '\\']))
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default()
+        .chars()
+        .filter(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | '.' | ' '))
+        .take(40)
+        .collect();
+    let name = name.trim();
+    let suffix: String = owner.chars().filter(char::is_ascii_hexdigit).take(6).collect();
+    format!("{} (ccb-{suffix})", if name.is_empty() { "project" } else { name })
+}
 fn validate_record(record: &Value, plan: &Value, signature: &str) -> Result<()> {
     ensure!(
         record.get("pending").is_some() && record.get("workspace_id").is_some(),
@@ -48,7 +68,9 @@ fn validate_record(record: &Value, plan: &Value, signature: &str) -> Result<()> 
     );
     let owner = text(record, "owner_id")?;
     ensure!(
-        uuid::Uuid::parse_str(owner).is_ok() && record["label"] == format!("ccb-native-{owner}"),
+        uuid::Uuid::parse_str(owner).is_ok()
+            && (record["label"] == format!("ccb-native-{owner}")
+                || record["label"] == workspace_label(plan, owner)),
         "invalid namespace owner identity"
     );
     ensure!(
@@ -1166,7 +1188,7 @@ pub fn execute(request: &Value) -> Result<Value> {
     } else {
         ensure!(action == "prepare", "no namespace operation to confirm");
         let owner = uuid::Uuid::new_v4().to_string();
-        let record = json!({"schema_version":1,"record_type":"native_herdr_namespace","project_id":plan["project_id"],"session":plan["session"],"owner_id":owner,"label":format!("ccb-native-{owner}"),"plan_hash":signature,"plan":plan,"workspace_id":null,"workspace_tagged":false,"bindings":{},"pending":null,"status":"preparing"});
+        let record = json!({"schema_version":1,"record_type":"native_herdr_namespace","project_id":plan["project_id"],"session":plan["session"],"owner_id":owner,"label":workspace_label(&plan,&owner),"plan_hash":signature,"plan":plan,"workspace_id":null,"workspace_tagged":false,"bindings":{},"pending":null,"status":"preparing"});
         store.save(RECORD, &record)?;
         store.commit()?;
         record
@@ -1198,5 +1220,31 @@ pub fn execute(request: &Value) -> Result<Value> {
                 Err(error)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn plan(cwd: &str) -> Value {
+        json!({"root_slot":"lead","slots":{"lead":{"cwd":cwd}}})
+    }
+    #[test]
+    fn workspace_label_leads_with_a_sanitized_project_name() {
+        let owner = "9f814036-c1d2-4e5f-8a9b-0123456789ab";
+        assert_eq!(
+            workspace_label(&plan("C:/work/sample-project"), owner),
+            "sample-project (ccb-9f8140)"
+        );
+        assert_eq!(
+            workspace_label(&plan(r"C:\work\my;proj$(x)\"), owner),
+            "myprojx (ccb-9f8140)"
+        );
+        assert_eq!(workspace_label(&plan(""), owner), "project (ccb-9f8140)");
+        let long = format!("C:/work/{}", "a".repeat(80));
+        assert_eq!(
+            workspace_label(&plan(&long), owner),
+            format!("{} (ccb-9f8140)", "a".repeat(40))
+        );
     }
 }

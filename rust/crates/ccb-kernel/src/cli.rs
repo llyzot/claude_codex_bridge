@@ -303,7 +303,8 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
         );
         return crate::herdr_open::worker(&serde_json::from_slice(&bytes)?);
     }
-    if args.is_empty() {
+    let mut bare = args.is_empty();
+    if bare {
         args.push("start".into());
     }
     if args[0] == "herdr-transport"
@@ -481,12 +482,24 @@ pub fn run(mut args: Vec<OsString>) -> Result<()> {
             )
         })?;
     if args.is_empty() {
+        bare = true;
         args.push("start".into());
     }
     let mut op = args
         .remove(0)
         .into_string()
         .map_err(|_| anyhow::anyhow!("invalid command encoding"))?;
+    // A bare `ccb` in a project whose configuration uses the Herdr backend (the
+    // default) opens it, like `ccb herdr open`. Inside a running agent the
+    // inherited state root leaves `project` unset, so `start` is kept there.
+    if bare && op == "start" && args.is_empty() {
+        if let Some(project) = project.as_deref() {
+            if crate::config::project_document(project)?["runtime"]["mux"]["backend"] == "herdr" {
+                op = "herdr".into();
+                args.push("open".into());
+            }
+        }
+    }
     if op == "worktree" {
         ensure!(
             args.len() >= 2,

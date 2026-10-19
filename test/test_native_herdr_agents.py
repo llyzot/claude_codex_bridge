@@ -170,3 +170,21 @@ def test_controller_death_after_committed_start_intent_does_not_replay(prepared)
         assert mutate_count(backend,['agent','start'])==2
     finally:
         if process.poll() is None:process.kill();process.wait(timeout=5)
+
+def test_mount_reports_readable_display_names_once_without_touching_identity(prepared):
+    project,backend,request,processes=prepared
+    result=run(request);rows=result['mount']['agents']
+    assert result['mount']['status']=='ready'
+    state=server(backend)
+    for name,row in rows.items():
+        pane=state['panes'][row['pane_id']]
+        provider=request['config']['agents'][name]['provider']
+        assert pane['display_agent']==(name if provider==name else f'{name} ({provider})')
+        assert pane['tokens']['ccb_native_owner'] and row['herdr_name'].startswith('ccb-')
+        assert row['display_reported']==row['pane_id']
+    reports=[r for r in calls(backend) if r[:2]==['pane','report-metadata'] and 'ccb-display' in r]
+    assert len(reports)==len(rows)
+    run(request)
+    assert len([r for r in calls(backend) if r[:2]==['pane','report-metadata'] and 'ccb-display' in r])==len(rows)
+    workspace=state['workspaces'][result['mount']['workspace_id']]
+    assert workspace['label'].startswith(project.name[:40]) and '(ccb-' in workspace['label']

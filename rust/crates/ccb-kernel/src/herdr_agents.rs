@@ -808,6 +808,7 @@ impl Manager<'_> {
                 }
             }
         }
+        self.report_display_names()?;
         let rows = self.record["agents"].as_object().unwrap();
         let status = if rows.values().all(|r| r["status"] == "ready") {
             "ready"
@@ -826,6 +827,52 @@ impl Manager<'_> {
         self.record["status"] = json!(status);
         self.save()?;
         Ok(json!({"mount":self.record,"daemon_connected":false,"task_completion_supported":false}))
+    }
+    /// Herdr's sidebar shows a pane's display metadata instead of the internal
+    /// `ccb-<operation>` agent name, which stays the identity CCB verifies.
+    /// Display-only and best effort, under its own source so it never touches
+    /// the ownership tokens; reported once per bound pane.
+    fn report_display_names(&mut self) -> Result<()> {
+        let names: Vec<String> = self.record["agents"].as_object().unwrap().keys().cloned().collect();
+        let mut changed = false;
+        for name in names {
+            let row = &self.record["agents"][&name];
+            let Some(pane) = row["pane_id"].as_str().map(str::to_owned) else {
+                continue;
+            };
+            if row["status"] != "ready" || row["display_reported"] == pane.as_str() {
+                continue;
+            }
+            let provider = self.plan["agents"][&name]["provider"].as_str().unwrap_or("");
+            let label = if provider.is_empty() || provider == name {
+                name.clone()
+            } else {
+                format!("{name} ({provider})")
+            };
+            let reported = herdr_transport::execute(&json!({"schema_version":1,"operation":"agent_mount",
+                "command":self.request["command"],"session":self.request["session"],"cancel_control":self.request["cancel_control"],
+                // Herdr prints nothing for a metadata report.
+                "expect_json":false,"timeout_ms":self.request["timeout_ms"].as_u64().unwrap_or(10000),"args":[
+                    "pane",
+                    "report-metadata",
+                    pane.clone(),
+                    "--source",
+                    "ccb-display",
+                    "--title",
+                    name.clone(),
+                    "--display-agent",
+                    label,
+                ]}),
+            );
+            if reported.is_ok_and(|r| r["ok"] == true) {
+                self.record["agents"][&name]["display_reported"] = json!(pane);
+                changed = true;
+            }
+        }
+        if changed {
+            self.save()?;
+        }
+        Ok(())
     }
     fn reset_dead_host_display(&mut self, name: &str) -> Result<()> {
         let row = self.record["agents"][name].clone();

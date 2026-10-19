@@ -144,3 +144,16 @@ def test_daemon_death_stops_owned_descendants(tmp_path):
     finally:
         if server.proc.poll() is None:server.proc.kill();server.proc.wait(timeout=3)
         # The asserted owned PID is not used for cleanup/restart if uncertain.
+
+
+def test_bare_command_opens_a_herdr_project(tmp_path):
+    project=tmp_path/'demo';(project/'.ccb').mkdir(parents=True)
+    (project/'.ccb'/'ccb.config').write_text('version=2\n[windows]\nmain="lead:pi"\n[runtime.mux]\nbackend="herdr"\n',encoding='utf-8')
+    env={**os.environ,'CCB_HERDR_EXE':'relative-herdr.exe'}
+    for name in ('CCB_NATIVE_TOKEN_FILE','CCB_NATIVE_STATE_ROOT'):env.pop(name,None)
+    # The Herdr executable check is reached only through `herdr open`.
+    bare=cli(cwd=project,env=env)
+    explicit=cli('herdr','open','--no-attach',cwd=project,env=env)
+    assert bare.returncode!=0 and explicit.returncode!=0
+    assert 'CCB_HERDR_EXE must name an existing absolute executable' in bare.stderr
+    assert bare.stderr==explicit.stderr

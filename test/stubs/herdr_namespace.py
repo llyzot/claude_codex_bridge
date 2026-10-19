@@ -135,6 +135,7 @@ elif args[1]=='report-metadata':
         if value=='--token':
             key,token=args[index+1].split('=',1);row['tokens'][key]=token
         if value=='--title':row['title']=args[index+1]
+        if value=='--display-agent':row['display_agent']=args[index+1]
     save();result={'status':'ok'}
 else:raise AssertionError(args)
 state_lock.close()

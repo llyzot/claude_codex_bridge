@@ -40,7 +40,7 @@ def project(setup):
     generated=subprocess.run([str(BIN),'pi-terminal-bridge'],input=json.dumps(dict(schema_version=1,project_root=str(root),agent_name='lead')),capture_output=True,text=True,encoding='utf-8',timeout=10)
     assert generated.returncode==0,generated.stderr
     bridge=json.loads(generated.stdout)['bridge'];native_session=root/'pi-native.jsonl'
-    config=dict(extension=bridge['extension'],project=str(root),session_id='open-pi-session',native_session_path=str(native_session),native=str(BIN),state_root=str(native_root))
+    config=dict(extension=bridge['extension'],project=str(root),session_id='open-pi-session',native_session_path=str(native_session),native=str(BIN),state_root=str(native_root),prompts_log=str(backend/'prompts.jsonl'))
     pi=subprocess.Popen([NODE,str(HOST),json.dumps(config)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8',creationflags=0x08000000)
     assert json.loads(pi.stdout.readline())['ready']
     codex=subprocess.Popen([sys.executable,'-I','-c','import time;time.sleep(180)'],creationflags=0x08000000)

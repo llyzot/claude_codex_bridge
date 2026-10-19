@@ -1,5 +1,5 @@
 // Pi API adapter only. Rust owns admission, completion decisions and delivery.
-import { appendFileSync, existsSync, lstatSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -10,6 +10,8 @@ export default function (pi) {
   let generation = null;
   let active = null;
   let sequence = 0;
+  // Prompts this bridge submitted itself; their `input` event is not a person's.
+  const own = new Set();
   const digest = text => createHash('sha256').update(String(text)).digest('hex');
   const anchor = text => {
     const first = String(text).split(/\r?\n/, 1)[0];
@@ -75,13 +77,55 @@ export default function (pi) {
       session_path: resolve(sessionPath) };
     const header = { type: 'session_meta', payload: { id, cwd: resolve(ctx.cwd), source: 'ccb_native_pi', ccb_bridge: bridge } };
     writeFileSync(path, JSON.stringify(header) + '\n', { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+    const inbox = join(root, 'inbox');
+    const canSend = typeof pi.sendUserMessage === 'function' && typeof ctx.isIdle === 'function';
+    if (canSend) {
+      mkdirSync(inbox, { recursive: true, mode: 0o700 });
+      if (lstatSync(inbox).isSymbolicLink() || realpathSync(inbox) !== inbox) throw new Error('CCB Pi inbox changed');
+    }
     const state = { schema_version: 1, adapter_revision: 'canonical-session-branch-v1', provider: 'pi', ready: true, agent_name: options.agent_name,
-      owner: options.owner, session_id: id, cwd: resolve(ctx.cwd), path, bridge, native_unwritten_empty: nativeUnwrittenEmpty };
+      owner: options.owner, session_id: id, cwd: resolve(ctx.cwd), path, bridge, native_unwritten_empty: nativeUnwrittenEmpty,
+      ...(canSend ? { inbox_protocol: 1 } : {}) };
     publish(root, state);
-    generation = { path, bridge, root, state };
+    generation = { path, bridge, root, state, ctx, inbox: canSend ? inbox : null };
     active = null;
     sequence = 0;
   };
+  // CCB writes `<instance>.<execution>.request.json`; the rename to
+  // `.claimed.json` is the only claim and excludes Rust's withdrawal. A request
+  // is submitted only while Pi is idle, so it always starts its own turn.
+  const takeRequest = () => {
+    const current = generation;
+    if (!current?.inbox || !current.ctx.isIdle()) return;
+    const prefix = `${current.bridge.instance}.`;
+    const name = readdirSync(current.inbox).filter(n => n.startsWith(prefix) && n.endsWith('.request.json')).sort()[0];
+    if (!name) return;
+    const path = join(current.inbox, name);
+    const stem = path.slice(0, -'.request.json'.length);
+    let request;
+    try {
+      if (statSync(path).size > 1024 * 1024) throw new Error('request exceeds limit');
+      request = JSON.parse(readFileSync(path, 'utf8'));
+    } catch (error) {
+      if (error.code === 'ENOENT') return;
+      request = null;
+    }
+    const prompt = request?.prompt;
+    if (request?.schema_version !== 1 || request.instance !== current.bridge.instance || typeof prompt !== 'string' ||
+        !request.anchor || anchor(prompt) !== request.anchor) {
+      try { renameSync(path, `${stem}.rejected.json`); } catch {}
+      emit('inbox_rejected');
+      return;
+    }
+    try { renameSync(path, `${stem}.claimed.json`); } catch { return; }
+    own.add(digest(prompt));
+    pi.sendUserMessage(prompt);
+  };
+  clearInterval(globalThis.__ccbPiInboxTimer);
+  globalThis.__ccbPiInboxTimer = setInterval(() => {
+    try { takeRequest(); } catch (error) { emit('inbox_failed', { error: String(error?.message || error) }); }
+  }, 200);
+  globalThis.__ccbPiInboxTimer.unref?.();
   pi.on('session_start', (_event, ctx) => rotate(ctx));
   pi.on('session_switch', (_event, ctx) => {
     emit('session_changed');
@@ -94,6 +138,8 @@ export default function (pi) {
     active = null;
   });
   pi.on('input', event => {
+    const mine = event?.source === 'extension' && own.delete(digest(event.text));
+    if (mine) return { action: 'continue' };
     emit('native_input_observed');
     if (active) { emit('request_superseded'); active = null; }
     return { action: 'continue' };

@@ -474,16 +474,39 @@ fn run(
         );
         dispatch_timings["recheck_ms"] = json!(recheck_started.elapsed().as_millis() as u64);
         let prompt_started = Instant::now();
-        // ACK failure is ambiguous: preserve the permit and observe; never replay.
-        let _ = herdr_agents::rpc(
-            request,
-            vec![
-                "agent".into(),
-                "prompt".into(),
-                crate::records::string(&proof["identity"], "herdr_name")?.into(),
-                input,
-            ],
-        );
+        // Pi takes the prompt through its bridge, outside the editor, so a
+        // person's unsent draft is never merged into it. Older bridges type.
+        let inbox = match &producer {
+            Some(producer) => crate::pi_terminal::deliver(
+                binding,
+                crate::records::string(spec, "pi_bridge_owner")?,
+                agent,
+                producer,
+                execution,
+                &anchor,
+                &input,
+                alive,
+                waiting + Duration::from_secs_f64(spec["timeout_s"].as_f64().unwrap_or(3600.0)),
+            )?,
+            None => crate::pi_terminal::Inbox::Unsupported,
+        };
+        match inbox {
+            crate::pi_terminal::Inbox::Claimed => {}
+            crate::pi_terminal::Inbox::Withdrawn => return Ok(()),
+            crate::pi_terminal::Inbox::Unsupported => {
+                // ACK failure is ambiguous: preserve the permit and observe; never replay.
+                let _ = herdr_agents::rpc(
+                    request,
+                    vec![
+                        "agent".into(),
+                        "prompt".into(),
+                        crate::records::string(&proof["identity"], "herdr_name")?.into(),
+                        input,
+                    ],
+                );
+            }
+        }
+        dispatch_timings["prompt_inbox"] = json!(inbox == crate::pi_terminal::Inbox::Claimed);
         dispatch_timings["prompt_rpc_ms"] = json!(prompt_started.elapsed().as_millis() as u64);
         proof
     } else {
@@ -495,6 +518,10 @@ fn run(
                 && saved["history_binding"] == json!(binding),
             "invalid durable Herdr dispatch proof"
         );
+        if provider == "pi" {
+            // A request the previous worker left unclaimed must never reach Pi later.
+            crate::pi_terminal::withdraw_pending(binding, execution)?;
+        }
         saved.clone()
     };
     let baseline: Baseline = serde_json::from_value(proof["baseline"].clone())?;

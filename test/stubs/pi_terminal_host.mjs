@@ -2,7 +2,7 @@
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { appendFileSync, existsSync } from 'node:fs';
 const config = JSON.parse(process.argv[2]);
 if (config.start_gate) {
   const deadline = Date.now() + 30000;
@@ -15,13 +15,23 @@ const bridge = (await import(pathToFileURL(config.extension).href)).default;
 let handlers;
 let currentSession = config.session_id;
 let branch = [];
-const ctx = { cwd: config.project, isIdle: () => true,
+// Prompts the bridge submitted through pi.sendUserMessage; the test then drives
+// the turn and the host reports that input with Pi's `extension` source.
+const submitted = [];
+const sendUserMessage = text => {
+  submitted.push(text);
+  if (config.prompts_log) appendFileSync(config.prompts_log, JSON.stringify({ name: 'pi-extension', body: text }) + '\n');
+};
+let idle = true;
+const ctx = { cwd: config.project, isIdle: () => idle,
   sessionManager: { getSessionId: () => currentSession, getSessionFile: () => config.native_session_path, getBranch: () => branch,
     getEntries: () => branch, getHeader: () => ({type:'session',id:currentSession,cwd:config.project}) } };
 const emit = async (event, payload={}) => { let result; for (const handler of handlers.get(event) || []) { const value=await handler({type:event,...payload},ctx); if(value!==undefined) result=value; } return result; };
 const load = async () => {
   handlers = new Map();
-  await bridge({on:(event,handler)=>handlers.set(event,[...(handlers.get(event)||[]),handler])});
+  const api={on:(event,handler)=>handlers.set(event,[...(handlers.get(event)||[]),handler])};
+  if (!config.without_send) api.sendUserMessage=sendUserMessage;
+  await bridge(api);
   await emit('session_start');
 };
 await load();
@@ -32,12 +42,15 @@ for await (const line of createInterface({input:process.stdin})) {
     const result=await emit('before_agent_start',{prompt:command.prompt||'interactive request',systemPrompt:'USER_SYSTEM_SENTINEL'});
     console.log(JSON.stringify({systemPrompt:result?.systemPrompt||'USER_SYSTEM_SENTINEL'}));continue;
   }
+  if (command.action === 'busy') {idle=!command.busy;console.log(JSON.stringify({ok:true,action:command.action}));continue;}
   if (command.action === 'reload') {await emit('session_shutdown');await load();}
   else if (command.action === 'switch') {currentSession=command.session_id;if (command.session_path) {config.native_session_path=command.session_path;branch=[];}await emit('session_switch');}
   else if (command.action === 'event') {await emit(command.event,command.payload);}
   else if (command.action === 'prompt') {
     const prompt = command.prompt;
-    await emit('input',{text:prompt,source:'interactive'});
+    const index = submitted.indexOf(prompt);
+    if (index >= 0) submitted.splice(index, 1);
+    await emit('input',{text:prompt,source:index >= 0 ? 'extension' : 'interactive'});
     await emit('before_agent_start',{prompt});
     await emit('agent_start');
     await emit('message_end',{message:{role:'user',content:[{type:'text',text:prompt}]}});

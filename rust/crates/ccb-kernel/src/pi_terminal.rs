@@ -95,6 +95,129 @@ pub(crate) fn resolve(binding: &Binding, owner: &str, agent: &str) -> Result<(Bi
     resolved.validate()?;
     Ok((resolved, producer.clone()))
 }
+/// How a prompt reached Pi through the bridge's inbox.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Inbox {
+    /// The bridge claimed the request and submits it with `pi.sendUserMessage`.
+    Claimed,
+    /// The worker stopped before the bridge claimed it; nothing reached Pi.
+    Withdrawn,
+    /// The running bridge has no inbox (an older generation); type instead.
+    Unsupported,
+}
+
+fn inbox_dir(binding: &Binding) -> Result<std::path::PathBuf> {
+    let dir = binding.root.join("inbox");
+    crate::herdr_namespace::unlinked(&dir)?;
+    Ok(dir)
+}
+
+fn inbox_name(producer: &Value, execution: &str) -> Result<String> {
+    let instance = crate::records::string(producer, "instance")?;
+    uuid::Uuid::parse_str(instance)?;
+    uuid::Uuid::parse_str(execution)?;
+    Ok(format!("{instance}.{execution}"))
+}
+
+/// Withdraws an unclaimed request. Returns whether the bridge had already
+/// claimed it; the rename makes withdrawal and claim mutually exclusive.
+fn withdraw(dir: &Path, name: &str) -> Result<bool> {
+    let request = dir.join(format!("{name}.request.json"));
+    let withdrawn = dir.join(format!("{name}.withdrawn.json"));
+    match std::fs::rename(&request, &withdrawn) {
+        Ok(()) => {
+            let _ = std::fs::remove_file(&withdrawn);
+            Ok(false)
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            let claimed = dir.join(format!("{name}.claimed.json"));
+            Ok(claimed.exists() && std::fs::remove_file(&claimed).is_ok())
+        }
+        Err(error) => Err(error.into()),
+    }
+}
+
+/// Removes a request left by an earlier worker for this execution, so a later
+/// bridge can never deliver it after a daemon restart.
+pub(crate) fn withdraw_pending(binding: &Binding, execution: &str) -> Result<()> {
+    let dir = inbox_dir(binding)?;
+    if !dir.is_dir() || uuid::Uuid::parse_str(execution).is_err() {
+        return Ok(());
+    }
+    let suffix = format!(".{execution}.request.json");
+    for entry in std::fs::read_dir(&dir)? {
+        let name = entry?.file_name().to_string_lossy().into_owned();
+        if let Some(stem) = name.strip_suffix(".request.json").filter(|_| name.ends_with(&suffix)) {
+            withdraw(&dir, stem)?;
+        }
+    }
+    Ok(())
+}
+
+/// Hands a prompt to the Pi bridge, which submits it as its own user message
+/// through `pi.sendUserMessage` when Pi is idle. Unlike typed input it never
+/// passes through the editor, so a person's unsent draft is neither merged
+/// into the prompt nor submitted with it.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn deliver(
+    binding: &Binding,
+    owner: &str,
+    agent: &str,
+    producer: &Value,
+    execution: &str,
+    anchor: &str,
+    input: &str,
+    alive: &std::sync::atomic::AtomicBool,
+    deadline: std::time::Instant,
+) -> Result<Inbox> {
+    use std::sync::atomic::Ordering;
+    use std::time::{Duration, Instant};
+    let state: Value = serde_json::from_slice(&std::fs::read(&binding.path)?)?;
+    let dir = inbox_dir(binding)?;
+    if state["inbox_protocol"] != 1 || state["bridge"] != *producer || !dir.is_dir() {
+        return Ok(Inbox::Unsupported);
+    }
+    let name = inbox_name(producer, execution)?;
+    let request = dir.join(format!("{name}.request.json"));
+    let claimed = dir.join(format!("{name}.claimed.json"));
+    let rejected = dir.join(format!("{name}.rejected.json"));
+    ensure!(
+        !request.exists() && !claimed.exists() && !rejected.exists(),
+        "Pi inbox already holds this execution"
+    );
+    let body = json!({"schema_version":1,"instance":producer["instance"],"anchor":anchor,"prompt":input,
+        "created_at":crate::daemon::now()});
+    let temporary = dir.join(format!("{name}.{}.tmp", uuid::Uuid::new_v4().simple()));
+    std::fs::write(&temporary, serde_json::to_vec(&body)?)?;
+    std::fs::rename(&temporary, &request)?;
+    let mut next_check = Instant::now() + Duration::from_millis(500);
+    loop {
+        if claimed.exists() {
+            let _ = std::fs::remove_file(&claimed);
+            return Ok(Inbox::Claimed);
+        }
+        if rejected.exists() {
+            let _ = std::fs::remove_file(&rejected);
+            anyhow::bail!("Pi bridge rejected the CCB request");
+        }
+        let stopping = !alive.load(Ordering::Acquire);
+        let expired = Instant::now() >= deadline;
+        let changed = Instant::now() >= next_check && {
+            next_check = Instant::now() + Duration::from_millis(500);
+            resolve(binding, owner, agent).map_or(true, |(_, current)| current != *producer)
+        };
+        if stopping || expired || changed {
+            if withdraw(&dir, &name)? {
+                return Ok(Inbox::Claimed);
+            }
+            ensure!(!changed, "Pi bridge reloaded before prompt dispatch");
+            ensure!(!expired, "Pi did not take the CCB request before the deadline");
+            return Ok(Inbox::Withdrawn);
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
 pub(crate) fn normalize(
     event: &Value,
     producer: &Value,

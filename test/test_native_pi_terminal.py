@@ -19,7 +19,8 @@ HOST=Path(__file__).parent/'stubs/pi_terminal_host.mjs'
 pytestmark=pytest.mark.skipif(os.name!='nt' or not NODE,reason='Windows Herdr identities and Node extension API fixture')
 
 @pytest.fixture
-def terminal(setup):
+def terminal(setup,request):
+    extra=getattr(request,'param',{})
     project,backend,request=setup
     provision=dict(schema_version=1,project_root=str(project),agent_name='lead')
     def install():
@@ -29,7 +30,7 @@ def terminal(setup):
     bridge=install();assert install()['owner']==bridge['owner']
     root=project/'.ccb/ccbd/daemon'
     native_session=project/'native-pi.jsonl'
-    config=dict(extension=bridge['extension'],project=str(project),session_id='pi-test-session',native_session_path=str(native_session),native=str(BIN),state_root=str(root))
+    config=dict(extension=bridge['extension'],project=str(project),session_id='pi-test-session',native_session_path=str(native_session),native=str(BIN),state_root=str(root),prompts_log=str(backend/'prompts.jsonl'),**extra)
     pi=subprocess.Popen([NODE,str(HOST),json.dumps(config)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding='utf-8',creationflags=0x08000000)
     assert json.loads(pi.stdout.readline())['ready']
     worker=subprocess.Popen([sys.executable,'-I','-c','import time;time.sleep(180)'],creationflags=0x08000000)
@@ -87,7 +88,9 @@ def test_original_pi_lead_dispatches_native_ask_yields_and_receives_worker_conti
     result=await_watch(s,receipt['job_id'],lambda row:row['visible_reply_source']=='message_bureau_reply')
     assert result['reply']=='Pi terminal reviewed result'
     assert bridge_state(r)['bridge']==initial['bridge'] and r['pi'].poll() is None
-    assert mutate_count(r['backend'],['agent','prompt'])==3
+    # Pi takes both prompts through its bridge; only the Codex worker is typed.
+    assert [p['name'] for p in r['prompts']()]==['pi-extension',r['rows']['worker']['herdr_name'],'pi-extension']
+    assert mutate_count(r['backend'],['agent','prompt'])==1
 
 def test_agent_end_alone_is_not_completion_and_exact_settlement_finishes(terminal):
     r=terminal;s=r['start']();receipt=r['submit'](s)
@@ -245,3 +248,40 @@ def test_terminal_compact_keeps_the_pi_session(terminal):
     r['idle']();done=await_context(s,op)
     assert done['status']=='completed' and done['results'][0]['completion_reason']=='herdr_context_compacted'
     assert not (s.root/'providers/pi/lead/herdr-rotation.json').exists()
+
+
+def inbox(r):return Path(r['bridge']['event_root'])/'inbox'
+
+def test_pi_prompt_reaches_pi_through_its_bridge_without_typing(terminal):
+    r=terminal;s=r['start']();receipt=r['submit'](s)
+    sent=prompt(r);assert sent['name']=='pi-extension' and sent['body'].startswith('CCB_REQ_ID: ')
+    assert bridge_state(r)['inbox_protocol']==1 and mutate_count(r['backend'],['agent','prompt'])==0
+    r['command'](action='prompt',prompt=sent['body'],reply='through the bridge');r['idle']()
+    assert await_watch(s,receipt['job_id'],lambda row:row['terminal'])['reply']=='through the bridge'
+    assert not list(inbox(r).iterdir())
+
+@pytest.mark.parametrize('terminal',[{'without_send':True}],indirect=True)
+def test_pi_without_send_api_falls_back_to_typed_prompt(terminal):
+    r=terminal;s=r['start']();receipt=r['submit'](s)
+    sent=prompt(r);assert sent['name']==r['rows']['lead']['herdr_name']
+    assert 'inbox_protocol' not in bridge_state(r) and mutate_count(r['backend'],['agent','prompt'])==1
+    r['command'](action='prompt',prompt=sent['body'],reply='typed fallback');r['idle']()
+    assert await_watch(s,receipt['job_id'],lambda row:row['terminal'])['reply']=='typed fallback'
+
+def test_busy_pi_waits_and_restart_withdraws_the_unclaimed_request(terminal):
+    r=terminal;r['command'](action='busy',busy=True);s=r['start']();r['submit'](s)
+    pending=wait_for(lambda:list(inbox(r).glob('*.request.json')) or None)
+    time.sleep(.6);assert pending[0].exists() and not r['prompts']()
+    s.expected_exit=True;s.proc.kill();s.proc.wait(timeout=5)
+    r['start']()
+    wait_for(lambda:not pending[0].exists() or None)
+    r['command'](action='busy',busy=False);time.sleep(.8)
+    assert not r['prompts']() and mutate_count(r['backend'],['agent','prompt'])==0
+
+def test_bridge_rejects_a_request_whose_anchor_does_not_match(terminal):
+    r=terminal;instance=bridge_state(r)['bridge']['instance']
+    request=inbox(r)/f'{instance}.00000000-0000-4000-8000-000000000000.request.json'
+    request.write_text(json.dumps({'schema_version':1,'instance':instance,'anchor':'job_x:other','prompt':'CCB_REQ_ID: job_x:mismatch\ntask'}),encoding='utf-8')
+    rejected=request.with_name(request.name.replace('.request.json','.rejected.json'))
+    wait_for(lambda:rejected.exists() or None)
+    assert not request.exists() and not r['prompts']()

@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -154,6 +155,21 @@ def test_bare_command_opens_a_herdr_project(tmp_path):
     # The Herdr executable check is reached only through `herdr open`.
     bare=cli(cwd=project,env=env)
     explicit=cli('herdr','open','--no-attach',cwd=project,env=env)
+    assert bare.returncode!=0 and explicit.returncode!=0
+    assert 'CCB_HERDR_EXE must name an existing absolute executable' in bare.stderr
+    assert bare.stderr==explicit.stderr
+
+
+@pytest.mark.skipif(os.name!='nt' or not shutil.which('pwsh'),reason='PowerShell launch contract')
+def test_bare_ccb_typed_in_pwsh_matches_herdr_open(tmp_path):
+    project=tmp_path/'demo';(project/'.ccb').mkdir(parents=True)
+    (project/'.ccb'/'ccb.config').write_text('version=2\n[windows]\nmain="lead:pi"\n[runtime.mux]\nbackend="herdr"\n',encoding='utf-8')
+    tools=tmp_path/'bin';tools.mkdir();shutil.copy2(BIN,tools/'ccb.exe')
+    env={**os.environ,'CCB_HERDR_EXE':'relative-herdr.exe','PATH':f"{tools}{os.pathsep}{os.environ['PATH']}"}
+    for name in ('CCB_NATIVE_TOKEN_FILE','CCB_NATIVE_STATE_ROOT'):env.pop(name,None)
+    def typed(line):
+        return subprocess.run(['pwsh','-NoProfile','-Command',line],cwd=project,env=env,text=True,capture_output=True,encoding='utf-8',timeout=30)
+    bare,explicit=typed('ccb'),typed('ccb herdr open --no-attach')
     assert bare.returncode!=0 and explicit.returncode!=0
     assert 'CCB_HERDR_EXE must name an existing absolute executable' in bare.stderr
     assert bare.stderr==explicit.stderr

@@ -163,6 +163,13 @@ impl Interrupt {
         })
     }
 }
+/// The prompt never reached Pi: CCB withdrew it before the bridge claimed it.
+fn unsent_decision(status: &str, reason: &str) -> Value {
+    json!({"schema_version":2,"record_type":"completion_decision","terminal":true,"status":status,"reason":reason,
+        "confidence":"exact","anchor_seen":false,"reply_started":false,"reply_stable":false,"reply":"","provider_turn_ref":null,
+        "source_cursor":null,"finished_at":crate::daemon::now(),
+        "diagnostics":{"completion_authority":"pi_inbox_withdrawn","provider_prompt_sent":false}})
+}
 impl Drop for Worker {
     fn drop(&mut self) {
         self.alive.store(false, Ordering::Release);
@@ -377,6 +384,8 @@ fn run(
     let anchor = format!("{task}:{execution}");
     let provider = crate::records::string(spec, "provider")?;
     let input = format!("CCB_REQ_ID: {anchor}\n{prompt}");
+    // A decision known before observation: the prompt provably never reached Pi.
+    let mut unsent: Option<Value> = None;
     let proof = if saved.is_null() {
         // Fail before granting input if native argv could exceed Windows limits.
         ensure!(
@@ -486,6 +495,7 @@ fn run(
                 &anchor,
                 &input,
                 alive,
+                &interrupt.requested,
                 waiting + Duration::from_secs_f64(spec["timeout_s"].as_f64().unwrap_or(3600.0)),
             )?,
             None => crate::pi_terminal::Inbox::Unsupported,
@@ -493,6 +503,9 @@ fn run(
         match inbox {
             crate::pi_terminal::Inbox::Claimed => {}
             crate::pi_terminal::Inbox::Withdrawn => return Ok(()),
+            crate::pi_terminal::Inbox::Cancelled => {
+                unsent = Some(unsent_decision("cancelled", "pi_inbox_cancelled_before_claim"));
+            }
             crate::pi_terminal::Inbox::Unsupported => {
                 // ACK failure is ambiguous: preserve the permit and observe; never replay.
                 let _ = herdr_agents::rpc(
@@ -518,9 +531,10 @@ fn run(
                 && saved["history_binding"] == json!(binding),
             "invalid durable Herdr dispatch proof"
         );
-        if provider == "pi" {
-            // A request the previous worker left unclaimed must never reach Pi later.
-            crate::pi_terminal::withdraw_pending(binding, execution)?;
+        // A request the previous worker left unclaimed must never reach Pi later;
+        // when it provably never did, settle without waiting for its turn.
+        if provider == "pi" && crate::pi_terminal::withdraw_pending(binding, execution)? {
+            unsent = Some(unsent_decision("incomplete", "pi_inbox_withdrawn_unsent"));
         }
         saved.clone()
     };
@@ -551,6 +565,11 @@ fn run(
     let started = Instant::now();
     let timeout = spec["timeout_s"].as_f64().unwrap_or(3600.0);
     let mut completed = false;
+    if let Some(mut decision) = unsent {
+        decision["diagnostics"]["native_execution_instance"] = json!(execution);
+        events.send(Event::Completed(decision))?;
+        completed = true;
+    }
     let mut next_live_observation = Instant::now();
     let mut metrics = PollMetrics::default();
     while alive.load(Ordering::Acquire) {

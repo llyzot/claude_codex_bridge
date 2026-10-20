@@ -268,15 +268,38 @@ def test_pi_without_send_api_falls_back_to_typed_prompt(terminal):
     r['command'](action='prompt',prompt=sent['body'],reply='typed fallback');r['idle']()
     assert await_watch(s,receipt['job_id'],lambda row:row['terminal'])['reply']=='typed fallback'
 
-def test_busy_pi_waits_and_restart_withdraws_the_unclaimed_request(terminal):
-    r=terminal;r['command'](action='busy',busy=True);s=r['start']();r['submit'](s)
+def lead_job(s,job_id):
+    rows=s.rpc('records.latest',dict(stream='jobs',identity='job_id',agent_name='lead'),version=1)['result']
+    return next(r for r in rows if r['job_id']==job_id)
+
+def test_cancel_while_busy_pi_has_not_taken_the_request_withdraws_it(terminal):
+    r=terminal;r['command'](action='busy',busy=True);s=r['start']();receipt=r['submit'](s)
     pending=wait_for(lambda:list(inbox(r).glob('*.request.json')) or None)
-    time.sleep(.6);assert pending[0].exists() and not r['prompts']()
-    s.expected_exit=True;s.proc.kill();s.proc.wait(timeout=5)
-    r['start']()
-    wait_for(lambda:not pending[0].exists() or None)
+    assert s.rpc('cancel',{'job_id':receipt['job_id']})['status']=='cancellation_requested'
+    row=await_watch(s,receipt['job_id'],lambda row:row['terminal'])
+    assert row['status']=='cancelled' and not pending[0].exists()
+    decision=lead_job(s,receipt['job_id'])['terminal_decision']
+    assert decision['diagnostics']['provider_prompt_sent'] is False
     r['command'](action='busy',busy=False);time.sleep(.8)
     assert not r['prompts']() and mutate_count(r['backend'],['agent','prompt'])==0
+
+@pytest.mark.parametrize('stop',['kill','graceful'])
+def test_daemon_restart_settles_a_withdrawn_request_without_waiting(terminal,stop):
+    r=terminal;r['command'](action='busy',busy=True);s=r['start']();receipt=r['submit'](s)
+    pending=wait_for(lambda:list(inbox(r).glob('*.request.json')) or None)
+    time.sleep(.6);assert pending[0].exists() and not r['prompts']()
+    if stop=='kill':s.expected_exit=True;s.proc.kill();s.proc.wait(timeout=5)
+    else:s.close()
+    resumed=r['start']()
+    row=await_watch(resumed,receipt['job_id'],lambda row:row['terminal'],timeout=10)
+    assert row['status']=='incomplete' and not pending[0].exists()
+    assert lead_job(resumed,receipt['job_id'])['terminal_decision']['diagnostics']['provider_prompt_sent'] is False
+    r['command'](action='busy',busy=False);time.sleep(.8)
+    assert not r['prompts']() and mutate_count(r['backend'],['agent','prompt'])==0
+    # The withdrawn prompt is not a provider fault: Pi takes the next task.
+    second=r['submit'](resumed);sent=prompt(r)
+    r['command'](action='prompt',prompt=sent['body'],reply='after restart');r['idle']()
+    assert await_watch(resumed,second['job_id'],lambda row:row['terminal'])['reply']=='after restart'
 
 def test_bridge_rejects_a_request_whose_anchor_does_not_match(terminal):
     r=terminal;instance=bridge_state(r)['bridge']['instance']
@@ -285,3 +308,26 @@ def test_bridge_rejects_a_request_whose_anchor_does_not_match(terminal):
     rejected=request.with_name(request.name.replace('.request.json','.rejected.json'))
     wait_for(lambda:rejected.exists() or None)
     assert not request.exists() and not r['prompts']()
+
+def test_withdrawn_result_delivery_is_requeued_once_without_a_provider_fault(terminal):
+    r=terminal;s=r['start']();root=r['project']/'.ccb/ccbd/daemon'
+    asked=subprocess.run([str(BIN),'--state-root',str(root),'ask','--from','lead','worker','plain worker task'],text=True,capture_output=True,encoding='utf-8',timeout=30)
+    assert asked.returncode==0,asked.stderr
+    worker=prompt(r);assert worker['name']==r['rows']['worker']['herdr_name']
+    r['command'](action='busy',busy=True)
+    with r['codex_log'].open('a',encoding='utf-8') as out:
+        for payload in [dict(type='task_started',turn_id='worker-turn'),dict(type='user_message',message=worker['body']),dict(type='task_complete',turn_id='worker-turn',last_agent_message='worker plain result')]:
+            out.write(json.dumps(dict(type='event_msg',payload=payload))+'\n')
+    r['idle']('worker')
+    pending=wait_for(lambda:list(inbox(r).glob('*.request.json')) or None)
+    s.expected_exit=True;s.proc.kill();s.proc.wait(timeout=5)
+    resumed=r['start']()
+    wait_for(lambda:not pending[0].exists() or None)
+    assert not (resumed.root/'providers/pi/lead/fault.json').exists()
+    r['command'](action='busy',busy=False)
+    delivered=prompt(r,2);assert 'CCB_REPLY from=worker' in delivered['body'] and 'worker plain result' in delivered['body']
+    assert delivered['name']=='pi-extension'
+    r['command'](action='prompt',prompt=delivered['body'],reply='noted');r['idle']()
+    wait_for(lambda:any(row['status']=='completed' and row['request']['message_type']=='reply_delivery'
+        for row in resumed.rpc('records.latest',dict(stream='jobs',identity='job_id',agent_name='lead'),version=1)['result']) or None)
+    time.sleep(.5);assert sum('CCB_REPLY from=worker' in p['body'] for p in r['prompts']())==1

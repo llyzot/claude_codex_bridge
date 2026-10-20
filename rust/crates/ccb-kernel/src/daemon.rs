@@ -1847,7 +1847,13 @@ impl Daemon {
                 )?;
             } else {
                 self.kernel.dispatch("rewrite_head",&json!({"agent_name":agent,"inbound_event_id":event,"payload_ref":format!("reply:{}",current["provider_options"]["reply_delivery_reply_id"].as_str().unwrap_or("")),"status":"queued","timestamp":timestamp,"clear_progress":true}))?;
-                if !self.faults.contains_key(agent)
+                // A Pi delivery withdrawn before its bridge claimed it provably
+                // never reached Pi: requeue it for redelivery without a hold.
+                let unsent = terminal["terminal_decision"]["diagnostics"]["completion_authority"]
+                    == "pi_inbox_withdrawn"
+                    && terminal["terminal_decision"]["diagnostics"]["provider_prompt_sent"] == false;
+                if !unsent
+                    && !self.faults.contains_key(agent)
                     && (current["provider_options"]["native_daemon_instance"] == self.state
                         || spec["driver_kind"] == "herdr_tui")
                     && ["pi_rpc", "codex_app_server", "claude_stream", "herdr_tui"]

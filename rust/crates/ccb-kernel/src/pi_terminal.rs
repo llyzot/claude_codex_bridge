@@ -102,6 +102,8 @@ pub(crate) enum Inbox {
     Claimed,
     /// The worker stopped before the bridge claimed it; nothing reached Pi.
     Withdrawn,
+    /// Cancellation arrived before the bridge claimed it; nothing reached Pi.
+    Cancelled,
     /// The running bridge has no inbox (an older generation); type instead.
     Unsupported,
 }
@@ -120,15 +122,14 @@ fn inbox_name(producer: &Value, execution: &str) -> Result<String> {
 }
 
 /// Withdraws an unclaimed request. Returns whether the bridge had already
-/// claimed it; the rename makes withdrawal and claim mutually exclusive.
+/// claimed it; the rename makes withdrawal and claim mutually exclusive. The
+/// `.withdrawn.json` file stays as durable proof that the prompt never reached
+/// Pi, so a worker restarted later can settle the execution without waiting.
 fn withdraw(dir: &Path, name: &str) -> Result<bool> {
     let request = dir.join(format!("{name}.request.json"));
     let withdrawn = dir.join(format!("{name}.withdrawn.json"));
     match std::fs::rename(&request, &withdrawn) {
-        Ok(()) => {
-            let _ = std::fs::remove_file(&withdrawn);
-            Ok(false)
-        }
+        Ok(()) => Ok(false),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             let claimed = dir.join(format!("{name}.claimed.json"));
             Ok(claimed.exists() && std::fs::remove_file(&claimed).is_ok())
@@ -137,21 +138,42 @@ fn withdraw(dir: &Path, name: &str) -> Result<bool> {
     }
 }
 
-/// Removes a request left by an earlier worker for this execution, so a later
-/// bridge can never deliver it after a daemon restart.
-pub(crate) fn withdraw_pending(binding: &Binding, execution: &str) -> Result<()> {
+/// Withdraws a request an earlier worker left for this execution, so a later
+/// bridge can never deliver it after a daemon restart. Returns true only when
+/// the prompt provably never reached Pi: the request was withdrawn now or
+/// earlier and no bridge claimed it.
+pub(crate) fn withdraw_pending(binding: &Binding, execution: &str) -> Result<bool> {
     let dir = inbox_dir(binding)?;
     if !dir.is_dir() || uuid::Uuid::parse_str(execution).is_err() {
-        return Ok(());
+        return Ok(false);
     }
-    let suffix = format!(".{execution}.request.json");
+    let mut unsent = false;
+    let mut claimed = false;
     for entry in std::fs::read_dir(&dir)? {
         let name = entry?.file_name().to_string_lossy().into_owned();
-        if let Some(stem) = name.strip_suffix(".request.json").filter(|_| name.ends_with(&suffix)) {
-            withdraw(&dir, stem)?;
+        let Some((stem, kind)) = name.strip_suffix(".json").and_then(|n| n.rsplit_once('.')) else {
+            continue;
+        };
+        if stem.split_once('.').map(|(_, e)| e) != Some(execution) {
+            continue;
+        }
+        match kind {
+            "request" => {
+                if withdraw(&dir, stem)? {
+                    claimed = true;
+                } else {
+                    unsent = true;
+                }
+            }
+            "withdrawn" => unsent = true,
+            "claimed" => {
+                claimed = true;
+                let _ = std::fs::remove_file(dir.join(&name));
+            }
+            _ => {}
         }
     }
-    Ok(())
+    Ok(unsent && !claimed)
 }
 
 /// Hands a prompt to the Pi bridge, which submits it as its own user message
@@ -168,6 +190,7 @@ pub(crate) fn deliver(
     anchor: &str,
     input: &str,
     alive: &std::sync::atomic::AtomicBool,
+    cancel: &std::sync::atomic::AtomicBool,
     deadline: std::time::Instant,
 ) -> Result<Inbox> {
     use std::sync::atomic::Ordering;
@@ -201,18 +224,24 @@ pub(crate) fn deliver(
             anyhow::bail!("Pi bridge rejected the CCB request");
         }
         let stopping = !alive.load(Ordering::Acquire);
+        let cancelled = cancel.load(Ordering::Acquire);
         let expired = Instant::now() >= deadline;
         let changed = Instant::now() >= next_check && {
             next_check = Instant::now() + Duration::from_millis(500);
             resolve(binding, owner, agent).map_or(true, |(_, current)| current != *producer)
         };
-        if stopping || expired || changed {
+        if stopping || cancelled || expired || changed {
             if withdraw(&dir, &name)? {
                 return Ok(Inbox::Claimed);
             }
+            if stopping {
+                return Ok(Inbox::Withdrawn);
+            }
+            if cancelled {
+                return Ok(Inbox::Cancelled);
+            }
             ensure!(!changed, "Pi bridge reloaded before prompt dispatch");
-            ensure!(!expired, "Pi did not take the CCB request before the deadline");
-            return Ok(Inbox::Withdrawn);
+            anyhow::bail!("Pi did not take the CCB request before the deadline");
         }
         std::thread::sleep(Duration::from_millis(50));
     }

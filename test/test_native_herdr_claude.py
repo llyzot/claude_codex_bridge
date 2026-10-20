@@ -198,6 +198,19 @@ def test_claude_background_task_notification_does_not_fault_the_turn(runtime):
     assert result['status']=='completed' and result['reply']=='submitted\n\naccepted by codex'
     assert not (s.root/'providers/claude/worker/fault.json').exists() and len(r['prompts']())==1
 
+def test_claude_auto_compaction_mid_turn_still_completes(runtime):
+    r=runtime;s=r['start']();task=r['submit'](s);prompt=wait_for(lambda:r['prompts']())[-1]
+    ident=str(uuid.uuid4())
+    boundary=r['row']('system',ident+'-boundary');boundary.update(subtype='compact_boundary',logicalParentUuid=ident+'-elsewhere');boundary.pop('message')
+    summary=r['row']('user',ident+'-summary',ident+'-boundary',content='This session is being continued from a previous conversation.')
+    summary.update(isCompactSummary=True,isVisibleInTranscriptOnly=True,summarizedTurnPromptUuids=[ident])
+    r['append'](r['row']('user',ident,content=prompt['body']),r['row']('assistant',ident+'-work',ident,[{'type':'text','text':'checking'}],'tool_use'),
+                boundary,summary,r['row']('assistant',ident+'-final',ident+'-summary',[{'type':'text','text':'done after compaction'}],'end_turn'))
+    r['idle']()
+    result=await_watch(s,task['job_id'],lambda v:v['terminal'],timeout=15)
+    assert result['status']=='completed' and result['reply']=='done after compaction'
+    assert not (s.root/'providers/claude/worker/fault.json').exists() and len(r['prompts']())==1
+
 @pytest.mark.parametrize('bound',[False,True])
 def test_public_open_mounts_original_claude_and_reconnects_without_relaunch(setup,bound):
     from test_native_herdr_open import cli

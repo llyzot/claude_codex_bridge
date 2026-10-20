@@ -271,8 +271,12 @@ impl Reader {
         // like a tool result and is never a new request.
         let notification = row["origin"]["kind"] == "task-notification"
             || row["turnOrigin"] == "task_notification";
+        // Auto-compaction mid-turn writes its summary as a user row; it carries
+        // the turn on and is never a new request.
+        let summary = row["isCompactSummary"] == true;
         let user = kind == "user"
             && !notification
+            && !summary
             && row["isMeta"] != true
             && row["toolUseResult"].is_null()
             && !row["message"]["content"]
@@ -339,11 +343,28 @@ impl Reader {
             ensure!(*prior == fingerprint(row), "Claude record UUID reused");
             return Ok(());
         }
+        if kind == "system" && row["subtype"] == "compact_boundary" {
+            // Compaction restarts the parent chain at a boundary with no parent
+            // while the current turn keeps running; follow the new chain.
+            ensure!(self.seen.len() < 4096, "Claude turn record limit exceeded");
+            self.seen.insert(id.into(), fingerprint(row));
+            self.terminal = None;
+            self.last_assistant.clear();
+            return Ok(());
+        }
         let Some(parent) = row["parentUuid"].as_str() else {
             return Ok(());
         };
         if !self.seen.contains_key(parent) {
             return Ok(());
+        }
+        if summary {
+            if let Some(turns) = row["summarizedTurnPromptUuids"].as_array() {
+                ensure!(
+                    self.anchor.as_ref().is_some_and(|a| turns.iter().any(|t| t == a.as_str())),
+                    "Claude compaction summarized another turn"
+                );
+            }
         }
         ensure!(self.seen.len() < 4096, "Claude turn record limit exceeded");
         self.seen.insert(id.into(), fingerprint(row));
@@ -630,6 +651,62 @@ mod tests {
                 Some("second"),
                 json!({"role":"user","content":"unrelated input"}),
             )],
+        );
+        assert!(r.poll().is_err());
+    }
+    #[test]
+    fn auto_compaction_mid_turn_continues_the_same_turn() {
+        let boundary = |b: &Binding, id: &str| {
+            let mut row = row(b, "system", id, None, Value::Null);
+            row["subtype"] = json!("compact_boundary");
+            row["logicalParentUuid"] = json!("elsewhere");
+            row
+        };
+        let summary = |b: &Binding, id: &str, parent: &str, turns: Value| {
+            let mut row = row(
+                b,
+                "user",
+                id,
+                Some(parent),
+                json!({"role":"user","content":"This session is being continued from a previous conversation."}),
+            );
+            row["isCompactSummary"] = json!(true);
+            row["isVisibleInTranscriptOnly"] = json!(true);
+            row["summarizedTurnPromptUuids"] = turns;
+            row
+        };
+        let attachment = |b: &Binding, id: &str, parent: &str| row(b, "attachment", id, Some(parent), Value::Null);
+        let (_d, b) = setup();
+        let mut r = reader(&b);
+        append(
+            &b,
+            &[
+                user(&b),
+                assistant(&b, "working", "request", json!("tool_use"), "checking"),
+                boundary(&b, "boundary"),
+                attachment(&b, "context", "boundary"),
+                summary(&b, "summary", "context", json!(["request"])),
+                attachment(&b, "restored", "summary"),
+            ],
+        );
+        assert!(r.poll().unwrap().is_none());
+        append(
+            &b,
+            &[assistant(&b, "final", "restored", json!("end_turn"), "done after compaction")],
+        );
+        let decision = r.poll().unwrap().unwrap();
+        assert_eq!(decision["status"], "completed");
+        assert_eq!(decision["reply"], "done after compaction");
+        // A summary of other turns does not adopt this request.
+        let (_d, b) = setup();
+        let mut r = reader(&b);
+        append(
+            &b,
+            &[
+                user(&b),
+                boundary(&b, "boundary"),
+                summary(&b, "summary", "boundary", json!(["someone-else"])),
+            ],
         );
         assert!(r.poll().is_err());
     }

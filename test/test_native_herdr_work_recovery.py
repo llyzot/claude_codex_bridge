@@ -297,3 +297,53 @@ def test_deferred_recovery_refuses_unknown_or_ambiguous_session_without_launch(p
     finally:
         if pi.poll() is None:pi.kill()
         pi.wait(timeout=5)
+
+
+def test_reopen_settles_a_delivery_merged_with_a_draft_from_the_native_session(project):
+    # The typed result was merged with an unsent draft, so the bridge could not
+    # attribute the turn and the delivery stayed running when Pi was closed.
+    p = project
+    original = json.loads(p['pi'].args[2])
+    history = Path(original['native_session_path'])
+    history.write_text(json.dumps({'type':'session', 'id':original['session_id'], 'cwd':str(p['root'])})+'\n', encoding='utf-8')
+    assert p['open']().returncode == 0
+    wait_for(p['ready'], timeout=30)
+    asked = cli('--state-root', p['native'], 'ask', '--from', 'lead', 'worker', 'plain worker task')
+    assert asked.returncode == 0, asked.stderr
+    worker = wait_for(lambda:p['prompts']())[-1]
+    finish_worker(p, worker['body'], 'worker plain result', 'plain-turn'); p['idle']('worker')
+    delivery = wait_for(lambda:next((r for r in p['prompts']() if 'CCB_REPLY from=worker' in r['body']), None), timeout=20)
+    merged = 'unsent draft ' + delivery['body']
+    p['command'](action='prompt', prompt=merged, reply='read it'); p['idle']('lead')
+    with history.open('a', encoding='utf-8') as out:
+        out.write(json.dumps({'type':'message', 'message':{'role':'user', 'content':[{'type':'text', 'text':merged}]}})+'\n')
+    rows = lambda: [json.loads(line) for line in (p['root']/'.ccb/agents/lead/jobs.jsonl').read_text(encoding='utf-8').splitlines()]
+    delivery_id = next(r['job_id'] for r in rows() if r['request']['message_type'] == 'reply_delivery')
+    assert job(p, 'lead', delivery_id)['status'] == 'running'
+    retired = cli('--state-root', p['native'], 'kill', timeout=25)
+    assert retired.returncode == 0, retired.stderr
+    for proc in [p['pi'], p['codex']]:
+        proc.kill(); proc.wait(timeout=5)
+    gate = p['root']/'resume-ready'
+    original['start_gate'] = str(gate)
+    pi = subprocess.Popen([NODE, str(HOST), json.dumps(original)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, text=True, encoding='utf-8', creationflags=0x08000000)
+    codex = subprocess.Popen([sys.executable, '-I', '-c', 'import time;time.sleep(180)'], creationflags=0x08000000)
+    try:
+        change(p['backend'], lambda s:s.update(provider_pids=[pi.pid, codex.pid]))
+        assert p['open'](0).returncode == 0
+        wait_for(lambda:(p['native']/'herdr/herdr-recovery.json').exists() and
+                 read(p['native']/'herdr/herdr-recovery.json')['phase'] == 'reset', timeout=20)
+        gate.touch()
+        assert json.loads(pi.stdout.readline())['ready']
+        result = p['open']()
+        assert result.returncode == 0, result.stderr
+        wait_for(p['ready'], timeout=20)
+        settled = job(p, 'lead', delivery_id)
+        assert settled['status'] == 'completed'
+        assert settled['terminal_decision']['reason'] == 'reply_delivery_anchor_submitted'
+        assert sum('CCB_REPLY from=worker' in r['body'] for r in p['prompts']()) == 1
+    finally:
+        for proc in [pi, codex]:
+            if proc.poll() is None:proc.kill()
+            proc.wait(timeout=5)

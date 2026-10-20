@@ -265,7 +265,7 @@ impl Daemon {
                     records::string(job, "provider")?,
                     resolved,
                     baseline,
-                    anchor,
+                    anchor.clone(),
                 )?;
                 let candidate = reader.poll_stopped()?;
                 if job["provider"] == "claude" {
@@ -278,6 +278,26 @@ impl Daemon {
                     )?;
                 } else {
                     decision = candidate;
+                }
+            }
+        }
+        let delivery = job["request"]["message_type"] == "reply_delivery"
+            || job["provider_options"]["reply_delivery"] == true;
+        if delivery
+            && !permit.is_null()
+            && decision.as_ref().is_none_or(|d| d["status"] != "completed")
+        {
+            // A delivery prompt merged with a person's unsent draft no longer
+            // starts with its anchor, so its turn is unattributable. The exact
+            // execution anchor inside a submitted user message still proves
+            // the result reached the agent, so it is settled, not redelivered.
+            if let Some(path) = native_session(job, &permit) {
+                if anchor_submitted(&path, records::string(job, "provider")?, &anchor)? {
+                    decision = Some(json!({"schema_version":2,"record_type":"completion_decision",
+                        "terminal":true,"status":"completed","reason":"reply_delivery_anchor_submitted","confidence":"exact",
+                        "reply":"","anchor_seen":true,"reply_started":false,"reply_stable":true,"provider_turn_ref":null,
+                        "source_cursor":null,"finished_at":now(),
+                        "diagnostics":{"completion_authority":"native_session_anchor_scan","provider_prompt_sent":true}}));
                 }
             }
         }
@@ -303,5 +323,104 @@ impl Daemon {
         ensure!((job["request"]["message_type"]!="reply_delivery" && job["provider_options"]["reply_delivery"] != true) || decision["status"]=="completed",
             "uncertain reply delivery requires explicit recovery; it cannot be redelivered automatically");
         Ok(decision)
+    }
+}
+
+/// The provider's own session file that received a permitted prompt.
+fn native_session(job: &Value, permit: &Value) -> Option<std::path::PathBuf> {
+    let path = if job["provider"] == "pi" {
+        &permit["baseline"]["producer"]["session_path"]
+    } else if permit["resolved_history_binding"].is_object() {
+        &permit["resolved_history_binding"]["path"]
+    } else {
+        &permit["history_binding"]["path"]
+    };
+    path.as_str()
+        .map(std::path::PathBuf::from)
+        .filter(|p| p.is_absolute())
+}
+
+/// Whether a user message in the provider's session contains this exact
+/// execution anchor. The anchor (`job:execution`) is unique per prompt.
+fn anchor_submitted(path: &std::path::Path, provider: &str, anchor: &str) -> Result<bool> {
+    use std::io::BufRead;
+    let needle = format!("CCB_REQ_ID: {anchor}");
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.into()),
+    };
+    for line in std::io::BufReader::new(file).lines() {
+        let line = line?;
+        if !line.contains(anchor) {
+            continue;
+        }
+        let Ok(row) = serde_json::from_str::<Value>(&line) else {
+            continue;
+        };
+        let message = &row["message"];
+        let user = match provider {
+            "pi" => row["type"] == "message" && message["role"] == "user",
+            _ => row["type"] == "user" && row["isSidechain"] != true && row["isMeta"] != true,
+        };
+        if !user {
+            continue;
+        }
+        let text = match &message["content"] {
+            Value::String(text) => text.clone(),
+            Value::Array(parts) => parts
+                .iter()
+                .filter_map(|p| p["text"].as_str())
+                .collect::<Vec<_>>()
+                .join("
+"),
+            _ => String::new(),
+        };
+        if text.contains(&needle) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn session(rows: &[Value]) -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("session.jsonl");
+        let text: String = rows.iter().map(|r| format!("{r}\n")).collect();
+        std::fs::write(&path, format!("not json job_1:exec\n{text}")).unwrap();
+        (dir, path)
+    }
+    #[test]
+    fn a_submitted_anchor_proves_a_merged_delivery() {
+        let anchor = "job_1:11111111-1111-4111-8111-111111111111";
+        let merged = format!("unsent draftCCB_REQ_ID: {anchor}\nCCB_REPLY from=codex");
+        let (_d, pi) = session(&[
+            json!({"type":"message","message":{"role":"assistant","content":[{"type":"text","text":format!("CCB_REQ_ID: {anchor}")}]}}),
+            json!({"type":"message","message":{"role":"user","content":[{"type":"text","text":merged}]}}),
+        ]);
+        assert!(anchor_submitted(&pi, "pi", anchor).unwrap());
+        let (_d, claude) = session(&[
+            json!({"type":"user","isSidechain":false,"message":{"role":"user","content":format!("<pasted_content id=\"1\">\nCCB_REQ_ID: {anchor}\ntask")}}),
+        ]);
+        assert!(anchor_submitted(&claude, "claude", anchor).unwrap());
+    }
+    #[test]
+    fn other_roles_executions_and_missing_files_prove_nothing() {
+        let anchor = "job_1:11111111-1111-4111-8111-111111111111";
+        let (_d, pi) = session(&[
+            json!({"type":"message","message":{"role":"assistant","content":[{"type":"text","text":format!("CCB_REQ_ID: {anchor}")}]}}),
+            json!({"type":"message","message":{"role":"user","content":"CCB_REQ_ID: job_1:22222222-2222-4222-8222-222222222222"}}),
+        ]);
+        assert!(!anchor_submitted(&pi, "pi", anchor).unwrap());
+        let (_d, claude) = session(&[
+            json!({"type":"user","isSidechain":true,"message":{"role":"user","content":format!("CCB_REQ_ID: {anchor}")}}),
+            json!({"type":"user","isMeta":true,"message":{"role":"user","content":format!("CCB_REQ_ID: {anchor}")}}),
+        ]);
+        assert!(!anchor_submitted(&claude, "claude", anchor).unwrap());
+        let dir = tempfile::tempdir().unwrap();
+        assert!(!anchor_submitted(&dir.path().join("absent.jsonl"), "pi", anchor).unwrap());
     }
 }
